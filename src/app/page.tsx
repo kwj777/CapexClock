@@ -1,7 +1,6 @@
-import Link from "next/link";
 import ForecastMockup from "@/components/ForecastMockup";
 import SignupForm from "@/components/SignupForm";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 
 const PROBLEMS = [
@@ -70,18 +69,7 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
 
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-        <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <ClockMark />
-          CapexClock
-        </Link>
-        <a
-          href="#signup"
-          className="text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-        >
-          Early access
-        </a>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1">
         {/* Hero */}
@@ -171,23 +159,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 dark:border-slate-800">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:px-6">
-          <p>© {new Date().getFullYear()} CapexClock</p>
-          <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900 dark:hover:text-white">
-            {CONTACT_EMAIL}
-          </a>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
-  );
-}
-
-function ClockMark() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="#f59e0b" />
-      <path d="M12 6.5V12l3.5 2" stroke="#0f172a" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-    </svg>
   );
 }
