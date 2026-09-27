@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import ExportButtons from "@/components/export/ExportButtons";
 import { computeForecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import {
@@ -92,6 +93,8 @@ export interface CalculatorViewProps {
   /** Extra controls shown above the property fields, e.g. a property name. */
   header?: ReactNode;
   footer?: ReactNode;
+  /** Title for exported files. */
+  exportName?: string;
 }
 
 export function CalculatorView({
@@ -101,6 +104,7 @@ export function CalculatorView({
   showExample = false,
   header,
   footer,
+  exportName = "My property",
 }: CalculatorViewProps) {
   const [startYear] = useState(() => new Date().getFullYear());
   const tracked = useRef({ started: !trackEvents || draft.rows.length > 0, generated: !trackEvents });
@@ -324,6 +328,13 @@ export function CalculatorView({
             <AtRisk forecast={forecast} />
             <DueTable forecast={forecast} />
           </div>
+
+          <ExportButtons
+            name={exportName}
+            unitCount={unitCount}
+            forecast={forecast}
+            components={components}
+          />
         </section>
       )}
       {footer}
