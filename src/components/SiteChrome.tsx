@@ -35,6 +35,17 @@ export function SiteFooter() {
     <footer className="border-t border-slate-200 dark:border-slate-800">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:px-6">
         <p>© {new Date().getFullYear()} CapexClock</p>
+        <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Tools">
+          <Link href="/capex-calculator" className="hover:text-slate-900 dark:hover:text-white">
+            CapEx calculator
+          </Link>
+          <Link href="/reserve-calculator" className="hover:text-slate-900 dark:hover:text-white">
+            Reserve calculator
+          </Link>
+          <Link href="/lifespan" className="hover:text-slate-900 dark:hover:text-white">
+            Component lifespans
+          </Link>
+        </nav>
         <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900 dark:hover:text-white">
           {CONTACT_EMAIL}
         </a>
