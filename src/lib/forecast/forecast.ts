@@ -10,6 +10,11 @@ import type {
 export const DEFAULT_WINDOW_YEARS = 10;
 /** A component is "at risk" when it is this many years or fewer from end of life. */
 export const AT_RISK_YEARS = 2;
+/**
+ * The reserve looks this far ahead, past the displayed window, so a big item due
+ * just after year 10 is still saved for instead of dropping out of the number.
+ */
+export const RESERVE_HORIZON_YEARS = 30;
 
 export function endOfLifeYear(component: ForecastComponent): number {
   return component.installYear + component.usefulLifeYears;
@@ -95,29 +100,16 @@ export function atRiskItems(
     .sort((a, b) => a.yearsRemaining - b.yearsRemaining || a.name.localeCompare(b.name));
 }
 
-export function computeForecast(input: ForecastInput): Forecast {
-  const windowYears = input.years ?? DEFAULT_WINDOW_YEARS;
-  if (!Number.isInteger(windowYears) || windowYears < 1) {
-    throw new RangeError("Forecast window must be a whole number of years, at least 1.");
-  }
-  if (!Number.isInteger(input.startYear)) {
-    throw new RangeError("Start year must be a whole year.");
-  }
-  if (!Number.isFinite(input.unitCount) || input.unitCount < 0) {
-    throw new RangeError("Unit count can't be negative.");
-  }
-
-  const startYear = input.startYear;
-  const endYear = startYear + windowYears - 1;
-
-  const years: ForecastYear[] = Array.from({ length: windowYears }, (_, i) => ({
+function buildYears(components: ForecastComponent[], startYear: number, count: number): ForecastYear[] {
+  const endYear = startYear + count - 1;
+  const years: ForecastYear[] = Array.from({ length: count }, (_, i) => ({
     year: startYear + i,
     total: 0,
     byCategory: {},
     replacements: [],
   }));
 
-  for (const component of input.components) {
+  for (const component of components) {
     const cost = replacementCost(component);
     const overdue = endOfLifeYear(component) < startYear;
     for (const year of replacementYears(component, startYear, endYear)) {
@@ -136,15 +128,53 @@ export function computeForecast(input: ForecastInput): Forecast {
         (bucket.byCategory[component.category] ?? 0) + cost;
     }
   }
+  return years;
+}
 
+/**
+ * The smallest level monthly deposit, starting from nothing today, that has the
+ * cash ready for every replacement after the first year. A bill in year k of the
+ * horizon (k >= 1) has 12k months of deposits behind it. First-year costs aren't
+ * included: there's no time to save for them, so they're reported as needed now.
+ */
+export function levelMonthlyReserve(years: ForecastYear[]): number {
+  let cumulative = 0;
+  let needed = 0;
+  for (let k = 1; k < years.length; k++) {
+    cumulative += years[k].total;
+    needed = Math.max(needed, cumulative / (k * 12));
+  }
+  return needed;
+}
+
+export function computeForecast(input: ForecastInput): Forecast {
+  const windowYears = input.years ?? DEFAULT_WINDOW_YEARS;
+  if (!Number.isInteger(windowYears) || windowYears < 1) {
+    throw new RangeError("Forecast window must be a whole number of years, at least 1.");
+  }
+  if (!Number.isInteger(input.startYear)) {
+    throw new RangeError("Start year must be a whole year.");
+  }
+  if (!Number.isFinite(input.unitCount) || input.unitCount < 0) {
+    throw new RangeError("Unit count can't be negative.");
+  }
+
+  const startYear = input.startYear;
+  const horizon = buildYears(
+    input.components,
+    startYear,
+    Math.max(windowYears, RESERVE_HORIZON_YEARS),
+  );
+  const years = horizon.slice(0, windowYears);
   const total = years.reduce((sum, y) => sum + y.total, 0);
-  const monthlyReserve = total / (windowYears * 12);
+  const monthlyReserve = levelMonthlyReserve(horizon);
 
   return {
     startYear,
-    endYear,
+    endYear: startYear + windowYears - 1,
     years,
     total,
+    neededNow: years[0].total,
     monthlyReserve,
     monthlyReservePerUnit: input.unitCount > 0 ? monthlyReserve / input.unitCount : null,
     atRisk: atRiskItems(input.components, startYear),

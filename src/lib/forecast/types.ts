@@ -61,7 +61,11 @@ export interface Forecast {
   startYear: number;
   endYear: number;
   years: ForecastYear[];
+  /** Sum of every replacement in the window. */
   total: number;
+  /** First-year costs (overdue or due this year): cash needed now, not saved for monthly. */
+  neededNow: number;
+  /** Level monthly deposit that covers every later replacement on time; see levelMonthlyReserve. */
   monthlyReserve: number;
   /** Null when the unit count is zero. */
   monthlyReservePerUnit: number | null;

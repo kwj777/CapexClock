@@ -14,9 +14,11 @@ import {
   EMPTY_DRAFT,
   loadDraft,
   PROBLEM_TEXT,
+  parseUnitCount,
   rowFromLibrary,
   saveDraft,
   toComponents,
+  withUnitCount,
   type Draft,
   type DraftRow,
 } from "./draft";
@@ -45,8 +47,8 @@ export default function Calculator() {
 
   useEffect(() => saveDraft(draft), [draft]);
 
-  const { components, problems } = useMemo(() => toComponents(draft), [draft]);
-  const unitCount = Number(draft.unitCount) || 0;
+  const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
+  const unitCount = parseUnitCount(draft.unitCount);
   const forecast = useMemo(
     () => computeForecast({ startYear, unitCount, components }),
     [startYear, unitCount, components],
@@ -110,7 +112,10 @@ export default function Calculator() {
                 inputMode="numeric"
                 placeholder="e.g. 12"
                 value={draft.unitCount}
-                onChange={(e) => updateDraft({ unitCount: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDraft((d) => withUnitCount(d, value));
+                }}
               />
             </label>
             <label className="block w-36">
@@ -217,7 +222,7 @@ export default function Calculator() {
             Your {forecast.startYear}–{forecast.endYear} forecast
           </h2>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Monthly reserve" value={formatMoney(forecast.monthlyReserve)} emphasis />
             <Stat
               label="Per unit, per month"
@@ -228,8 +233,15 @@ export default function Calculator() {
               }
               emphasis
             />
+            <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
             <Stat label="10-year total" value={formatMoney(forecast.total)} />
           </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            The monthly reserve is the smallest steady amount that has the cash ready for every
+            replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
+            {forecast.startYear} costs (overdue or due this year) are shown separately because
+            there&apos;s no time to save for them.
+          </p>
           {incomplete > 0 && (
             <p className="text-sm text-amber-800 dark:text-amber-300">
               {incomplete} component{incomplete === 1 ? " isn't" : "s aren't"} included yet. See the

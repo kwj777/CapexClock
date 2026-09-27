@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 const FAQ = [
   {
     q: "How is the monthly reserve calculated?",
-    a: "We add up every replacement that falls in the next 10 years, including items that come due more than once, and divide by 120 months. The per-unit figure divides that by your number of units.",
+    a: "It's the smallest steady monthly amount that, starting from zero, has the cash ready for every replacement on time. We look 30 years ahead so a big item due just after the 10-year chart is still saved for. Anything overdue or due this year is shown separately as needed now, since there's no time to save for it. The per-unit figure divides the monthly reserve by your number of units.",
   },
   {
     q: "What if I don't know when something was installed?",

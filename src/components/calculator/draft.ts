@@ -94,14 +94,43 @@ export function customRow(): DraftRow {
   };
 }
 
+/** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
 function parseNumber(value: string): number | null {
   const cleaned = value.replace(/[$,\s]/g, "");
   if (cleaned === "") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  return Number(cleaned);
 }
 
-export type RowProblem = "missing_name" | "missing_install_year" | "missing_cost" | "invalid";
+/** Unit count for the forecast: blank or unreadable counts as zero, never negative. */
+export function parseUnitCount(value: string): number {
+  const n = parseNumber(value);
+  return n !== null && Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Sets the unit count and carries it to per-unit rows still at the old count,
+ * so "12 water heaters" becomes 14 when the building has 14 units.
+ */
+export function withUnitCount(draft: Draft, unitCount: string): Draft {
+  return {
+    ...draft,
+    unitCount,
+    rows: draft.rows.map((r) =>
+      r.unitLabel === "per_unit" && (r.quantity === draft.unitCount || r.quantity === "")
+        ? { ...r, quantity: unitCount }
+        : r,
+    ),
+  };
+}
+
+export const EARLIEST_INSTALL_YEAR = 1900;
+
+export type RowProblem =
+  | "missing_name"
+  | "missing_install_year"
+  | "bad_install_year"
+  | "missing_cost"
+  | "invalid";
 
 export interface ConvertedRows {
   components: ForecastComponent[];
@@ -109,7 +138,7 @@ export interface ConvertedRows {
 }
 
 /** Turns form rows into forecast components; rows that aren't complete are reported, not guessed. */
-export function toComponents(draft: Draft): ConvertedRows {
+export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
   const yearBuilt = parseNumber(draft.yearBuilt);
   const components: ForecastComponent[] = [];
   const problems: Record<string, RowProblem> = {};
@@ -123,6 +152,11 @@ export function toComponents(draft: Draft): ConvertedRows {
     const installYear = explicitYear ?? yearBuilt;
     if (installYear === null) {
       problems[row.id] = "missing_install_year";
+      continue;
+    }
+    // Catches typos like "98" or "2106", which would otherwise read as long overdue or never due.
+    if (!Number.isInteger(installYear) || installYear < EARLIEST_INSTALL_YEAR || installYear > currentYear) {
+      problems[row.id] = "bad_install_year";
       continue;
     }
     const cost = parseNumber(row.costEach);
@@ -154,8 +188,9 @@ export function toComponents(draft: Draft): ConvertedRows {
 export const PROBLEM_TEXT: Record<RowProblem, string> = {
   missing_name: "Name this component.",
   missing_install_year: "Add an install year, or the building's year built.",
+  bad_install_year: `Install year should be a 4-digit year from ${EARLIEST_INSTALL_YEAR} to this year.`,
   missing_cost: "Add a replacement cost to include it.",
-  invalid: "Check quantity (above 0), useful life (1–100 years) and cost.",
+  invalid: "Check quantity (above 0), useful life (1–100 years) and cost (a plain number like 1400).",
 };
 
 /** A small 12-unit example so first-time visitors can see a forecast immediately. */
