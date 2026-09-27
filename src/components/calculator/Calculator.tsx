@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { computeForecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import {
@@ -39,13 +49,61 @@ const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 
-export default function Calculator() {
+/** The public calculator: work is kept in this browser until it's saved to an account. */
+export default function Calculator({ accountsEnabled = false }: { accountsEnabled?: boolean }) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
-  const [startYear] = useState(() => new Date().getFullYear());
-  const tracked = useRef({ started: draft.rows.length > 0, generated: false });
-
   useEffect(() => saveDraft(draft), [draft]);
+
+  return (
+    <CalculatorView
+      draft={draft}
+      setDraft={setDraft}
+      trackEvents
+      showExample
+      footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
+    />
+  );
+}
+
+function SaveToAccount() {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
+      <p className="text-sm text-slate-700 dark:text-slate-200">
+        Save this property to a free account to keep it, add more buildings and see your whole
+        portfolio.
+      </p>
+      <Link
+        href="/app/properties/new?from=calculator"
+        className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+      >
+        Save to my account
+      </Link>
+    </div>
+  );
+}
+
+export interface CalculatorViewProps {
+  draft: Draft;
+  setDraft: Dispatch<SetStateAction<Draft>>;
+  /** Sends calculator_started / forecast_generated (public calculator only). */
+  trackEvents?: boolean;
+  showExample?: boolean;
+  /** Extra controls shown above the property fields, e.g. a property name. */
+  header?: ReactNode;
+  footer?: ReactNode;
+}
+
+export function CalculatorView({
+  draft,
+  setDraft,
+  trackEvents = false,
+  showExample = false,
+  header,
+  footer,
+}: CalculatorViewProps) {
+  const [startYear] = useState(() => new Date().getFullYear());
+  const tracked = useRef({ started: !trackEvents || draft.rows.length > 0, generated: !trackEvents });
 
   const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
   const unitCount = parseUnitCount(draft.unitCount);
@@ -100,6 +158,7 @@ export default function Calculator() {
     <div className="space-y-8">
       {/* Property */}
       <section className={cardClass} aria-labelledby="property-heading">
+        {header}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap gap-4">
             <h2 id="property-heading" className="sr-only">
@@ -130,14 +189,16 @@ export default function Calculator() {
             </label>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={loadExample}
-              className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800"
-            >
-              Load an example
-            </button>
-            {draft.rows.length > 0 && (
+            {showExample && (
+              <button
+                type="button"
+                onClick={loadExample}
+                className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800"
+              >
+                Load an example
+              </button>
+            )}
+            {showExample && draft.rows.length > 0 && (
               <button
                 type="button"
                 onClick={() => setDraft(EMPTY_DRAFT)}
@@ -265,6 +326,7 @@ export default function Calculator() {
           </div>
         </section>
       )}
+      {footer}
     </div>
   );
 }
