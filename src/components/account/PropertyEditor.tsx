@@ -135,7 +135,12 @@ export default function PropertyEditor({
 
   return (
     <div className="space-y-8">
-      <CalculatorView draft={draft} setDraft={updateDraft} header={header} />
+      <CalculatorView
+        draft={draft}
+        setDraft={updateDraft}
+        header={header}
+        exportName={name.trim() || "My property"}
+      />
       {propertyId && (
         <div className="border-t border-slate-200 pt-6 dark:border-slate-800">
           <button

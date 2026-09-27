@@ -5,8 +5,10 @@ import { requireSupabaseEnv } from "./env";
 
 /** Supabase client for Server Components, Server Actions and Route Handlers. */
 export async function createClient() {
-  const { url, key } = requireSupabaseEnv();
+  // Read cookies first: it marks the route as dynamic, so a build without
+  // Supabase settings doesn't try to prerender signed-in pages.
   const cookieStore = await cookies();
+  const { url, key } = requireSupabaseEnv();
   return createServerClient<Database>(url, key, {
     cookies: {
       getAll() {

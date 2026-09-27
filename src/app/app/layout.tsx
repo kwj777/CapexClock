@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import TrackWelcome from "@/components/account/TrackWelcome";
 import { SiteFooter } from "@/components/SiteChrome";
+import { supabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -14,6 +16,8 @@ const navLink =
   "text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
 
 export default async function AppLayout({ children }: LayoutProps<"/app">) {
+  // Accounts aren't set up on this deployment.
+  if (!supabaseEnv()) notFound();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const email = typeof data?.claims.email === "string" ? data.claims.email : null;
