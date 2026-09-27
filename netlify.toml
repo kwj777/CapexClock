@@ -1,8 +1,12 @@
-# Netlify auto-detects Next.js and applies its current OpenNext-based runtime;
-# no plugin entry is needed.
 [build]
   command = "npm run build"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Declared explicitly because Netlify's automatic Next.js detection did not
+# apply the runtime to this project (the site was linked before the repo had
+# any Next.js code). Without it, deploys publish raw .next output and 404.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
