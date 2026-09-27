@@ -93,6 +93,18 @@ export default async function CapexCalculatorPage() {
               .
             </p>
           </section>
+
+          <p className="mt-10 max-w-3xl text-slate-600 dark:text-slate-400">
+            More free tools: the{" "}
+            <Link href="/reserve-calculator" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+              reserve calculator
+            </Link>{" "}
+            for expenses you already know about, and{" "}
+            <Link href="/lifespan" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+              typical lifespans
+            </Link>{" "}
+            for 25 building components.
+          </p>
         </div>
       </main>
       <SiteFooter />

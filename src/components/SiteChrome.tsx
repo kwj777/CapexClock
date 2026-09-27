@@ -5,26 +5,44 @@ import { CONTACT_EMAIL } from "@/lib/site";
 const navLink =
   "whitespace-nowrap text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
 
+const TOOLS = [
+  { href: "/capex-calculator", label: "CapEx calculator", short: "Calculator" },
+  { href: "/reserve-calculator", label: "Reserve calculator", short: "Reserve calculator" },
+  { href: "/lifespan", label: "Lifespans", short: "Lifespans" },
+];
+
 export function SiteHeader() {
-  return (
-    <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-      <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <ClockMark />
-        CapexClock
+  const tools = (short: boolean) =>
+    TOOLS.map((t) => (
+      <Link key={t.href} href={t.href} className={navLink}>
+        {short ? t.short : t.label}
       </Link>
-      <nav className="flex items-center gap-4 sm:gap-5">
-        <Link href="/capex-calculator" className={navLink}>
-          Calculator
+    ));
+  return (
+    <header className="mx-auto w-full max-w-6xl px-4 pb-3 pt-5 sm:px-6 md:pb-5">
+      <div className="flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <ClockMark />
+          CapexClock
         </Link>
-        {/* On small phones the landing page's own signup section covers this. */}
-        <Link href="/#signup" className={`${navLink} hidden sm:inline`}>
-          Early access
-        </Link>
-        {supabaseEnv() && (
-          <Link href="/app" className={navLink}>
-            Sign in
+        <nav aria-label="Free tools" className="hidden items-center gap-5 md:flex">
+          {tools(false)}
+        </nav>
+        <div className="flex items-center gap-4 sm:gap-5">
+          {/* Below lg the landing page's own signup section covers this. */}
+          <Link href="/#signup" className={`${navLink} hidden lg:inline`}>
+            Early access
           </Link>
-        )}
+          {supabaseEnv() && (
+            <Link href="/app" className={navLink}>
+              Sign in
+            </Link>
+          )}
+        </div>
+      </div>
+      {/* Phones and tablets get the tools on their own row so nothing is squeezed. */}
+      <nav aria-label="Free tools" className="mt-3 flex flex-wrap gap-x-4 gap-y-2 md:hidden">
+        {tools(true)}
       </nav>
     </header>
   );
