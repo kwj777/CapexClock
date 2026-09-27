@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { track } from "@/lib/analytics";
+import { CONTACT_EMAIL } from "@/lib/site";
 
 // Field names and options must match public/__forms.html, which is the copy
 // Netlify registers at deploy time.
@@ -17,7 +19,7 @@ const METHOD_OPTIONS = [
 type Status = "idle" | "submitting" | "success" | "error";
 
 const fieldClass =
-  "mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30";
+  "mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 
 export default function SignupForm() {
   const [status, setStatus] = useState<Status>("idle");
@@ -40,6 +42,10 @@ export default function SignupForm() {
       });
       if (!res.ok) throw new Error(`Form submission failed: ${res.status}`);
       setStatus("success");
+      void track("early_access_signup", {
+        units: body.get("units") ?? "",
+        current_method: body.get("current_method") ?? "",
+      });
     } catch {
       setStatus("error");
     }
@@ -49,13 +55,13 @@ export default function SignupForm() {
     return (
       <div
         role="status"
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center"
+        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center dark:border-emerald-900 dark:bg-emerald-950"
       >
-        <p className="text-xl font-semibold text-emerald-900">
+        <p className="text-xl font-semibold text-emerald-900 dark:text-emerald-100">
           You&apos;re on the list.
         </p>
-        <p className="mt-2 text-emerald-800">
-          We&apos;ll email you when early access opens.
+        <p className="mt-2 text-emerald-800 dark:text-emerald-200">
+          We&apos;ll email you when your spot opens.
         </p>
       </div>
     );
@@ -77,7 +83,7 @@ export default function SignupForm() {
       </p>
 
       <div>
-        <label htmlFor="email" className="text-sm font-medium text-slate-700">
+        <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Email
         </label>
         <input
@@ -93,7 +99,7 @@ export default function SignupForm() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label htmlFor="units" className="text-sm font-medium text-slate-700">
+          <label htmlFor="units" className="text-sm font-medium text-slate-700 dark:text-slate-300">
             How many units do you own?
           </label>
           <select id="units" name="units" defaultValue="" className={fieldClass}>
@@ -108,7 +114,7 @@ export default function SignupForm() {
           </select>
         </div>
         <div>
-          <label htmlFor="current_method" className="text-sm font-medium text-slate-700">
+          <label htmlFor="current_method" className="text-sm font-medium text-slate-700 dark:text-slate-300">
             How do you track CapEx today?
           </label>
           <select
@@ -130,9 +136,9 @@ export default function SignupForm() {
       </div>
 
       <div>
-        <label htmlFor="biggest_worry" className="text-sm font-medium text-slate-700">
+        <label htmlFor="biggest_worry" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           What replacement worries you most right now?{" "}
-          <span className="font-normal text-slate-500">(optional)</span>
+          <span className="font-normal text-slate-500 dark:text-slate-400">(optional)</span>
         </label>
         <input
           id="biggest_worry"
@@ -147,14 +153,14 @@ export default function SignupForm() {
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="w-full rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+        className="w-full rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-70"
       >
         {status === "submitting" ? "Signing you up…" : "Get early access"}
       </button>
 
       {status === "error" && (
-        <p role="alert" className="text-sm text-red-700">
-          Something went wrong. Please try again, or email us at hello@capexclock.com.
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+          Something went wrong. Please try again, or email us at {CONTACT_EMAIL}.
         </p>
       )}
     </form>

@@ -37,18 +37,18 @@ export default function ForecastMockup() {
   const y = (v: number) => PAD.top + plotH - (v / MAX) * plotH;
 
   return (
-    <figure className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-6">
+    <figure className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-6 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-slate-500">Maple St. Apartments · 12 units</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">10-year replacement forecast</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Maple St. Apartments · 12 units</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">10-year replacement forecast</p>
         </div>
-        <div className="rounded-lg bg-amber-50 px-3.5 py-2 text-right ring-1 ring-amber-200">
-          <p className="text-xs font-medium uppercase tracking-wide text-amber-800">
+        <div className="rounded-lg bg-amber-50 px-3.5 py-2 text-right ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
+          <p className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-300">
             Recommended reserve
           </p>
-          <p className="text-xl font-semibold text-slate-900">
-            $108<span className="text-sm font-normal text-slate-600"> /unit/mo</span>
+          <p className="text-xl font-semibold text-slate-900 dark:text-white">
+            $108<span className="text-sm font-normal text-slate-600 dark:text-slate-400"> /unit/mo</span>
           </p>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function ForecastMockup() {
               x2={W - PAD.right}
               y1={y(t)}
               y2={y(t)}
-              stroke={t === 0 ? "#cbd5e1" : "#e2e8f0"}
+              className={t === 0 ? "stroke-slate-300 dark:stroke-slate-600" : "stroke-slate-200 dark:stroke-slate-800"}
               strokeWidth={1}
             />
             <text
@@ -75,7 +75,7 @@ export default function ForecastMockup() {
               dy="0.32em"
               textAnchor="end"
               fontSize={11}
-              fill="#64748b"
+              className="fill-slate-500 dark:fill-slate-400"
             >
               ${t}k
             </text>
@@ -102,7 +102,7 @@ export default function ForecastMockup() {
                 y={H - PAD.bottom + 17}
                 textAnchor="middle"
                 fontSize={11}
-                fill="#64748b"
+                className="fill-slate-500 dark:fill-slate-400"
               >
                 {`'${String(d.year).slice(2)}`}
               </text>
@@ -118,21 +118,21 @@ export default function ForecastMockup() {
             textAnchor="middle"
             fontSize={11}
             fontWeight={600}
-            fill="#0f172a"
+            className="fill-slate-900 dark:fill-white"
           >
             Roof, $38k
           </text>
         </g>
       </svg>
 
-      <figcaption className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+      <figcaption className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-400">
         {SERIES.map((s) => (
           <span key={s.key} className="inline-flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
             {s.label}
           </span>
         ))}
-        <span className="ml-auto text-slate-400">Example data</span>
+        <span className="ml-auto text-slate-500">Example data</span>
       </figcaption>
     </figure>
   );

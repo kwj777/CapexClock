@@ -2,7 +2,6 @@
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 html {
@@ -18,4 +17,11 @@ html {
 body {
   background: #ffffff;
   color: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #020617;
+    color: #f1f5f9;
+  }
 }
