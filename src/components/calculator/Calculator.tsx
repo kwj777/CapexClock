@@ -38,11 +38,12 @@ import { formatMoney } from "./format";
 
 const CUSTOM = "__custom__";
 
-const LIBRARY_BY_SLUG = new Map(COMPONENT_LIBRARY.map((c) => [c.slug, c]));
-const LIBRARY_GROUPS = COMPONENT_LIBRARY.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
-  (acc[c.category] ??= []).push(c);
-  return acc;
-}, {});
+function groupByCategory(library: LibraryComponent[]): Record<string, LibraryComponent[]> {
+  return library.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
+    (acc[c.category] ??= []).push(c);
+    return acc;
+  }, {});
+}
 
 const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
@@ -51,7 +52,13 @@ const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 
 /** The public calculator: work is kept in this browser until it's saved to an account. */
-export default function Calculator({ accountsEnabled = false }: { accountsEnabled?: boolean }) {
+export default function Calculator({
+  accountsEnabled = false,
+  library = COMPONENT_LIBRARY,
+}: {
+  accountsEnabled?: boolean;
+  library?: LibraryComponent[];
+}) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
   useEffect(() => saveDraft(draft), [draft]);
@@ -60,6 +67,7 @@ export default function Calculator({ accountsEnabled = false }: { accountsEnable
     <CalculatorView
       draft={draft}
       setDraft={setDraft}
+      library={library}
       trackEvents
       showExample
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
@@ -95,6 +103,8 @@ export interface CalculatorViewProps {
   footer?: ReactNode;
   /** Title for exported files. */
   exportName?: string;
+  /** Components offered in the picker; defaults to the built-in library. */
+  library?: LibraryComponent[];
 }
 
 export function CalculatorView({
@@ -105,7 +115,10 @@ export function CalculatorView({
   header,
   footer,
   exportName = "My property",
+  library = COMPONENT_LIBRARY,
 }: CalculatorViewProps) {
+  const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
+  const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
   const tracked = useRef({ started: !trackEvents || draft.rows.length > 0, generated: !trackEvents });
 
@@ -145,7 +158,7 @@ export function CalculatorView({
     const value = event.target.value;
     event.target.value = "";
     if (!value) return;
-    const item = LIBRARY_BY_SLUG.get(value);
+    const item = libraryBySlug.get(value);
     const row = item ? rowFromLibrary(item, draft.unitCount) : customRow();
     setDraft((d) => ({ ...d, rows: [...d.rows, row] }));
     markStarted("add_component");
@@ -234,7 +247,7 @@ export function CalculatorView({
               <option value="" disabled>
                 + Add a component…
               </option>
-              {Object.entries(LIBRARY_GROUPS).map(([category, items]) => (
+              {Object.entries(libraryGroups).map(([category, items]) => (
                 <optgroup key={category} label={category}>
                   {items.map((item) => (
                     <option key={item.slug} value={item.slug}>
@@ -270,6 +283,7 @@ export function CalculatorView({
                   key={row.id}
                   row={row}
                   yearBuilt={draft.yearBuilt}
+                  lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
                   problem={problems[row.id] ? PROBLEM_TEXT[problems[row.id]] : null}
                   onChange={(patch) => updateRow(row.id, patch)}
                   onRemove={() => removeRow(row.id)}
@@ -345,17 +359,18 @@ export function CalculatorView({
 function ComponentRow({
   row,
   yearBuilt,
+  lib,
   problem,
   onChange,
   onRemove,
 }: {
   row: DraftRow;
   yearBuilt: string;
+  lib: LibraryComponent | undefined;
   problem: string | null;
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
-  const lib = row.librarySlug ? LIBRARY_BY_SLUG.get(row.librarySlug) : undefined;
   const label = row.name || "this component";
 
   return (

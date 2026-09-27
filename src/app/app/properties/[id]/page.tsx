@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PropertyEditorLoader from "@/components/account/PropertyEditorLoader";
+import { getLibrary } from "@/lib/library/source";
 import { draftFromRows } from "@/lib/properties/convert";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,9 +12,10 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
-  const [{ data: property }, { data: components }] = await Promise.all([
+  const [{ data: property }, { data: components }, library] = await Promise.all([
     supabase.from("properties").select("*").eq("id", id).maybeSingle(),
     supabase.from("components").select("*").eq("property_id", id),
+    getLibrary(),
   ]);
   // Row Level Security returns nothing for someone else's property, so this is also the access check.
   if (!property) notFound();
@@ -25,6 +27,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
       </Link>
       <h1 className="mt-2 mb-6 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{property.name}</h1>
       <PropertyEditorLoader
+        library={library}
         // Remount with fresh ids from the database after each save.
         key={property.updated_at}
         propertyId={property.id}

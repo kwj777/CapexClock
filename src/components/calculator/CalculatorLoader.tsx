@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { LibraryComponent } from "@/lib/library/components";
 
 // The calculator reads localStorage and today's date, so it renders only in the browser.
 const Calculator = dynamic(() => import("./Calculator"), {
@@ -10,6 +11,12 @@ const Calculator = dynamic(() => import("./Calculator"), {
   ),
 });
 
-export default function CalculatorLoader({ accountsEnabled }: { accountsEnabled: boolean }) {
-  return <Calculator accountsEnabled={accountsEnabled} />;
+export default function CalculatorLoader({
+  accountsEnabled,
+  library,
+}: {
+  accountsEnabled: boolean;
+  library: LibraryComponent[];
+}) {
+  return <Calculator accountsEnabled={accountsEnabled} library={library} />;
 }

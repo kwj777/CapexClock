@@ -98,6 +98,9 @@ owner can only read or change their own properties.
    launch, add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
    Resend or Postmark, sending from support@capexclock.com).
 
-The component library can be edited under **Table Editor → component_library**. The calculator
-still uses the copy in `src/lib/library/components.ts` for now; a test keeps that file and
+The component library can be edited under **Table Editor → component_library**. The calculators and
+the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
+own /lifespan page automatically (add sentence-friendly wording and notes in
+`src/lib/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be reached, the site
+falls back to the copy in `src/lib/library/components.ts`; a test keeps that file and
 `supabase/seed.sql` in sync.

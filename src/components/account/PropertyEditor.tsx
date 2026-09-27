@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CalculatorView } from "@/components/calculator/Calculator";
 import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
+import type { LibraryComponent } from "@/lib/library/components";
 import { SAVE_PROBLEM_TEXT, toSaveInput, type SaveProblem } from "@/lib/properties/convert";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,6 +21,7 @@ export interface PropertyEditorProps {
   initialDraft: Draft;
   /** New property started from the public calculator's work in this browser. */
   importFromCalculator?: boolean;
+  library: LibraryComponent[];
 }
 
 export default function PropertyEditor({
@@ -27,6 +29,7 @@ export default function PropertyEditor({
   initialName,
   initialDraft,
   importFromCalculator = false,
+  library,
 }: PropertyEditorProps) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -140,6 +143,7 @@ export default function PropertyEditor({
         setDraft={updateDraft}
         header={header}
         exportName={name.trim() || "My property"}
+        library={library}
       />
       {propertyId && (
         <div className="border-t border-slate-200 pt-6 dark:border-slate-800">

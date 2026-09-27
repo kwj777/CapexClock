@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import CalculatorLoader from "@/components/calculator/CalculatorLoader";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { getLibrary } from "@/lib/library/source";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 const title = "Free CapEx Calculator for Rental Properties | CapexClock";
@@ -48,7 +49,8 @@ const faqJsonLd = {
   })),
 };
 
-export default function CapexCalculatorPage() {
+export default async function CapexCalculatorPage() {
+  const library = await getLibrary();
   return (
     <>
       <script
@@ -68,7 +70,7 @@ export default function CapexCalculatorPage() {
           </p>
 
           <div className="mt-8">
-            <CalculatorLoader accountsEnabled={supabaseEnv() !== null} />
+            <CalculatorLoader accountsEnabled={supabaseEnv() !== null} library={library} />
           </div>
 
           <section className="mt-16 max-w-3xl" aria-labelledby="faq-heading">
