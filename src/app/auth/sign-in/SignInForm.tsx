@@ -4,7 +4,11 @@ import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CONTACT_EMAIL } from "@/lib/site";
 
-type Status = { kind: "idle" } | { kind: "sending" } | { kind: "sent"; email: string } | { kind: "error"; message: string };
+type Status =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "sent"; email: string }
+  | { kind: "error"; message: string; detail: string };
 
 export default function SignInForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
@@ -20,8 +24,11 @@ export default function SignInForm({ next }: { next: string }) {
       options: { emailRedirectTo: callback.toString(), shouldCreateUser: true },
     });
     if (error) {
+      console.error("Sign-in link failed", error.status, error.code, error.message);
       setStatus({
         kind: "error",
+        // Supabase's own reason, so a setup problem (email sender, URL settings) can be diagnosed.
+        detail: [error.status, error.code, error.message].filter(Boolean).join(" · "),
         message:
           error.status === 429
             ? "Too many sign-in emails just now. Please wait a minute and try again."
@@ -65,9 +72,10 @@ export default function SignInForm({ next }: { next: string }) {
         {status.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
       </button>
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-          {status.message}
-        </p>
+        <div role="alert" className="text-sm text-red-700 dark:text-red-400">
+          <p>{status.message}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Details: {status.detail}</p>
+        </div>
       )}
     </form>
   );
