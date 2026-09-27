@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Forms</title>
+  </head>
+  <body>
+    <!--
+      Netlify scans this static file at deploy time to register the
+      "early-access" form. The real form lives in the React app
+      (src/components/SignupForm.tsx) and POSTs here with fetch.
+      Keep field names in sync with that component.
+    -->
+    <form name="early-access" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="early-access" />
+      <input name="bot-field" />
+      <input type="email" name="email" required />
+      <select name="units">
+        <option value="1–4">1–4</option>
+        <option value="5–20">5–20</option>
+        <option value="21–50">21–50</option>
+        <option value="51–100">51–100</option>
+        <option value="100+">100+</option>
+      </select>
+      <select name="current_method">
+        <option value="Spreadsheet">Spreadsheet</option>
+        <option value="Property management software">Property management software</option>
+        <option value="Nothing formal">Nothing formal</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="text" name="biggest_worry" />
+    </form>
+  </body>
+</html>
