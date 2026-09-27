@@ -23,6 +23,8 @@ npm run lint
 | --- | --- | --- |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project API key. Unset = analytics off. |
 | `NEXT_PUBLIC_POSTHOG_HOST` | No | Defaults to `https://us.i.posthog.com`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | For accounts | Supabase project URL. Unset = no sign-in; the calculator still works. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 
 Set them in Netlify under **Project configuration → Environment variables**, then redeploy
 (they're baked in at build time).
@@ -76,3 +78,26 @@ current method, biggest worry). From there you can:
   most bots).
 - Get notified: **Project configuration → Notifications → Emails and webhooks → Form submission
   notifications → Add notification → Email notification**.
+
+## Accounts (Supabase)
+
+Accounts use Supabase magic-link sign-in. All data is protected by Row Level Security: each
+owner can only read or change their own properties.
+
+1. **Create the tables.** In the Supabase dashboard open **SQL Editor → New query**, paste
+   `supabase/migrations/0001_init.sql`, and run it. Then do the same with `supabase/seed.sql`
+   (the component library; safe to run again).
+2. **Allow the sign-in links to return to the site.** Under **Authentication → URL
+   Configuration**, set **Site URL** to `https://capexclock.com` and add these **Redirect URLs**:
+   - `https://capexclock.com/auth/callback`
+   - `https://*--capexclock.netlify.app/auth/callback` (deploy previews)
+   - `http://localhost:3000/auth/callback` (local development)
+3. **Environment variables.** Add `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Netlify (see above) and redeploy.
+4. **Email.** Supabase's built-in email sender is rate-limited and meant for testing. Before
+   launch, add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
+   Resend or Postmark, sending from support@capexclock.com).
+
+The component library can be edited under **Table Editor → component_library**. The calculator
+still uses the copy in `src/lib/library/components.ts` for now; a test keeps that file and
+`supabase/seed.sql` in sync.

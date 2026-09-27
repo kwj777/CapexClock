@@ -10,6 +10,6 @@ const Calculator = dynamic(() => import("./Calculator"), {
   ),
 });
 
-export default function CalculatorLoader() {
-  return <Calculator />;
+export default function CalculatorLoader({ accountsEnabled }: { accountsEnabled: boolean }) {
+  return <Calculator accountsEnabled={accountsEnabled} />;
 }

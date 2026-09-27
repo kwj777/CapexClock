@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import CalculatorLoader from "@/components/calculator/CalculatorLoader";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { supabaseEnv } from "@/lib/supabase/env";
 
 const title = "Free CapEx Calculator for Rental Properties | CapexClock";
 const description =
@@ -33,7 +34,7 @@ const FAQ = [
   },
   {
     q: "Is my data saved?",
-    a: "Your entries stay in this browser only. Accounts for saving multiple properties are coming soon.",
+    a: "Your entries stay in this browser until you choose to save them. A free account keeps them safe and lets you add more properties.",
   },
 ];
 
@@ -67,7 +68,7 @@ export default function CapexCalculatorPage() {
           </p>
 
           <div className="mt-8">
-            <CalculatorLoader />
+            <CalculatorLoader accountsEnabled={supabaseEnv() !== null} />
           </div>
 
           <section className="mt-16 max-w-3xl" aria-labelledby="faq-heading">

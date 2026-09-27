@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { supabaseEnv } from "@/lib/supabase/env";
 import { CONTACT_EMAIL } from "@/lib/site";
 
 const navLink =
-  "text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
+  "whitespace-nowrap text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
 
 export function SiteHeader() {
   return (
@@ -11,13 +12,19 @@ export function SiteHeader() {
         <ClockMark />
         CapexClock
       </Link>
-      <nav className="flex items-center gap-5">
+      <nav className="flex items-center gap-4 sm:gap-5">
         <Link href="/capex-calculator" className={navLink}>
           Calculator
         </Link>
-        <Link href="/#signup" className={navLink}>
+        {/* On small phones the landing page's own signup section covers this. */}
+        <Link href="/#signup" className={`${navLink} hidden sm:inline`}>
           Early access
         </Link>
+        {supabaseEnv() && (
+          <Link href="/app" className={navLink}>
+            Sign in
+          </Link>
+        )}
       </nav>
     </header>
   );
