@@ -110,12 +110,40 @@ describe("reserve totals and per-unit math", () => {
     expect(f.endYear).toBe(2035);
   });
 
-  it("monthly reserve is the 10-year total over 120 months", () => {
-    expect(f.monthlyReserve).toBeCloseTo(123600 / 120, 6); // $1,030
+  it("reports first-year costs as needed now", () => {
+    expect(f.neededNow).toBe(33600);
+  });
+
+  it("monthly reserve is the smallest level amount that pays every later bill on time", () => {
+    // Tightest point: roof (2030) + condensers (2033) = $90,000 after 7 years of saving.
+    expect(f.monthlyReserve).toBeCloseTo(90000 / 84, 6); // $1,071
+  });
+
+  it("never leaves the balance short, starting from zero after paying first-year costs", () => {
+    const long = computeForecast({ startYear: START, years: 30, unitCount: 24, components });
+    let balance = 0;
+    for (const y of long.years.slice(1)) {
+      balance += f.monthlyReserve * 12 - y.total;
+      expect(balance).toBeGreaterThanOrEqual(-1e-6);
+    }
+  });
+
+  it("still saves for a big item due just after the 10-year window", () => {
+    const roof = component({ quantity: 1, installYear: 2016, usefulLifeYears: 20, replacementCostEach: 120000 }); // 2036
+    const r = computeForecast({ startYear: START, unitCount: 10, components: [roof] });
+    expect(r.total).toBe(0);
+    expect(r.monthlyReserve).toBeCloseTo(120000 / 120, 6);
+  });
+
+  it("does not spread first-year costs into the monthly reserve", () => {
+    const once = component({ installYear: 1990, usefulLifeYears: 36, replacementCostEach: 5000 }); // 2026, next 2062
+    const r = computeForecast({ startYear: START, unitCount: 1, components: [once] });
+    expect(r.neededNow).toBe(5000);
+    expect(r.monthlyReserve).toBe(0);
   });
 
   it("per-unit reserve divides by unit count", () => {
-    expect(f.monthlyReservePerUnit).toBeCloseTo(1030 / 24, 6);
+    expect(f.monthlyReservePerUnit).toBeCloseTo(90000 / 84 / 24, 6);
   });
 
   it("per-unit reserve is null with zero units", () => {
@@ -130,6 +158,7 @@ describe("reserve totals and per-unit math", () => {
   it("returns zeros for an empty property", () => {
     const empty = computeForecast({ startYear: START, unitCount: 10, components: [] });
     expect(empty.total).toBe(0);
+    expect(empty.neededNow).toBe(0);
     expect(empty.monthlyReserve).toBe(0);
     expect(empty.monthlyReservePerUnit).toBe(0);
     expect(empty.atRisk).toEqual([]);
@@ -139,7 +168,8 @@ describe("reserve totals and per-unit math", () => {
     const five = computeForecast({ startYear: START, years: 5, unitCount: 24, components });
     expect(five.endYear).toBe(2030);
     expect(five.total).toBe(33600 + 36000);
-    expect(five.monthlyReserve).toBeCloseTo(69600 / 60, 6);
+    // The reserve still looks past a short window.
+    expect(five.monthlyReserve).toBeCloseTo(f.monthlyReserve, 6);
   });
 });
 
