@@ -124,6 +124,22 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
         })}
         {replacements.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
 
+        {/* Later replacements the monthly reserve is already saving for, so it isn't a mystery. */}
+        {forecast.savingAhead.length > 0 && (
+          <View>
+            <Text style={s.h2} minPresenceAhead={40}>
+              The monthly reserve is {replacements.length > 0 ? "also " : ""}saving for
+            </Text>
+            {forecast.savingAhead.map((r, i) => (
+              <View key={`${r.componentId}-${r.year}-${i}`} style={s.tr} wrap={false}>
+                <Text style={{ width: cols.year }}>{r.year}</Text>
+                <Text style={{ flex: 1 }}>{r.name}</Text>
+                <Text style={{ width: cols.total, textAlign: "right" }}>{formatMoney(r.cost)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={s.footer} fixed>
           <Text>capexclock.com</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
