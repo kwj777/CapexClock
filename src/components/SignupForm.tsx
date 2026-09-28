@@ -5,8 +5,10 @@ import { track } from "@/lib/analytics";
 import { CONTACT_EMAIL } from "@/lib/site";
 
 // Field names and options must match public/__forms.html, which is the copy
-// Netlify registers at deploy time.
+// Netlify registers at deploy time. Posting to that file (with form-name) is
+// what reaches Netlify Forms, with or without JavaScript.
 const FORM_NAME = "early-access";
+const FORM_ACTION = "/__forms.html";
 
 const UNIT_OPTIONS = ["1–4", "5–20", "21–50", "51–100", "100+"] as const;
 const METHOD_OPTIONS = [
@@ -28,14 +30,14 @@ export default function SignupForm() {
     event.preventDefault();
     setStatus("submitting");
 
+    // Includes the hidden form-name field.
     const body = new URLSearchParams();
-    body.append("form-name", FORM_NAME);
     for (const [key, value] of new FormData(event.currentTarget)) {
       if (typeof value === "string") body.append(key, value);
     }
 
     try {
-      const res = await fetch("/__forms.html", {
+      const res = await fetch(FORM_ACTION, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
@@ -71,11 +73,13 @@ export default function SignupForm() {
     <form
       name={FORM_NAME}
       method="POST"
+      action={FORM_ACTION}
       data-netlify="true"
       netlify-honeypot="bot-field"
       onSubmit={handleSubmit}
       className="space-y-5"
     >
+      <input type="hidden" name="form-name" value={FORM_NAME} />
       <p className="hidden" aria-hidden="true">
         <label>
           Don&apos;t fill this out: <input name="bot-field" tabIndex={-1} autoComplete="off" />
