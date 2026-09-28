@@ -160,22 +160,27 @@ function tightestPoint(years: ForecastYear[]): { monthly: number; index: number 
 
 /**
  * Level monthly amount to have the cash ready for one component's next
- * replacement that can still be saved for: the one at end of life, or, when
- * that's this year or overdue, the one after it. It matches the forecast's
- * reserve for a single component but has no horizon, so long-lived items still
- * get a figure.
+ * replacement that can still be saved for (savingFor): the one at end of life,
+ * or, when that's this year or overdue, the one after it. It matches the
+ * forecast's reserve for a single component but has no horizon, so long-lived
+ * items still get a figure. The forecast leaves out a replacement due after
+ * startYear + RESERVE_HORIZON_YEARS until it comes within the horizon.
  */
 export function nextReplacementReserve(
   component: ForecastComponent,
   startYear: number,
-): { neededNow: number; monthly: number } {
+): { neededNow: number; monthly: number; savingFor: number } {
   assertValid(component);
   const cost = replacementCost(component);
   const yearsUntilDue = endOfLifeYear(component) - startYear;
   if (component.scenario === "replace_now" || yearsUntilDue <= 0) {
-    return { neededNow: cost, monthly: cost / (12 * component.usefulLifeYears) };
+    return {
+      neededNow: cost,
+      monthly: cost / (12 * component.usefulLifeYears),
+      savingFor: startYear + component.usefulLifeYears,
+    };
   }
-  return { neededNow: 0, monthly: cost / (12 * yearsUntilDue) };
+  return { neededNow: 0, monthly: cost / (12 * yearsUntilDue), savingFor: startYear + yearsUntilDue };
 }
 
 export function computeForecast(input: ForecastInput): Forecast {

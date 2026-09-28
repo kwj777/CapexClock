@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
-import { nextReplacementReserve } from "@/lib/forecast";
+import { nextReplacementReserve, RESERVE_HORIZON_YEARS } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import { subjectFor } from "@/lib/library/phrasing";
 
@@ -48,12 +48,21 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
   const each = num(cost);
   const sqFt = item.unitLabel === "per_sq_ft";
 
-  let result: { due: number; low: number; high: number; monthly: number | null; neededNow: number | null } | null = null;
+  let result: {
+    due: number;
+    low: number;
+    high: number;
+    monthly: number | null;
+    neededNow: number | null;
+    /** The replacement the monthly amount saves for. */
+    savingFor: number | null;
+  } | null = null;
   // Why no dollar figure shows yet, once a cost has been typed, and which field it's about.
   let moneyHint: { text: string; field: "cost" | "quantity"; invalid: boolean } | null = null;
   if (validYear) {
     let monthly: number | null = null;
     let neededNow: number | null = null;
+    let savingFor: number | null = null;
     if (each !== null && (Number.isNaN(each) || each < 0)) {
       moneyHint = { text: "Enter the cost as a plain number, like 1400.", field: "cost", invalid: true };
     } else if (each !== null && qty === null) {
@@ -75,8 +84,9 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
       );
       monthly = r.monthly;
       neededNow = r.neededNow;
+      savingFor = r.savingFor;
     }
-    result = { due: year + life, low: year + item.lifeLow, high: year + item.lifeHigh, monthly, neededNow };
+    result = { due: year + life, low: year + item.lifeLow, high: year + item.lifeHigh, monthly, neededNow, savingFor };
   }
 
   function addToForecast(mode?: "add" | "update") {
@@ -91,6 +101,11 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
   }
 
   const yearsLeft = result ? result.due - startYear : 0;
+  // The building forecast looks RESERVE_HORIZON_YEARS ahead, so it leaves out a later replacement for now.
+  const forecastCountsFrom =
+    result?.savingFor != null && result.savingFor > startYear + RESERVE_HORIZON_YEARS
+      ? result.savingFor - RESERVE_HORIZON_YEARS
+      : null;
   const badYear = installYear.trim() !== "" && !validYear;
   // Points a field at the note below it, and marks it when what's typed can't be read.
   const noteFor = (field: "cost" | "quantity") =>
@@ -178,6 +193,13 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
                   <>
                     Set aside <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong> to
                     have the cash ready for the next replacement.
+                  </>
+                )}
+                {result.monthly > 0 && forecastCountsFrom !== null && (
+                  <>
+                    {" "}
+                    The building forecast looks {RESERVE_HORIZON_YEARS} years ahead, so its monthly reserve won&apos;t
+                    count this replacement until {forecastCountsFrom}.
                   </>
                 )}
               </p>

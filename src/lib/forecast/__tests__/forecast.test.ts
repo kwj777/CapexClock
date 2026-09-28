@@ -4,6 +4,7 @@ import {
   endOfLifeYear,
   nextReplacementReserve,
   replacementYears,
+  RESERVE_HORIZON_YEARS,
   validateComponent,
   type ForecastComponent,
 } from "@/lib/forecast";
@@ -209,12 +210,24 @@ describe("single-component reserve (lifespan pages)", () => {
 
   it("still gives a monthly amount when the item is due more than 30 years out", () => {
     const panel = component({ installYear: 2024, usefulLifeYears: 33, quantity: 12, replacementCostEach: 3000 }); // 2057
-    expect(nextReplacementReserve(panel, START)).toEqual({ neededNow: 0, monthly: 36000 / (31 * 12) });
+    expect(nextReplacementReserve(panel, START)).toEqual({ neededNow: 0, monthly: 36000 / (31 * 12), savingFor: 2057 });
+    // The forecast doesn't count it yet: it's past the horizon.
+    expect(2057).toBeGreaterThan(START + RESERVE_HORIZON_YEARS);
+    expect(computeForecast({ startYear: START, unitCount: 12, components: [panel] }).monthlyReserve).toBe(0);
   });
 
   it("saves for the replacement after this one when it's due now", () => {
     const due = component({ installYear: 2000, usefulLifeYears: 20, replacementCostEach: 24000 });
-    expect(nextReplacementReserve(due, START)).toEqual({ neededNow: 24000, monthly: 24000 / 240 });
+    expect(nextReplacementReserve(due, START)).toEqual({ neededNow: 24000, monthly: 24000 / 240, savingFor: START + 20 });
+    const overdueLongLived = component({ installYear: 1980, usefulLifeYears: 40, replacementCostEach: 3000 });
+    expect(nextReplacementReserve(overdueLongLived, START).savingFor).toBe(START + 40);
+  });
+
+  it("names the year it saves for, which the forecast counts once it's within the horizon", () => {
+    const inside = component({ installYear: 2026, usefulLifeYears: 30, replacementCostEach: 3000 }); // 2056
+    const r = nextReplacementReserve(inside, START);
+    expect(r.savingFor).toBe(START + RESERVE_HORIZON_YEARS);
+    expect(computeForecast({ startYear: START, unitCount: 0, components: [inside] }).monthlyReserve).toBeCloseTo(r.monthly, 6);
   });
 });
 
