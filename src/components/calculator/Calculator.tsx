@@ -619,7 +619,7 @@ function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }
       {forecast.savingAhead.length > 0 && (
         <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
           <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
-            The monthly reserve is also saving for
+            The monthly reserve is {rows.length > 0 && "also "}saving for
           </h4>
           <ul className="mt-2 space-y-1.5 text-sm">
             {forecast.savingAhead.map((r) => (
