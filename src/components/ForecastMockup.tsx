@@ -132,7 +132,7 @@ export default function ForecastMockup() {
             {s.label}
           </span>
         ))}
-        <span className="ml-auto text-slate-500">Example data</span>
+        <span className="ml-auto text-slate-500 dark:text-slate-400">Example data</span>
       </figcaption>
     </figure>
   );
