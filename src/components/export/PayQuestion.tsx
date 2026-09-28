@@ -2,30 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
-
-const STORAGE_KEY = "capexclock:pay-question:v1";
+import { alreadyAsked, remember } from "@/lib/export/pay-question";
 
 export const PAY_QUESTION =
   "Would you pay $19/month for replacement reminders and a lender-ready condition report?";
 
 const ANSWERS = ["Yes", "Maybe", "No"] as const;
 type Answer = (typeof ANSWERS)[number];
-
-function alreadyAsked(): boolean {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) !== null;
-  } catch {
-    return false;
-  }
-}
-
-function remember(value: string) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, value);
-  } catch {
-    // Storage blocked: the question may show again, which is fine.
-  }
-}
 
 /**
  * One-question pricing survey. It appears after the first export in a browser
@@ -41,7 +24,7 @@ export default function PayQuestion({
   /** Called on dismiss, to put keyboard focus back where it was. */
   onDismiss?: () => void;
 }) {
-  const [askedBefore] = useState(alreadyAsked);
+  const [askedBefore] = useState(() => alreadyAsked());
   const [answer, setAnswer] = useState<Answer | "dismissed" | null>(null);
   const shown = useRef(false);
   const thanks = useRef<HTMLParagraphElement>(null);
