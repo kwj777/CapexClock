@@ -23,6 +23,7 @@ import {
   customRow,
   exampleDraft,
   EMPTY_DRAFT,
+  STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
   PROBLEM_TEXT,
   parseUnitCount,
@@ -62,6 +63,14 @@ export default function Calculator({
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
   useEffect(() => saveDraft(draft), [draft]);
+  // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === DRAFT_STORAGE_KEY || event.key === null) setDraft(loadDraft());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <CalculatorView
@@ -105,6 +114,8 @@ export interface CalculatorViewProps {
   exportName?: string;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
+  /** Notes by row id that replace the row's forecast note, e.g. why it can't be saved. */
+  rowNotes?: Record<string, string>;
 }
 
 export function CalculatorView({
@@ -116,6 +127,7 @@ export function CalculatorView({
   footer,
   exportName = "My property",
   library = COMPONENT_LIBRARY,
+  rowNotes,
 }: CalculatorViewProps) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
@@ -284,7 +296,7 @@ export function CalculatorView({
                   row={row}
                   yearBuilt={draft.yearBuilt}
                   lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
-                  problem={problems[row.id] ? PROBLEM_TEXT[problems[row.id]] : null}
+                  problem={rowNotes?.[row.id] ?? (problems[row.id] ? PROBLEM_TEXT[problems[row.id]] : null)}
                   onChange={(patch) => updateRow(row.id, patch)}
                   onRemove={() => removeRow(row.id)}
                 />
@@ -381,6 +393,7 @@ function ComponentRow({
           <input
             className={`${inputClass} mt-1 font-medium lg:mt-0`}
             value={row.name}
+            maxLength={200}
             placeholder="e.g. Elevator"
             onChange={(e) => onChange({ name: e.target.value })}
           />

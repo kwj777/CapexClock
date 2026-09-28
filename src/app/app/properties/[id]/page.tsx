@@ -59,6 +59,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
         key={property.id}
         propertyId={property.id}
         initialName={property.name}
+        initialUpdatedAt={property.updated_at}
         initialDraft={draftFromRows(property, components)}
       />
     </div>

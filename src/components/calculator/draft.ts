@@ -24,7 +24,7 @@ export interface Draft {
 
 export const EMPTY_DRAFT: Draft = { unitCount: "", yearBuilt: "", rows: [] };
 
-const STORAGE_KEY = "capexclock:calculator:v1";
+export const STORAGE_KEY = "capexclock:calculator:v1";
 
 export function loadDraft(): Draft {
   try {
