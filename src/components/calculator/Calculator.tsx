@@ -346,14 +346,21 @@ export function CalculatorView({
             </button>
           </p>
         )}
-        {showYearBuiltError && (
-          <p id={yearBuiltErrorId} className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+        {/* The error takes the hint's place in one grid cell, sized for the longer of the two, so
+            showing it when the field is left never moves the button the owner is clicking. */}
+        <div className="mt-3 grid text-sm">
+          <p
+            id={yearBuiltErrorId}
+            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${showYearBuiltError ? "" : "invisible"}`}
+          >
             {YEAR_BUILT_TEXT}
           </p>
-        )}
-        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Year built fills in any install year you leave blank, marked as an estimate.
-        </p>
+          <p
+            className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${showYearBuiltError ? "invisible" : ""}`}
+          >
+            Year built fills in any install year you leave blank, marked as an estimate.
+          </p>
+        </div>
       </section>
 
       {/* Components */}
