@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { track } from "@/lib/analytics";
 import { CONTACT_EMAIL } from "@/lib/site";
@@ -183,6 +184,14 @@ function EarlyAccessForm({
       >
         {status === "submitting" ? "Signing you up…" : "Get early access"}
       </button>
+
+      <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+        See how we handle your answers on our{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
+          privacy page
+        </Link>
+        .
+      </p>
 
       {status === "error" && (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">

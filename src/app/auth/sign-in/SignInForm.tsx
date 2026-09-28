@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CONTACT_EMAIL } from "@/lib/site";
@@ -92,6 +93,13 @@ export default function SignInForm({ next }: { next: string }) {
           >
             {status.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
           </button>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            See how we handle your email on our{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
+              privacy page
+            </Link>
+            .
+          </p>
           {status.kind === "error" && (
             <div role="alert" className="text-sm text-red-700 dark:text-red-400">
               <p>{status.message}</p>

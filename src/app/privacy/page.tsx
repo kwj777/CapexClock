@@ -1,0 +1,132 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { CONTACT_EMAIL } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Privacy | CapexClock",
+  description:
+    "What CapexClock collects, why, and who helps run the site: PostHog analytics, Supabase accounts and Netlify Forms. We don't sell your data.",
+  alternates: { canonical: "/privacy" },
+};
+
+// Keep this page in step with what the code does (src/lib/analytics.ts,
+// src/lib/supabase, src/components/SignupForm.tsx) whenever those change.
+const UPDATED = "September 28, 2026";
+
+const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
+
+export default function PrivacyPage() {
+  return (
+    <>
+      <SiteHeader />
+      <main className="flex-1">
+        <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Privacy</h1>
+          <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
+            What CapexClock collects, why, and who helps us run the site. Last updated {UPDATED}.
+          </p>
+
+          <Section title="The short version">
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>We don&apos;t sell your data or share it with advertisers.</li>
+              <li>The free calculators work without an account. What you enter stays in your browser unless you save it to an account.</li>
+              <li>We use PostHog to see how the site is used. It never gets your email, your property names or addresses, or anything you type.</li>
+            </ul>
+          </Section>
+
+          <Section title="The free calculators">
+            <p>
+              The CapEx calculator keeps your work in your browser&apos;s local storage, so it&apos;s still there when you
+              come back. It isn&apos;t sent to us. PDF and CSV exports are made in your browser too. We also remember in
+              your browser whether you&apos;ve answered our one-question survey, so we don&apos;t ask twice. Clearing your
+              browser data removes all of this.
+            </p>
+          </Section>
+
+          <Section title="Your account">
+            <p>
+              When you sign in, we store your email address and the properties you save: their names, unit counts, year
+              built, and each component&apos;s details and costs. They are stored with Supabase, our database provider,
+              and only your account can read or change them. Supabase also sends our sign-in emails. A cookie keeps you
+              signed in on this browser until you sign out.
+            </p>
+          </Section>
+
+          <Section title="The early access list">
+            <p>
+              If you join the early access list, Netlify, our web host, stores what you send through Netlify Forms: your
+              email, how many units you own, how you track CapEx today and, if you answer it, what worries you most. We
+              use it to contact you about CapexClock.
+            </p>
+          </Section>
+
+          <Section title="Analytics">
+            <p>We use PostHog to learn how people use CapexClock so we can improve it. PostHog records:</p>
+            <ul className="mt-3 list-disc space-y-1.5 pl-5">
+              <li>the pages you visit and the site that sent you,</li>
+              <li>clicks, without the text of what you clicked,</li>
+              <li>
+                steps like starting the calculator, getting a forecast, creating an account, saving a property,
+                exporting, and coming back on a later day,
+              </li>
+              <li>on the early access form, your answers about units and how you track CapEx, but not your email,</li>
+              <li>basic details such as your browser, screen size and rough location, which PostHog works out from your IP address.</li>
+            </ul>
+            <p className="mt-3">
+              When you&apos;re signed in, these are linked to your account&apos;s random ID, never your email. PostHog
+              keeps a random ID in a cookie and in your browser&apos;s local storage so it can tell visits apart. The
+              cookie lasts one year. We also keep the date of your last visit in your browser to count return visits.
+              We don&apos;t record your screen. If you block cookies or use a tracker blocker, the site still works.
+            </p>
+          </Section>
+
+          <Section title="Who we share data with">
+            <p>
+              Only the services that run the site: Netlify (hosting and the early access form), Supabase (accounts,
+              saved properties and sign-in emails) and PostHog (analytics). We don&apos;t sell your data, and we
+              don&apos;t share it with advertisers.
+            </p>
+          </Section>
+
+          <Section title="Deleting your data">
+            <p>
+              You can delete a saved property from your account at any time. To delete your account or your early access
+              answers, email{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
+                {CONTACT_EMAIL}
+              </a>
+              .
+            </p>
+          </Section>
+
+          <Section title="Questions">
+            <p>
+              Email{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
+                {CONTACT_EMAIL}
+              </a>
+              . If we change how we handle your data, we&apos;ll update this page and the date at the top.
+            </p>
+            <p className="mt-3">
+              <Link href="/" className={link}>
+                Back to CapexClock
+              </Link>
+            </p>
+          </Section>
+        </article>
+      </main>
+      <SiteFooter />
+    </>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{title}</h2>
+      <div className="mt-3 text-slate-600 dark:text-slate-300">{children}</div>
+    </section>
+  );
+}
