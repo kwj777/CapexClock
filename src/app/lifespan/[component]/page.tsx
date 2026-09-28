@@ -4,10 +4,17 @@ import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import LifespanEstimator from "@/components/lifespan/LifespanEstimator";
 import { defaultLife, UNIT_LABEL_TEXT, type LibraryComponent } from "@/lib/library/components";
-import { LIFESPAN_NOTES } from "@/lib/library/content";
-import { capitalize, subjectFor, titleCase } from "@/lib/library/phrasing";
+import { notesFor } from "@/lib/library/content";
+import {
+  capitalize,
+  lifeDrivers,
+  lifespanDescription,
+  lifespanTitle,
+  relatedHeading,
+  subjectFor,
+} from "@/lib/library/phrasing";
 import { getLibrary } from "@/lib/library/source";
-import { SITE_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
 // Library edits in Supabase show up within an hour; new components get pages on first visit.
 export const revalidate = 3600;
@@ -26,27 +33,25 @@ export async function generateMetadata({ params }: PageProps<"/lifespan/[compone
   const found = await findComponent((await params).component);
   if (!found) return {};
   const { item } = found;
-  const { noun, plural } = subjectFor(item);
-  const title = `How Long ${plural ? "Do" : "Does"} ${titleCase(noun)} Last? (${item.lifeLow}–${item.lifeHigh} Years) | CapexClock`;
-  const description = `${capitalize(noun)} typically ${plural ? "last" : "lasts"} ${item.lifeLow} to ${item.lifeHigh} years. See what shortens ${plural ? "their" : "its"} life, the signs ${plural ? "they're" : "it's"} near the end, and how much to set aside for replacement.`;
-  return {
-    title,
-    description,
-    alternates: { canonical: `/lifespan/${item.slug}` },
-    openGraph: { title, description, url: `${SITE_URL}/lifespan/${item.slug}` },
-  };
+  return pageMetadata({
+    title: lifespanTitle(item),
+    description: lifespanDescription(item, notesFor(item.slug) !== undefined),
+    path: `/lifespan/${item.slug}`,
+  });
 }
 
 export default async function LifespanPage({ params }: PageProps<"/lifespan/[component]">) {
   const found = await findComponent((await params).component);
   if (!found) notFound();
   const { item, library } = found;
-  const notes = LIFESPAN_NOTES[item.slug];
+  const notes = notesFor(item.slug);
   const life = defaultLife(item);
   const { noun, plural } = subjectFor(item);
   const does = plural ? "do" : "does";
   const lasts = plural ? "last" : "lasts";
-  const related = library.filter((c) => c.category === item.category && c.slug !== item.slug);
+  const sameCategory = library.filter((c) => c.category === item.category && c.slug !== item.slug);
+  // A category of one still links on to a few others.
+  const related = sameCategory.length > 0 ? sameCategory : library.filter((c) => c.slug !== item.slug).slice(0, 5);
 
   const faq = [
     {
@@ -55,7 +60,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
     },
     {
       q: `When should I start saving to replace ${noun}?`,
-      a: `As soon as ${plural ? "they're" : "it's"} installed. Spreading the cost over ${plural ? "their" : "its"} ${item.lifeLow}–${item.lifeHigh} year life keeps the replacement from landing as a surprise. The mini calculator on this page shows a monthly amount for yours.`,
+      a: `From day one. Spreading the cost over ${plural ? "their" : "its"} ${item.lifeLow}–${item.lifeHigh} year life keeps the replacement from landing as a surprise. The mini calculator on this page shows a monthly amount for yours.`,
     },
     {
       q: `How ${plural ? "are" : "is"} ${noun} priced in the calculator?`,
@@ -74,11 +79,22 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
       <SiteHeader />
       <main className="flex-1">
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
-          <nav className="text-sm text-slate-500 dark:text-slate-400">
-            <Link href="/lifespan" className="hover:text-slate-900 dark:hover:text-white">
-              Component lifespans
-            </Link>{" "}
-            / {item.category}
+          <nav aria-label="Breadcrumb" className="text-sm text-slate-500 dark:text-slate-400">
+            <ol className="flex flex-wrap gap-x-1.5">
+              <li>
+                <Link href="/lifespan" className="hover:text-slate-900 dark:hover:text-white">
+                  Component lifespans
+                </Link>
+              </li>
+              <li>
+                <span aria-hidden="true">› </span>
+                {item.category}
+              </li>
+              <li aria-current="page">
+                <span aria-hidden="true">› </span>
+                {item.name}
+              </li>
+            </ol>
           </nav>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance text-slate-950 sm:text-4xl dark:text-white">
             How long {does} {noun} last?
@@ -88,9 +104,17 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
             <strong className="text-slate-950 dark:text-white">
               {item.lifeLow} to {item.lifeHigh} years
             </strong>
-            . Where yours {plural ? "fall" : "falls"} in that range depends on how {plural ? "they were" : "it was"} installed, how hard {plural ? "they work" : "it works"} and how well{" "}
-            {plural ? "they're" : "it's"} maintained.
+            . Where yours {plural ? "fall" : "falls"} in that range depends on {lifeDrivers(item)}.
           </p>
+
+          {notes?.safety && (
+            <p
+              role="note"
+              className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"
+            >
+              <strong className="font-semibold">Safety first:</strong> {notes.safety}
+            </p>
+          )}
 
           <div className="mt-8">
             <LifespanEstimator item={item} />
@@ -117,6 +141,11 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
             </div>
           )}
 
+          <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
+            This is general guidance, not an inspection. If something about yours worries you, have a licensed pro look
+            at it.
+          </p>
+
           <section className="mt-12">
             <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Questions</h2>
             <dl className="mt-4 divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
@@ -141,7 +170,9 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
 
           {related.length > 0 && (
             <section className="mt-12">
-              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Other {item.category.toLowerCase()} lifespans</h2>
+              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
+                {sameCategory.length > 0 ? relatedHeading(item.category) : "More component lifespans"}
+              </h2>
               <ul className="mt-3 space-y-1.5">
                 {related.map((c) => (
                   <li key={c.slug}>

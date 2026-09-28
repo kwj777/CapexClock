@@ -1,11 +1,15 @@
 /**
  * Editorial notes for the /lifespan pages. General guidance only: it describes
  * what commonly shortens or extends a component's life and what owners
- * typically notice near the end, not a substitute for an inspection.
+ * typically notice near the end, not a substitute for an inspection (the pages
+ * say so too).
  */
 export interface LifespanNotes {
   factors: string[];
+  /** Wear to plan and budget for. Hazards go in safety, never here. */
   signs: string[];
+  /** A hazard that needs a licensed pro now, not a savings plan. Shown first, set apart. */
+  safety?: string;
 }
 
 export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
@@ -23,11 +27,13 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   },
   "gas-furnace": {
     factors: ["Filter changes: clogged filters strain the blower and heat exchanger", "Annual service and cleaning", "Correct sizing for the unit", "Climate and hours of use"],
-    signs: ["Rising repair calls, especially ignition and blower parts", "Uneven heat or short cycling", "Rust or cracks on the heat exchanger", "Climbing gas use for the same comfort"],
+    signs: ["Rising repair calls, especially ignition and blower parts", "Uneven heat or short cycling", "Climbing gas use for the same comfort", "Parts getting hard to find for an older model"],
+    safety: "A cracked heat exchanger can leak carbon monoxide. If a CO alarm goes off or you smell gas, get everyone outside and call 911. If a technician finds a crack, shut the furnace off and call a licensed HVAC pro now.",
   },
   "central-ac": {
     factors: ["Coil cleaning and filter changes", "Coastal salt air or heavy dust", "Correct refrigerant charge", "Runtime in hot climates"],
-    signs: ["Longer run times and weaker cooling", "Refrigerant leaks or compressor trouble", "Obsolete refrigerant making repairs costly", "Loud operation or frequent breaker trips"],
+    signs: ["Longer run times and weaker cooling", "Refrigerant leaks or compressor trouble", "Obsolete refrigerant making repairs costly", "Louder, rougher running as parts wear"],
+    safety: "A breaker that keeps tripping, a burning smell or scorched wires at the unit are fire risks. Don't keep resetting the breaker. Turn the AC off and call a licensed HVAC pro now.",
   },
   "heat-pump": {
     factors: ["Year-round runtime (it heats and cools)", "Coil and filter maintenance", "Defrost performance in cold climates", "Correct sizing and refrigerant charge"],
@@ -35,15 +41,18 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   },
   boiler: {
     factors: ["Water treatment and annual flushing", "Cast-iron vs. steel vs. high-efficiency condensing design", "Short cycling from oversizing", "Service of burners and controls"],
-    signs: ["Leaks at sections or the heat exchanger", "Frequent pressure or pilot problems", "Rising fuel use", "Parts that are hard to source"],
+    signs: ["Leaks at sections or the heat exchanger", "More frequent repairs to pumps and controls", "Rising fuel use", "Parts that are hard to source"],
+    safety: "A gas or oil boiler can leak carbon monoxide. If a CO alarm goes off or you smell gas, get everyone outside and call 911. If you see soot, a yellow, flickering flame or a relief valve that drips or sprays, shut the boiler off and call a licensed pro now.",
   },
   "tank-water-heater": {
     factors: ["Water hardness: sediment builds up in the tank", "Flushing the tank and checking the anode rod", "Temperature setting and demand", "Installation in unheated spaces"],
     signs: ["Rusty or discolored hot water", "Rumbling or popping from sediment", "Moisture or a slow leak at the base", "Hot water running out sooner than it used to"],
+    safety: "If a CO alarm goes off or you smell gas, get everyone outside and call 911. If the relief valve drips or sprays, or you see soot around a gas heater, turn the heater off and call a licensed plumber now.",
   },
   "tankless-water-heater": {
     factors: ["Descaling in hard-water areas", "Venting and combustion-air quality", "Inlet filter cleaning", "Correct sizing for peak demand"],
     signs: ["Error codes and ignition failures", "Temperature swings during use", "Scale-related flow restrictions", "Heat exchanger leaks"],
+    safety: "If a CO alarm goes off or you smell gas, get everyone outside and call 911. On a gas model, soot at the vent or a burning smell can mean carbon monoxide. Turn the heater off and call a licensed pro now.",
   },
   refrigerator: {
     factors: ["Coil cleaning", "Door gasket condition", "Placement near heat sources", "Tenant use and moves"],
@@ -52,6 +61,7 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   "range-oven": {
     factors: ["Gas vs. electric", "Cleaning between tenants", "Igniter and element wear", "Control board failures"],
     signs: ["Uneven or unreliable heating", "Failed igniters or burners", "Broken controls or door seals", "Hard-to-find parts"],
+    safety: "If you smell gas near a gas range, don't light it or flip any switches. Get everyone out and call 911 or the gas company from outside.",
   },
   dishwasher: {
     factors: ["Water hardness", "Filter cleaning", "Tenant use", "Pump and seal wear"],
@@ -59,7 +69,8 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   },
   "washer-dryer": {
     factors: ["Shared laundry vs. in-unit use", "Dryer vent cleaning", "Overloading", "Level installation"],
-    signs: ["Excess vibration or noise", "Leaks or drainage problems", "Long drying times", "Frequent repair calls"],
+    signs: ["Excess vibration or noise", "Leaks or drainage problems", "Frequent repair calls", "Repairs approaching the cost of a new machine"],
+    safety: "Long drying times usually mean a clogged dryer vent, a common cause of dryer fires. Clean the vent now, before you decide the dryer is failing.",
   },
   carpet: {
     factors: ["Tenant turnover and foot traffic", "Pet use", "Carpet and pad quality", "Regular professional cleaning"],
@@ -103,10 +114,17 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   },
   "electrical-panel": {
     factors: ["Panel brand and model history", "Capacity versus modern loads", "Moisture and corrosion", "Loose connections"],
-    signs: ["Breakers that trip often or feel warm", "Rust or scorch marks", "Insurance or lender questions about the panel", "No room for new circuits"],
+    signs: ["Insurance or lender questions about the panel", "No room for new circuits", "Not enough capacity for new appliances or AC", "Replacement breakers that are hard to find"],
+    safety: "Breakers that feel warm or keep tripping, scorch marks, rust or water in the panel, buzzing or a burning smell are fire risks. Call a licensed electrician now.",
   },
   "fire-alarm-panel": {
     factors: ["Manufacturer support and parts availability", "Code changes in your area", "Testing and service contracts", "Battery and power supply maintenance"],
-    signs: ["Frequent trouble signals or false alarms", "Discontinued parts", "Failed inspections", "Devices that no longer talk to the panel"],
+    signs: ["Frequent false alarms", "Discontinued parts or no manufacturer support", "Failed inspections", "Code changes the panel can't meet"],
+    safety: "A trouble signal or a device that drops off the panel means part of the system may not work in a fire. Call your fire alarm company to fix it now.",
   },
 };
+
+/** The notes for a slug, if any. Own keys only, so a slug like "constructor" finds nothing. */
+export function notesFor(slug: string): LifespanNotes | undefined {
+  return Object.prototype.hasOwnProperty.call(LIFESPAN_NOTES, slug) ? LIFESPAN_NOTES[slug] : undefined;
+}

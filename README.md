@@ -99,8 +99,8 @@ owner can only read or change their own properties.
 
 1. **Create the tables.** In the Supabase dashboard open **SQL Editor → New query**, paste
    `supabase/migrations/0001_init.sql`, and run it. Then run each later migration in order
-   (`0002_safer_saves.sql`, …), and then `supabase/seed.sql` (the component library; safe to
-   run again).
+   (`0002_safer_saves.sql`, then `0003_library_checks.sql`, …), and then `supabase/seed.sql` (the
+   component library; safe to run again).
 2. **Allow the sign-in links to return to the site.** Under **Authentication → URL
    Configuration**, set **Site URL** to `https://capexclock.com` and add these **Redirect URLs**.
    They need the `/**` ending: the sign-in link comes back to `/auth/callback?next=…`, and an
@@ -125,6 +125,11 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   records tied to their own component's assets. It's safe to run again, and the site works
   both before and after it runs. If it notes that some existing rows break a rule, those rows
   are left as they are and every new save is still checked.
+- `0003_library_checks.sql`: makes the table editor refuse a component library row the site
+  can't use (a slug with capitals or spaces, or a name or category with no letters or numbers)
+  instead of saving it and leaving it off the site. It's safe to run again. If it notes that
+  some existing rows break a rule, fix them under **Table Editor → component_library**; until
+  then the site skips them and logs why.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
