@@ -34,11 +34,24 @@ describe("forecast CSV", () => {
   });
 
   it("stops formulas that start after a separator inside a name", () => {
-    const names = ["x;=1+1;", "Roof\t+SUM(1)", "Deck|@A1", "Gutters, -2+3", "Boiler; =1+1", "Porch\n=1+1"];
+    const names = [
+      "x;=1+1;",
+      "Roof\t+SUM(1)",
+      "Deck|@A1",
+      "Gutters, -2+3",
+      "Boiler; =1+1",
+      "Porch\n=1+1",
+      'x;"=1+1;',
+      'x;"=HYPERLINK(1);',
+      'Fence; " =1+1',
+      ' =1+1',
+      '"@SUM(1)"',
+    ];
     const out = csvLines(
       names.map((name, i) => ({ id: `n${i}`, category: "Other", name, quantity: 1, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 1000 })),
     );
     expect(out[1]).toBe(`2026,"x;'=1+1;",Other,1,each,1000.00,1000.00,Overdue`);
+    expect(out[7]).toBe(`2026,"x;""'=1+1;",Other,1,each,1000.00,1000.00,Overdue`);
     // Split the file the way an app set to each of these separators would, ignoring quotes.
     for (const separator of [",", ";", "\t", "|", "\n"]) {
       const cells = out.join("\n").split(separator).map((c) => c.replace(/^[\s"]+/, ""));

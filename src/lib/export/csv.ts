@@ -1,18 +1,19 @@
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
 
-// Spreadsheet apps run cells starting with these as formulas; prefix them so a
-// component named "=HYPERLINK(...)" stays plain text.
-const FORMULA_START = /^[=+\-@\t\r]/;
-// Apps set to split on ";" or tabs (common in Europe) start a new cell inside
-// ours at those characters, so a formula can start there too.
-const FORMULA_AFTER_SEPARATOR = /([,;\t|\r\n]\s*)([=+\-@])/g;
+// Spreadsheet apps run a cell starting with = + - or @ as a formula. Apps set
+// to split on ";" or tabs (common in Europe) also start a new cell inside ours
+// at those characters, and spaces or quotes before the formula don't stop it.
+// An apostrophe in front keeps it plain text, so "=HYPERLINK(...)" stays a name.
+const FORMULA = /((?:^|[,;\t|\r\n])[\s"]*)([=+\-@])/g;
+// Some apps also treat a cell starting with a tab or carriage return as a formula.
+const CONTROL_START = /^[\t\r]/;
 
 function cell(value: string | number): string {
   let text = String(value);
   if (typeof value === "string") {
-    text = text.replace(FORMULA_AFTER_SEPARATOR, "$1'$2");
-    if (FORMULA_START.test(text)) text = `'${text}`;
+    text = text.replace(FORMULA, "$1'$2");
+    if (CONTROL_START.test(text)) text = `'${text}`;
   }
   return /[",;\t\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
