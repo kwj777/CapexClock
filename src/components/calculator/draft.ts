@@ -73,10 +73,15 @@ export function upgradeDraft(draft: Draft, currentYear: number): Draft {
     forecastTracked: draft.forecastTracked ?? toComponents(draft, currentYear).components.length > 0,
     rows: draft.rows.map((r) =>
       r.followsUnitCount === undefined
-        ? { ...r, followsUnitCount: quantityMatchesUnits(r, draft.unitCount) }
+        ? { ...r, followsUnitCount: quantityMatchesUnits(r, draft.unitCount) || blankPerUnit(r) }
         : r,
     ),
   };
+}
+
+// Before the flag, a blank per-unit quantity was filled in from the unit count too.
+function blankPerUnit(row: Pick<DraftRow, "unitLabel" | "quantity">): boolean {
+  return row.unitLabel === "per_unit" && row.quantity.trim() === "";
 }
 
 /** A per-unit row whose quantity is the unit count is taken to follow it (used for loaded rows). */
@@ -182,12 +187,25 @@ export function withLibraryItem(
   if (mode === "update" && existing >= 0) {
     return {
       ...draft,
-      rows: draft.rows.map((r, i) => (i === existing ? editRow(r, typed, draft.unitCount) : r)),
+      rows: draft.rows.map((r, i) => (i === existing ? fillRow(r, typed, draft.unitCount) : r)),
     };
   }
-  const row = editRow(rowFromLibrary(item, draft.unitCount), typed, draft.unitCount);
+  const row = fillRow(rowFromLibrary(item, draft.unitCount), typed, draft.unitCount);
   // A draft with nothing in it yet starts a new forecast in the calculator.
   return { ...draft, forecastTracked: draft.rows.length > 0 && draft.forecastTracked, rows: [...draft.rows, row] };
+}
+
+/**
+ * The lifespan page asks for a cost each. With no count typed, a row following
+ * the unit count would take that cost as per apartment (one window's price for
+ * all of an apartment's windows), so its count is left blank for the owner.
+ */
+function fillRow(row: DraftRow, typed: Partial<DraftRow>, unitCount: string): DraftRow {
+  const costWithoutCount = typed.costEach !== undefined && typed.quantity === undefined;
+  if (costWithoutCount && row.unitLabel === "per_unit" && row.followsUnitCount) {
+    return editRow(row, { ...typed, quantity: "" }, unitCount);
+  }
+  return editRow(row, typed, unitCount);
 }
 
 /** Quantity × cost for a row, or null until both are readable numbers. */

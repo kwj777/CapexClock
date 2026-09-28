@@ -320,6 +320,26 @@ describe("drafts saved before the follow flag", () => {
     expect(typeUnitCount(upgraded, "1", "14").rows.map((r) => r.quantity)).toEqual(["14", "1"]);
   });
 
+  it("fill a blank per-unit quantity from the unit count, as they did before", () => {
+    const legacy: Draft = {
+      unitCount: "12",
+      yearBuilt: "",
+      rows: [
+        { id: "a", librarySlug: null, category: "Plumbing", name: "Water heaters", quantity: "", unitLabel: "per_unit", installYear: "", usefulLife: "10", costEach: "", scenario: "run_to_failure" },
+        { id: "b", librarySlug: null, category: "Flooring", name: "Carpet", quantity: "", unitLabel: "per_sq_ft", installYear: "", usefulLife: "8", costEach: "", scenario: "run_to_failure" },
+      ],
+    };
+    const upgraded = upgradeDraft(legacy, 2026);
+    expect(upgraded.rows.map((r) => r.followsUnitCount)).toEqual([true, false]);
+    expect(withUnitCount(upgraded, "14").rows.map((r) => r.quantity)).toEqual(["14", ""]);
+  });
+
+  it("leave rows that already have the flag as they are", () => {
+    const blankOnPurpose: DraftRow = { ...rowFromLibrary(waterHeater, "12"), quantity: "", followsUnitCount: false };
+    const upgraded = upgradeDraft({ unitCount: "12", yearBuilt: "", rows: [blankOnPurpose] }, 2026);
+    expect(upgraded.rows[0].followsUnitCount).toBe(false);
+  });
+
   it("count a forecast the older draft already showed as tracked", () => {
     expect(upgradeDraft(exampleDraft(), 2026).forecastTracked).toBe(true);
     expect(upgradeDraft({ unitCount: "", yearBuilt: "", rows: [rowFromLibrary(roof, "")] }, 2026).forecastTracked).toBe(false);
@@ -335,12 +355,49 @@ describe("drafts saved before the follow flag", () => {
 
 describe("adding from a lifespan page", () => {
   const typed = { installYear: "2016", quantity: "", costEach: "1400" };
+  const windows = COMPONENT_LIBRARY.find((c) => c.slug === "vinyl-windows")!;
 
-  it("appends a row that follows the unit count when no quantity was typed", () => {
-    const next = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [] }, waterHeater, typed, "add");
+  it("appends a row that follows the unit count when no quantity or cost was typed", () => {
+    const next = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [] }, waterHeater, { ...typed, costEach: "" }, "add");
     expect(next.rows).toHaveLength(1);
-    expect(next.rows[0]).toMatchObject({ librarySlug: "tank-water-heater", quantity: "12", followsUnitCount: true, installYear: "2016", costEach: "1400" });
+    expect(next.rows[0]).toMatchObject({ librarySlug: "tank-water-heater", quantity: "12", followsUnitCount: true, installYear: "2016", costEach: "" });
     expect(next.forecastTracked).toBe(false);
+  });
+
+  // The page asks for a cost each: $650 a window must not become $650 an apartment.
+  it("leaves the count blank when a cost each was typed without one", () => {
+    const draft: Draft = { unitCount: "12", yearBuilt: "", rows: [] };
+    const next = withLibraryItem(draft, windows, { installYear: "2005", quantity: "", costEach: "650" }, "add");
+    const row = next.rows[0];
+    expect(row).toMatchObject({ quantity: "", followsUnitCount: false, costEach: "650" });
+    expect(costLabel(row)).toBe("Cost each");
+    expect(rowTotal(row)).toBeNull();
+    // The calculator asks for the count instead of guessing 12.
+    const { components, problems } = toComponents(next, 2026);
+    expect(components).toEqual([]);
+    expect(problemFields(row, problems[row.id])).toEqual(["quantity"]);
+    // And a new unit count doesn't fill it in either.
+    expect(withUnitCount(next, "14").rows[0].quantity).toBe("");
+  });
+
+  it("uses the count typed with the cost", () => {
+    const next = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [] }, windows, { installYear: "2005", quantity: "96", costEach: "650" }, "add");
+    expect(rowTotal(next.rows[0])).toEqual({ quantity: 96, each: 650, total: 62400 });
+  });
+
+  it("keeps one of a building item when only a cost was typed", () => {
+    const next = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [] }, roof, { installYear: "2008", quantity: "", costEach: "38000" }, "add");
+    expect(next.rows[0]).toMatchObject({ quantity: "1", costEach: "38000" });
+  });
+
+  it("clears a following count when updating the cost each, but keeps one the owner set", () => {
+    const following = rowFromLibrary(windows, "12");
+    const typedCount = editRow(rowFromLibrary(windows, "12"), { quantity: "96" }, "12");
+    const values = { installYear: "", quantity: "", costEach: "650" };
+    const fromFollowing = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [following] }, windows, values, "update");
+    expect(fromFollowing.rows[0]).toMatchObject({ quantity: "", followsUnitCount: false, costEach: "650" });
+    const fromTyped = withLibraryItem({ unitCount: "12", yearBuilt: "", rows: [typedCount] }, windows, values, "update");
+    expect(fromTyped.rows[0]).toMatchObject({ quantity: "96", followsUnitCount: false, costEach: "650" });
   });
 
   it("keeps a typed quantity as set by hand", () => {
