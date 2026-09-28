@@ -1,6 +1,6 @@
 import { editRow, exampleDraft, withUnitCount } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
-import { draftFromRows, forecastForProperty, toSaveInput } from "../convert";
+import { draftFromRows, forecastForProperty, saveProblemFields, toSaveInput } from "../convert";
 
 const property: PropertyRow = {
   id: "8f5a2b9e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
@@ -84,6 +84,41 @@ describe("saving an editor draft", () => {
     const draft = { ...exampleDraft(), yearBuilt: "1890" };
     expect(toSaveInput("x", draft, 2026).problems).toEqual({});
     expect(toSaveInput("x", { ...draft, yearBuilt: "1799" }, 2026).problems).toEqual({ property: "year_built" });
+  });
+
+  it("reports values over the database's limits instead of failing the save", () => {
+    const draft = exampleDraft();
+    const [a, b, c] = draft.rows;
+    draft.rows = [
+      { ...a, name: "x".repeat(201) },
+      { ...b, quantity: "1e400" },
+      { ...c, costEach: "2000000000000" },
+    ];
+    draft.unitCount = "150000";
+    const input = toSaveInput("x", draft, 2026);
+    expect(input.problems).toEqual({
+      property: "unit_count",
+      [a.id]: "name_length",
+      [b.id]: "quantity",
+      [c.id]: "cost",
+    });
+    expect(input.property.unit_count).toBe(0);
+  });
+
+  it("accepts values right at the limits", () => {
+    const draft = exampleDraft();
+    draft.rows = [{ ...draft.rows[0], name: "x".repeat(200), quantity: "999999999", costEach: "999999999999" }];
+    draft.unitCount = "100000";
+    expect(toSaveInput("x", draft, 2026).problems).toEqual({});
+  });
+
+  it("points each row problem at the field it's about", () => {
+    expect(saveProblemFields("name_length")).toEqual(["name"]);
+    expect(saveProblemFields("quantity")).toEqual(["quantity"]);
+    expect(saveProblemFields("life")).toEqual(["usefulLife"]);
+    expect(saveProblemFields("install_year")).toEqual(["installYear"]);
+    expect(saveProblemFields("cost")).toEqual(["costEach"]);
+    expect(saveProblemFields("unit_count")).toEqual([]);
   });
 });
 

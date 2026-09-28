@@ -28,6 +28,7 @@ import {
   exampleDraft,
   EMPTY_DRAFT,
   hasEntries,
+  STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
   neighborRowId,
   parseUnitCount,
@@ -84,6 +85,14 @@ export default function Calculator({
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
   useEffect(() => saveDraft(draft), [draft]);
+  // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === DRAFT_STORAGE_KEY || event.key === null) setDraft(loadDraft());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <CalculatorView
@@ -127,6 +136,17 @@ export interface CalculatorViewProps {
   exportName?: string;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
+  /**
+   * Notes by row id that replace the row's forecast note, e.g. why it can't be saved,
+   * with the fields they're about (marked invalid and pointed at the note).
+   */
+  rowNotes?: Record<string, RowNote>;
+}
+
+/** A note shown under a row, and the row's fields it's about. */
+export interface RowNote {
+  text: string;
+  fields: RowField[];
 }
 
 export function CalculatorView({
@@ -138,6 +158,7 @@ export function CalculatorView({
   footer,
   exportName = "My property",
   library = COMPONENT_LIBRARY,
+  rowNotes,
 }: CalculatorViewProps) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
@@ -432,7 +453,8 @@ export function CalculatorView({
                     yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
                     lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
                     problem={
-                      problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null
+                      rowNotes?.[row.id] ??
+                      (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)
                     }
                     onChange={(patch) => updateRow(row.id, patch)}
                     onRemove={() => removeRow(row.id)}
@@ -536,7 +558,7 @@ function ComponentRow({
   idPrefix: string;
   yearBuilt: string;
   lib: LibraryComponent | undefined;
-  problem: { text: string; fields: RowField[] } | null;
+  problem: RowNote | null;
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
@@ -555,6 +577,7 @@ function ComponentRow({
             id={`${idPrefix}-name`}
             className={`${inputClass} mt-1 font-medium lg:mt-0`}
             value={row.name}
+            maxLength={200}
             placeholder="e.g. Elevator"
             {...flag("name")}
             onChange={(e) => onChange({ name: e.target.value })}
