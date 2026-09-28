@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
-import { supabaseEnv } from "./env";
+import { AUTH_COOKIE_OPTIONS, supabaseEnv } from "./env";
 
 /**
  * Refreshes the Supabase session cookie and sends signed-out visitors to sign in.
@@ -13,6 +13,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   if (!env) return response;
 
   const supabase = createServerClient<Database>(env.url, env.key, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();
