@@ -89,7 +89,7 @@ export default function Portfolio({
                   ? `${property.unit_count} unit${property.unit_count === 1 ? "" : "s"}`
                   : "No unit count"}{" "}
                 · {componentCount} component{componentCount === 1 ? "" : "s"}
-                {excluded > 0 && ` · ${excluded} missing a cost or year`}
+                {excluded > 0 && ` · ${excluded} left out of the forecast`}
               </p>
               <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                 <div>
