@@ -63,7 +63,8 @@ function groupByCategory(library: LibraryComponent[]): Record<string, LibraryCom
   return library.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
     (acc[c.category] ??= []).push(c);
     return acc;
-  }, {});
+    // No prototype, so a category named "constructor" can't collide with Object's own keys.
+  }, Object.create(null) as Record<string, LibraryComponent[]>);
 }
 
 const inputClass =

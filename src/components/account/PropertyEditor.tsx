@@ -449,8 +449,11 @@ export default function PropertyEditor({
         <button
           type="button"
           onClick={() => onSave()}
-          disabled={save.kind === "saving" || save.kind === "opening"}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60"
+          // aria-disabled, not disabled, while saving: a disabled button drops keyboard focus to the page.
+          // onSave ignores clicks while a save is in flight.
+          aria-disabled={save.kind === "saving"}
+          disabled={save.kind === "opening"}
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60 aria-disabled:opacity-60"
         >
           {propertyId ? "Save changes" : "Save property"}
         </button>
