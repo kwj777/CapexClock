@@ -128,7 +128,7 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
         {forecast.savingAhead.length > 0 && (
           <View>
             <Text style={s.h2} minPresenceAhead={40}>
-              The monthly reserve is {replacements.length > 0 ? "also " : ""}saving for
+              The monthly reserve is {forecast.years.some((y) => y.replacements.length > 0) ? "also " : ""}saving for
             </Text>
             {forecast.savingAhead.map((r, i) => (
               <View key={`${r.componentId}-${r.year}-${i}`} style={s.tr} wrap={false}>
