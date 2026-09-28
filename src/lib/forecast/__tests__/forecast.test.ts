@@ -253,6 +253,22 @@ describe("at-risk list", () => {
     const [item] = atRiskItems([component({ installYear: 2016, installYearIsEstimate: true })], START);
     expect(item.installYearIsEstimate).toBe(true);
   });
+
+  it("carries the estimate flag on every replacement, at risk or not", () => {
+    const f = computeForecast({
+      startYear: START,
+      unitCount: 1,
+      components: [
+        component({ id: "est", installYear: 2010, usefulLifeYears: 20, installYearIsEstimate: true }),
+        component({ id: "known", installYear: 2020, usefulLifeYears: 10 }),
+      ],
+    });
+    const flags = f.years.flatMap((y) => y.replacements).map((r) => [r.componentId, r.year, r.installYearIsEstimate]);
+    expect(flags).toEqual([
+      ["est", 2030, true],
+      ["known", 2030, false],
+    ]);
+  });
 });
 
 describe("validation", () => {

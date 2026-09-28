@@ -122,6 +122,7 @@ function buildYears(components: ForecastComponent[], startYear: number, count: n
         year,
         cost,
         overdue: overdue && year === startYear,
+        installYearIsEstimate: component.installYearIsEstimate ?? false,
       };
       bucket.replacements.push(replacement);
       bucket.total += cost;
