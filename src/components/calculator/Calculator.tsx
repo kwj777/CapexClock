@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -20,21 +21,26 @@ import {
   type LibraryComponent,
 } from "@/lib/library/components";
 import {
+  badYearBuilt,
+  costLabel,
   customRow,
+  editRow,
   exampleDraft,
   EMPTY_DRAFT,
   loadDraft,
   PROBLEM_TEXT,
   parseUnitCount,
   rowFromLibrary,
+  rowTotal,
   saveDraft,
   toComponents,
   withUnitCount,
+  YEAR_BUILT_TEXT,
   type Draft,
   type DraftRow,
 } from "./draft";
 import ForecastChart from "./ForecastChart";
-import { formatMoney, formatReserve } from "./format";
+import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
 const CUSTOM = "__custom__";
 
@@ -120,7 +126,9 @@ export function CalculatorView({
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
-  const tracked = useRef({ started: !trackEvents || draft.rows.length > 0, generated: !trackEvents });
+  const tracked = useRef({ started: !trackEvents || draft.rows.length > 0 });
+  const yearBuiltErrorId = useId();
+  const [editingYearBuilt, setEditingYearBuilt] = useState(false);
 
   const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
   const unitCount = parseUnitCount(draft.unitCount);
@@ -128,13 +136,18 @@ export function CalculatorView({
     () => computeForecast({ startYear, unitCount, components }),
     [startYear, unitCount, components],
   );
+  const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, startYear);
+  const showYearBuiltError = yearBuiltIsBad && !editingYearBuilt;
 
+  // Once per draft, as soon as it shows a forecast (the reserve can come from items after year 10).
+  const trackedDraft = useRef<Draft | null>(null);
+  const showsForecast = components.length > 0;
   useEffect(() => {
-    if (forecast.total > 0 && !tracked.current.generated) {
-      tracked.current.generated = true;
-      void track("forecast_generated", { components: String(components.length) });
-    }
-  }, [forecast.total, components.length]);
+    if (!trackEvents || !showsForecast || draft.forecastTracked || trackedDraft.current === draft) return;
+    trackedDraft.current = draft;
+    setDraft((d) => ({ ...d, forecastTracked: true }));
+    void track("forecast_generated", { components: String(components.length) });
+  }, [trackEvents, showsForecast, draft, setDraft, components.length]);
 
   function markStarted(source: string) {
     if (tracked.current.started) return;
@@ -147,7 +160,7 @@ export function CalculatorView({
   }
 
   function updateRow(id: string, patch: Partial<DraftRow>) {
-    setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+    setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? editRow(r, patch, d.unitCount) : r)) }));
   }
 
   function removeRow(id: string) {
@@ -201,6 +214,10 @@ export function CalculatorView({
                 inputMode="numeric"
                 placeholder="e.g. 1998"
                 value={draft.yearBuilt}
+                aria-invalid={showYearBuiltError || undefined}
+                aria-describedby={showYearBuiltError ? yearBuiltErrorId : undefined}
+                onFocus={() => setEditingYearBuilt(true)}
+                onBlur={() => setEditingYearBuilt(false)}
                 onChange={(e) => updateDraft({ yearBuilt: e.target.value })}
               />
             </label>
@@ -226,6 +243,11 @@ export function CalculatorView({
             )}
           </div>
         </div>
+        {showYearBuiltError && (
+          <p id={yearBuiltErrorId} className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+            {YEAR_BUILT_TEXT}
+          </p>
+        )}
         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
           Year built fills in any install year you leave blank, marked as an estimate.
         </p>
@@ -269,7 +291,7 @@ export function CalculatorView({
         ) : (
           <div className="mt-5">
             <div className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_auto_auto] gap-3 border-b border-slate-200 pb-2 lg:grid dark:border-slate-800">
-              {["Component", "Quantity", "Installed", "Life (yrs)", "Cost each", "Replace now", ""].map(
+              {["Component", "Quantity", "Installed", "Life (yrs)", "Cost", "Replace now", ""].map(
                 (h) => (
                   <span key={h} className={labelClass}>
                     {h}
@@ -282,7 +304,7 @@ export function CalculatorView({
                 <ComponentRow
                   key={row.id}
                   row={row}
-                  yearBuilt={draft.yearBuilt}
+                  yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
                   lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
                   problem={problems[row.id] ? PROBLEM_TEXT[problems[row.id]] : null}
                   onChange={(patch) => updateRow(row.id, patch)}
@@ -335,7 +357,15 @@ export function CalculatorView({
             <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               In today&apos;s dollars, no inflation.
             </p>
-            <ForecastChart forecast={forecast} />
+            {forecast.total > 0 ? (
+              <ForecastChart forecast={forecast} />
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Nothing comes due from {forecast.startYear} to {forecast.endYear}.
+                {forecast.savingAhead.length > 0 &&
+                  " The monthly reserve is saving ahead for the later replacements listed under What's due when."}
+              </p>
+            )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
@@ -393,6 +423,7 @@ function ComponentRow({
               className={inputClass}
               inputMode="decimal"
               value={row.quantity}
+              placeholder={row.unitLabel === "per_sq_ft" ? "Sq ft" : undefined}
               aria-label={`Quantity of ${label}`}
               onChange={(e) => onChange({ quantity: e.target.value })}
             />
@@ -437,7 +468,7 @@ function ComponentRow({
           )}
         </label>
         <label className="block">
-          <span className={`${labelClass} lg:sr-only`}>Cost each</span>
+          <span className={`${labelClass} lg:sr-only`}>{costLabel(row.unitLabel)}</span>
           <div className="relative mt-1 lg:mt-0">
             <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500">
               $
@@ -446,11 +477,12 @@ function ComponentRow({
               className={`${inputClass} pl-6`}
               inputMode="decimal"
               value={row.costEach}
-              placeholder="Your cost"
-              aria-label={`Replacement cost ${UNIT_LABEL_TEXT[row.unitLabel]} for ${label}`}
+              placeholder="Quote or estimate"
+              aria-label={`${costLabel(row.unitLabel)}, ${label}`}
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
+          <CostNote row={row} />
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-700 lg:justify-center dark:text-slate-300">
           <input
@@ -472,6 +504,24 @@ function ComponentRow({
       </div>
       {problem && <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">{problem}</p>}
     </li>
+  );
+}
+
+/** Shows the multiplication behind a row ("12 × $650 = $7,800"), or what the cost is for. */
+function CostNote({ row }: { row: DraftRow }) {
+  const total = rowTotal(row);
+  if (total === null) {
+    return (
+      <span className="mt-1 hidden text-xs text-slate-500 lg:block dark:text-slate-400">
+        {costLabel(row.unitLabel).replace(/^Cost /, "")}
+      </span>
+    );
+  }
+  const quantity = `${total.quantity.toLocaleString("en-US")}${row.unitLabel === "per_sq_ft" ? " sq ft" : ""}`;
+  return (
+    <span className="mt-1 block text-xs text-slate-500 tabular-nums dark:text-slate-400">
+      {quantity} × {formatUnitPrice(total.each)} = {formatMoney(total.total)}
+    </span>
   );
 }
 
@@ -564,6 +614,23 @@ function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {forecast.savingAhead.length > 0 && (
+        <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
+            The monthly reserve is also saving for
+          </h4>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {forecast.savingAhead.map((r) => (
+              <li key={`${r.componentId}-${r.year}`} className="flex justify-between gap-3">
+                <span className="text-slate-900 dark:text-white">
+                  <span className="tabular-nums text-slate-600 dark:text-slate-300">{r.year}</span> {r.name}
+                </span>
+                <span className="tabular-nums text-slate-900 dark:text-white">{formatMoney(r.cost)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
