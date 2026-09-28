@@ -8,6 +8,7 @@ import {
   lifespanTitle,
   MAX_DESCRIPTION_LENGTH,
   MAX_TITLE_LENGTH,
+  relatedHeading,
   subjectFor,
   titleCase,
 } from "../phrasing";
@@ -59,9 +60,42 @@ describe("subjectFor", () => {
       ["U-bend", "a U-bend", false],
       ["A/C condenser", "an A/C condenser", false],
       ["(misc)", "a misc", false],
+      ["Parking lot striping", "parking lot striping", false],
+      ["Wallpaper", "wallpaper", false],
+      ["Plaster", "plaster", false],
+      ["Flashing", "flashing", false],
+      ["Hardwood", "hardwood", false],
+      ["Mulch", "mulch", false],
+      ["Artificial turf", "artificial turf", false],
+      ["Metal cladding", "metal cladding", false],
+      ["Sod", "sod", false],
+      ["Gravel", "gravel", false],
+      ["Millwork", "millwork", false],
+      ["Cabinetry", "cabinetry", false],
+      ["Canvas", "canvas", false],
+      ["Canvas awning", "a canvas awning", false],
+      ["Asbestos", "asbestos", false],
+      ["Uninterruptible power supply", "an uninterruptible power supply", false],
+      ["Uniform", "a uniform", false],
+      ["The pool", "a pool", false],
+      ["The gutters", "gutters", true],
+      ["An awning", "an awning", false],
+      ["A pool", "a pool", false],
+      ["I beam", "an I beam", false],
+      ["French drain", "a French drain", false],
+      ["Venetian blinds", "Venetian blinds", true],
     ];
     for (const [name, noun, plural] of cases) expect(subjectFor(added(name))).toEqual({ noun, plural });
     expect(titleCase("a flat or membrane roof")).toBe("a Flat or Membrane Roof");
+  });
+
+  it("reads names that match built-in object properties as plain names", () => {
+    for (const name of ["Constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"]) {
+      const item = added(name);
+      expect(subjectFor(item)).toEqual({ noun: `a ${name.charAt(0).toLowerCase()}${name.slice(1)}`, plural: false });
+      expect(lifespanTitle(item)).toContain("20–30 Years");
+      expect(lifespanDescription(item, false)).toMatch(/^A .* typically lasts 20 to 30 years\./);
+    }
   });
 
   it("follows a rename made in the dashboard instead of the built-in wording", () => {
@@ -144,6 +178,16 @@ describe("inSentence", () => {
     expect(categoryAsModifier("Heating / Cooling")).toBe("heating and cooling");
     expect(categoryAsModifier("HVAC & Plumbing")).toBe("HVAC and plumbing");
     expect(categoryAsModifier("Grounds")).toBe("grounds");
+  });
+
+  it("never heads the related list with \"Other other\"", () => {
+    expect(relatedHeading("HVAC")).toBe("Other HVAC lifespans");
+    expect(relatedHeading("Appliances")).toBe("Other appliance lifespans");
+    expect(relatedHeading("Doors & windows")).toBe("Other door and window lifespans");
+    for (const category of ["Other", "other", "Others", "Other items", "More"]) {
+      expect(relatedHeading(category)).toBe("More component lifespans");
+    }
+    expect(relatedHeading("Mother-in-law suites")).toBe("Other mother-in-law suite lifespans");
   });
 });
 

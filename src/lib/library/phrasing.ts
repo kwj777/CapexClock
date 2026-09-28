@@ -8,44 +8,57 @@ export interface Subject {
 
 // Library names are table labels ("Windows (vinyl)"); these read better in a sentence.
 // Keyed by the seeded name, lower case, so a row renamed in the dashboard reads
-// from its new name instead of keeping the old wording.
-const SUBJECTS: Record<string, Subject> = {
-  "central ac / condenser": { noun: "a central AC condenser", plural: false },
-  "washer / dryer": { noun: "a washer and dryer", plural: false },
-  "luxury vinyl plank": { noun: "luxury vinyl plank flooring", plural: false },
-  "windows (vinyl)": { noun: "vinyl windows", plural: true },
-  "parking lot resurface": { noun: "a resurfaced parking lot", plural: false },
-};
+// from its new name instead of keeping the old wording. A Map, so a name such as
+// "Constructor" can't pick up a built-in object property.
+const SUBJECTS = new Map<string, Subject>([
+  ["central ac / condenser", { noun: "a central AC condenser", plural: false }],
+  ["washer / dryer", { noun: "a washer and dryer", plural: false }],
+  ["luxury vinyl plank", { noun: "luxury vinyl plank flooring", plural: false }],
+  ["windows (vinyl)", { noun: "vinyl windows", plural: true }],
+  ["parking lot resurface", { noun: "a resurfaced parking lot", plural: false }],
+]);
 
 // Materials and finishes you don't count, so they take no "a" ("carpet", "vinyl siding").
 const MASS_NOUNS = new Set([
-  "asphalt", "carpet", "carpeting", "caulk", "caulking", "concrete", "decking", "drywall",
-  "ductwork", "equipment", "fencing", "flooring", "glass", "glazing", "grout", "hardware",
-  "insulation", "landscaping", "lighting", "masonry", "paint", "paving", "piping", "plumbing",
-  "roofing", "sealant", "sheathing", "shelving", "siding", "stucco", "tile", "trim",
-  "waterproofing", "weatherstripping", "wiring",
+  "aluminum", "asbestos", "asphalt", "blacktop", "brick", "brickwork", "cabinetry", "canvas", "carpentry",
+  "carpet", "carpeting", "casework", "caulk", "caulking", "cement", "cladding", "coating", "concrete",
+  "cooling", "copper", "decking", "drainage", "drywall", "ducting", "ductwork", "electrical", "epoxy",
+  "equipment", "fabric", "fencing", "fireproofing", "flashing", "flooring", "framing", "furniture", "glass",
+  "glazing", "granite", "gravel", "grass", "grout", "guttering", "hardscape", "hardscaping", "hardware",
+  "hardwood", "heating", "insulation", "irrigation", "ironwork", "landscaping", "laminate", "lighting",
+  "linoleum", "lumber", "marble", "masonry", "mesh", "metal", "metalwork", "millwork", "molding", "mortar",
+  "moulding", "mulch", "paint", "painting", "paneling", "panelling", "pavement", "paving", "piping",
+  "plaster", "plasterwork", "plumbing", "quartz", "repointing", "restriping", "roofing", "rubber", "screening",
+  "sealant", "sealcoat", "sealcoating", "sealer", "sheathing", "sheetrock", "shelving", "siding", "signage",
+  "slate", "sod", "soil", "soundproofing", "stain", "steel", "stone", "stonework", "striping", "stucco",
+  "terrazzo", "tile", "tilework", "timber", "topsoil", "trim", "tuckpointing", "turf", "underlayment",
+  "upholstery", "ventilation", "vinyl", "wainscoting", "wallcovering", "wallpaper", "water", "waterproofing",
+  "weatherstripping", "wiring", "wood", "woodwork",
 ]);
 
 // Words ending in "s" that are still one thing.
-const SINGULAR_S = new Set(["gas", "lens", "series"]);
+const SINGULAR_S = new Set(["asbestos", "canvas", "gas", "lens", "series"]);
 
 function isPlural(word: string): boolean {
   const w = word.toLowerCase();
   return w.endsWith("s") && !/(ss|us|is)$/.test(w) && !SINGULAR_S.has(w);
 }
 
-// Said letter by letter: "HVAC", "LED", "A/C", or a single letter as in "X-ray" or "U-bend".
-const SPELLED_OUT = /^([A-Z]{2}|[A-Za-z]([-/]|$))/;
+// Said letter by letter: "HVAC", "LED", "A/C", or a single letter as in "X-ray", "U-bend" or "I beam".
+const SPELLED_OUT = /^([A-Z]{2}|[A-Z] |[A-Za-z]([-/]|$))/;
 
-/** "an" before a vowel sound: "an HVAC unit", "an X-ray room", "an hour meter", but "a unit heater". */
+/** "an" before a vowel sound: "an HVAC unit", "an X-ray room", "an hour meter", "an uninterruptible power supply", but "a unit heater". */
 function article(word: string): "a" | "an" {
   if (SPELLED_OUT.test(word)) return /^[AEFHILMNORSX]/i.test(word) ? "an" : "a";
   if (/^(8|11|18)/.test(word)) return "an";
   const w = word.toLowerCase();
-  if (/^(hour|honou?r|honest|heir)/.test(w)) return "an";
+  if (/^(hour|honou?r|honest|heir|unin)/.test(w)) return "an";
   if (/^(uni|us[aeu]|uti|ur[aeio]|eu|one)/.test(w)) return "a";
   return /^[aeiou]/.test(w) ? "an" : "a";
 }
+
+// Proper adjectives keep their capital mid-sentence: "a French drain", "Venetian blinds".
+const PROPER = new Set(["dutch", "european", "franklin", "french", "murphy", "roman", "spanish", "venetian"]);
 
 const HAS_WORD = /[\p{L}\p{N}]/u;
 
@@ -68,14 +81,16 @@ function plainName(name: string): string {
 const lastWord = (phrase: string) => phrase.split(" ").pop()!.toLowerCase();
 
 export function subjectFor(item: LibraryComponent): Subject {
-  const known = SUBJECTS[item.name.trim().toLowerCase()];
+  const known = SUBJECTS.get(item.name.trim().toLowerCase());
   if (known) return known;
-  const name = plainName(item.name);
+  // "The pool" reads as "a pool": the sentence picks its own article.
+  const name = plainName(item.name).replace(/^(?:the|an?)\s+(?=[\p{L}\p{N}])/iu, "");
   // "Carpet and pad" takes its article, or none, from the first thing it names.
   const parts = name.split(/ (?:and|or) /i);
   const plural = parts.some((p) => isPlural(lastWord(p)));
   const first = lastWord(parts[0]);
-  const lower = SPELLED_OUT.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
+  const keepCase = SPELLED_OUT.test(name) || PROPER.has(name.split(/[\s-]/)[0].toLowerCase());
+  const lower = keepCase ? name : name.charAt(0).toLowerCase() + name.slice(1);
   if (plural || isPlural(first) || MASS_NOUNS.has(first)) return { noun: lower, plural };
   return { noun: `${article(name.split(" ")[0])} ${lower}`, plural: false };
 }
@@ -121,6 +136,12 @@ export function categoryAsModifier(category: string): string {
       return words.join(" ");
     })
     .join("");
+}
+
+/** Heading over links to the rest of a category: "Other HVAC lifespans", never "Other other lifespans". */
+export function relatedHeading(category: string): string {
+  const modifier = categoryAsModifier(category);
+  return /^(other|more)\b/i.test(modifier) ? "More component lifespans" : `Other ${modifier} lifespans`;
 }
 
 // Search results cut titles off at about 60 characters and descriptions at about 155.
