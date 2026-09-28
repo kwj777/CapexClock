@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { track } from "@/lib/analytics";
 import { CONTACT_EMAIL } from "@/lib/site";
 
@@ -25,6 +25,13 @@ const fieldClass =
 
 export default function SignupForm() {
   const [status, setStatus] = useState<Status>("idle");
+  const successRef = useRef<HTMLDivElement>(null);
+
+  // The form goes away on success, so move focus to the message instead of
+  // letting it drop to the top of the page.
+  useEffect(() => {
+    if (status === "success") successRef.current?.focus();
+  }, [status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,22 +60,37 @@ export default function SignupForm() {
     }
   }
 
-  if (status === "success") {
-    return (
-      <div
-        role="status"
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center dark:border-emerald-900 dark:bg-emerald-950"
-      >
-        <p className="text-xl font-semibold text-emerald-900 dark:text-emerald-100">
-          You&apos;re on the list.
-        </p>
-        <p className="mt-2 text-emerald-800 dark:text-emerald-200">
-          We&apos;ll email you when your spot opens.
-        </p>
+  return (
+    <>
+      {/* Always in the page, so screen readers announce the message when it appears. */}
+      <div role="status">
+        {status === "success" && (
+          <div
+            ref={successRef}
+            tabIndex={-1}
+            className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center focus:outline-none dark:border-emerald-900 dark:bg-emerald-950"
+          >
+            <p className="text-xl font-semibold text-emerald-900 dark:text-emerald-100">
+              You&apos;re on the list.
+            </p>
+            <p className="mt-2 text-emerald-800 dark:text-emerald-200">
+              We&apos;ll email you when your spot opens.
+            </p>
+          </div>
+        )}
       </div>
-    );
-  }
+      {status !== "success" && <EarlyAccessForm status={status} onSubmit={handleSubmit} />}
+    </>
+  );
+}
 
+function EarlyAccessForm({
+  status,
+  onSubmit,
+}: {
+  status: Status;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
   return (
     <form
       name={FORM_NAME}
@@ -76,7 +98,7 @@ export default function SignupForm() {
       action={FORM_ACTION}
       data-netlify="true"
       netlify-honeypot="bot-field"
-      onSubmit={handleSubmit}
+      onSubmit={onSubmit}
       className="space-y-5"
     >
       <input type="hidden" name="form-name" value={FORM_NAME} />
