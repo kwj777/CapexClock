@@ -30,6 +30,10 @@ const FAQ = [
     a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm.",
   },
   {
+    q: "What does Replace this year do?",
+    a: "Tick it for anything you plan to replace this year, even if it still works. Its cost is added to this year's costs and its replacement cycle starts again from this year. If you already replaced something, don't tick it. Enter the year you replaced it as the install year instead.",
+  },
+  {
     q: "What happens to items that are already past their useful life?",
     a: "They're counted in this year's costs and flagged as overdue, then repeat on their normal cycle.",
   },
@@ -90,9 +94,9 @@ export default async function CapexCalculatorPage() {
               ))}
             </dl>
             <p className="mt-8 text-slate-600 dark:text-slate-300">
-              Want to save properties and get reminders?{" "}
+              Want a reminder before something comes due?{" "}
               <Link href="/#signup" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
-                Get early access
+                Get early access to reminders
               </Link>
               .
             </p>
