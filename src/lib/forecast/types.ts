@@ -35,6 +35,8 @@ export interface Replacement {
   cost: number;
   /** Past end of life at the start of the window, so pulled into year one. */
   overdue: boolean;
+  /** True when the install year was defaulted to the building's year built. */
+  installYearIsEstimate: boolean;
 }
 
 export interface ForecastYear {

@@ -14,6 +14,7 @@ import {
 import ExportButtons from "@/components/export/ExportButtons";
 import { computeForecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
+import { moneyColumn } from "@/lib/export/format";
 import {
   COMPONENT_LIBRARY,
   UNIT_LABEL_TEXT,
@@ -531,6 +532,8 @@ function AtRisk({ forecast }: { forecast: ReturnType<typeof computeForecast> }) 
 
 function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }) {
   const rows = forecast.years.flatMap((y) => y.replacements);
+  // Every row shows cents once any row has them, so the rows add up.
+  const money = moneyColumn(rows.map((r) => r.cost));
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">What&apos;s due when</h3>
@@ -557,9 +560,15 @@ function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }
                     {r.overdue && (
                       <span className="ml-1.5 text-xs text-red-700 dark:text-red-400">overdue</span>
                     )}
+                    {r.installYearIsEstimate && (
+                      <>
+                        {" "}
+                        <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
+                      </>
+                    )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
-                    {formatMoney(r.cost)}
+                    {money(r.cost)}
                   </td>
                 </tr>
               ))}

@@ -60,7 +60,7 @@ export function exportRows(
         unit: unitLabels.get(r.componentId) === "per_sq_ft" ? "sq ft" : "each",
         costEach: c?.replacementCostEach ?? null,
         total: toCents(r.cost),
-        notes: [r.overdue ? "Overdue" : "", c?.installYearIsEstimate ? ESTIMATED_NOTE : ""].filter(Boolean),
+        notes: [r.overdue ? "Overdue" : "", r.installYearIsEstimate ? ESTIMATED_NOTE : ""].filter(Boolean),
       };
     }),
   );
