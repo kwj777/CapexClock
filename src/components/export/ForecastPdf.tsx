@@ -1,7 +1,15 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
+import type { ReactElement } from "react";
 import { formatMoney } from "@/components/calculator/format";
 import { formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
-import { ESTIMATED_NOTE, exportRows, leftOutSummary, sumTotals, type ExportDetails } from "@/lib/export/rows";
+import {
+  ESTIMATED_NOTE,
+  exportRows,
+  leftOutSummary,
+  sumTotals,
+  type ExportDetails,
+  type ExportRow,
+} from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons), so the
@@ -66,9 +74,41 @@ async function printableText(): Promise<(text: string) => string> {
 }
 
 /** Renders the PDF once its fonts are loaded. Render it only through here. */
-export async function forecastPdfBlob(props: Omit<ForecastPdfProps, "printable">): Promise<Blob> {
+export async function forecastPdfBlob(
+  props: Omit<ForecastPdfProps, "printable" | "keepTableTogether">,
+): Promise<Blob> {
   const printable = await printableText();
-  return pdf(<ForecastPdf {...props} printable={printable} />).toBlob();
+  const rows = exportRows(props.forecast, props.components, props.details?.unitLabels);
+  // A short table is kept on one page, but only if it fits on one: a block
+  // that can't break and is taller than a page squeezes the whole page
+  // together. Laying the table out on its own shows whether it fits. If it
+  // doesn't, it starts on a new page and runs on, like a long table.
+  const keepTableTogether =
+    rows.length <= MAX_ROWS_KEPT_TOGETHER &&
+    (await pageCount(<DueTable rows={rows} money={moneyColumn(rows.map((r) => r.total))} printable={printable} />)) === 1;
+  return pdf(<ForecastPdf {...props} printable={printable} keepTableTogether={keepTableTogether} />).toBlob();
+}
+
+/** How many pages some content takes on its own. */
+async function pageCount(content: ReactElement): Promise<number> {
+  let pages = 0;
+  await pdf(
+    <Document>
+      <Page size="LETTER" style={s.page}>
+        {content}
+        {/* Drawn on every page, so the last page number it sees is the count. */}
+        <Text
+          fixed
+          style={{ position: "absolute" }}
+          render={({ pageNumber }) => {
+            pages = Math.max(pages, pageNumber);
+            return null;
+          }}
+        />
+      </Page>
+    </Document>,
+  ).toBlob();
+  return pages;
 }
 
 const ink = "#0f172a";
@@ -105,6 +145,11 @@ const s = StyleSheet.create({
 
 // Wide enough for "250,000 sq ft", "$9,999,999.99" each and "$99,999,999.99" in total.
 const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84 };
+// A longer table starts on a new page.
+const MAX_ROWS_KEPT_TOGETHER = 12;
+// A row stays on one page unless its name is long enough that it might not fit
+// on one. The database allows 200 characters; the calculator has no limit.
+const MAX_NAME_KEPT_TOGETHER = 500;
 
 export interface ForecastPdfProps {
   name: string;
@@ -115,6 +160,11 @@ export interface ForecastPdfProps {
   generatedOn: string;
   /** Makes names safe to print; see printableText. */
   printable?: (text: string) => string;
+  /**
+   * Keeps the table on one page instead of starting it on a new one. Only set
+   * when it fits on one; see forecastPdfBlob.
+   */
+  keepTableTogether?: boolean;
 }
 
 export default function ForecastPdf({
@@ -125,6 +175,7 @@ export default function ForecastPdf({
   details = {},
   generatedOn,
   printable = (text) => text,
+  keepTableTogether = false,
 }: ForecastPdfProps) {
   const rows = exportRows(forecast, components, details.unitLabels);
   // Totals add up the rounded rows, so they match the table to the cent.
@@ -133,7 +184,6 @@ export default function ForecastPdf({
   const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
   // Shows cents everywhere when any row has them, so rows add up to the totals.
   const money = moneyColumn(rows.map((r) => r.total));
-  const longTable = rows.length > 12;
 
   return (
     <Document title={`${name} CapEx forecast`} author="CapexClock">
@@ -189,35 +239,18 @@ export default function ForecastPdf({
           </>
         )}
 
-        {/* The header row is fixed inside this view, so it repeats on each page
-            the table spans and nowhere else. A short table is kept on one page. */}
-        <View style={s.table} break={longTable} wrap={longTable}>
-          <Text style={s.h2}>What&apos;s due when</Text>
-          <View style={s.tr} fixed>
-            <Text style={[s.th, { width: cols.year }]}>Year</Text>
-            <Text style={[s.th, { width: cols.name }]}>Component</Text>
-            <Text style={[s.th, s.num, { width: cols.qty }]}>Qty</Text>
-            <Text style={[s.th, s.num, { width: cols.each }]}>Cost each</Text>
-            <Text style={[s.th, s.num, { width: cols.total }]}>Total</Text>
-            <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Note</Text>
-          </View>
-          {rows.map((r, i) => (
-            <View key={`${r.name}-${r.year}-${i}`} style={s.tr} wrap={false}>
-              <Text style={{ width: cols.year }}>{r.year}</Text>
-              <Text style={{ width: cols.name }}>{printable(r.name)}</Text>
-              <Text style={[s.num, { width: cols.qty }]}>{formatQuantity(r)}</Text>
-              <Text style={[s.num, { width: cols.each }]}>{formatCostEach(r)}</Text>
-              <Text style={[s.num, { width: cols.total }]}>{money(r.total)}</Text>
-              <Text style={s.noteCell}>{r.notes.join("; ")}</Text>
-            </View>
-          ))}
-          {rows.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
-          {rows.some((r) => r.notes.includes(ESTIMATED_NOTE)) && (
-            <Text style={s.note}>
-              {ESTIMATED_NOTE}: no install year was entered, so the building&apos;s year built is used.
-            </Text>
-          )}
-        </View>
+        <DueTable
+          rows={rows}
+          money={money}
+          printable={printable}
+          keepTogether={keepTableTogether}
+          newPage={!keepTableTogether}
+        />
+        {rows.some((r) => r.notes.includes(ESTIMATED_NOTE)) && (
+          <Text style={s.note}>
+            {ESTIMATED_NOTE}: no install year was entered, so the building&apos;s year built is used.
+          </Text>
+        )}
 
         <View style={s.footer} fixed>
           <Text>capexclock.com</Text>
@@ -225,6 +258,51 @@ export default function ForecastPdf({
         </View>
       </Page>
     </Document>
+  );
+}
+
+/**
+ * The "What's due when" table. Its header row is fixed inside the table's view,
+ * so it repeats on each page the table spans and nowhere else.
+ */
+function DueTable({
+  rows,
+  money,
+  printable,
+  keepTogether = false,
+  newPage = false,
+}: {
+  rows: ExportRow[];
+  money: (value: number) => string;
+  printable: (text: string) => string;
+  /** Keeps the whole table on one page. Only safe when it fits on one. */
+  keepTogether?: boolean;
+  /** Starts the table on a new page. */
+  newPage?: boolean;
+}) {
+  return (
+    <View style={s.table} break={newPage} wrap={!keepTogether}>
+      <Text style={s.h2}>What&apos;s due when</Text>
+      <View style={s.tr} fixed>
+        <Text style={[s.th, { width: cols.year }]}>Year</Text>
+        <Text style={[s.th, { width: cols.name }]}>Component</Text>
+        <Text style={[s.th, s.num, { width: cols.qty }]}>Qty</Text>
+        <Text style={[s.th, s.num, { width: cols.each }]}>Cost each</Text>
+        <Text style={[s.th, s.num, { width: cols.total }]}>Total</Text>
+        <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Note</Text>
+      </View>
+      {rows.map((r, i) => (
+        <View key={`${r.name}-${r.year}-${i}`} style={s.tr} wrap={r.name.length > MAX_NAME_KEPT_TOGETHER}>
+          <Text style={{ width: cols.year }}>{r.year}</Text>
+          <Text style={{ width: cols.name }}>{printable(r.name)}</Text>
+          <Text style={[s.num, { width: cols.qty }]}>{formatQuantity(r)}</Text>
+          <Text style={[s.num, { width: cols.each }]}>{formatCostEach(r)}</Text>
+          <Text style={[s.num, { width: cols.total }]}>{money(r.total)}</Text>
+          <Text style={s.noteCell}>{r.notes.join("; ")}</Text>
+        </View>
+      ))}
+      {rows.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
+    </View>
   );
 }
 
