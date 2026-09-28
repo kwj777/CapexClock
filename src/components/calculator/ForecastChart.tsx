@@ -13,29 +13,14 @@ import {
   type TooltipValueType,
 } from "recharts";
 import type { Forecast } from "@/lib/forecast";
-import { CHART_CATEGORIES, chartCategory, type ChartCategory } from "@/lib/library/components";
+import { CHART_CATEGORIES, type ChartCategory } from "@/lib/library/components";
+import { toChartRows } from "./chartData";
 import { formatCompactMoney, formatMoney } from "./format";
 
 // Color follows the category, never its position in the current data.
 const CATEGORY_COLOR: Record<ChartCategory, string> = Object.fromEntries(
   CHART_CATEGORIES.map((c, i) => [c, `var(--series-${i + 1})`]),
 ) as Record<ChartCategory, string>;
-
-type Row = { year: number } & Partial<Record<ChartCategory, number>>;
-
-function toRows(forecast: Forecast): { rows: Row[]; present: ChartCategory[] } {
-  const present = new Set<ChartCategory>();
-  const rows = forecast.years.map((y) => {
-    const row: Row = { year: y.year };
-    for (const [category, cost] of Object.entries(y.byCategory)) {
-      const key = chartCategory(category);
-      row[key] = (row[key] ?? 0) + cost;
-      present.add(key);
-    }
-    return row;
-  });
-  return { rows, present: CHART_CATEGORIES.filter((c) => present.has(c)) };
-}
 
 function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipValueType, number | string>) {
   if (!active || !payload?.length) return null;
@@ -58,16 +43,26 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
   );
 }
 
+/**
+ * The stacked bar chart. It's hidden from screen readers, which get the same
+ * numbers as a table next to it (ForecastTable), so it takes no keyboard focus.
+ */
 export default function ForecastChart({ forecast }: { forecast: Forecast }) {
-  const { rows, present } = toRows(forecast);
+  const { rows, present } = toChartRows(forecast);
 
   return (
-    <div className="viz-root h-72 w-full sm:h-80">
+    <div className="viz-root h-72 w-full sm:h-80" aria-hidden="true">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <BarChart
+          data={rows}
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+          accessibilityLayer={false}
+        >
           <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
           <XAxis
             dataKey="year"
+            // Always show the first year, even when narrow screens skip labels.
+            interval="equidistantPreserveStart"
             tickLine={false}
             axisLine={{ stroke: "var(--viz-grid)" }}
             tick={{ fill: "var(--viz-axis)", fontSize: 12 }}
