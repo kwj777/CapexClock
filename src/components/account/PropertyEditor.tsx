@@ -7,7 +7,7 @@ import { CalculatorView } from "@/components/calculator/Calculator";
 import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import type { LibraryComponent } from "@/lib/library/components";
-import { SAVE_PROBLEM_TEXT, toSaveInput } from "@/lib/properties/convert";
+import { SAVE_PROBLEM_TEXT, toSaveInput, type SaveInput } from "@/lib/properties/convert";
 import { fetchAllRows } from "@/lib/properties/load";
 import {
   FUNCTION_NOT_FOUND,
@@ -20,7 +20,15 @@ import {
   type SaveFailure,
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
-import { clearUnsaved, keepUnsaved, loadUnsaved, unsavedKey } from "./unsaved";
+import {
+  clearUnsaved,
+  keepUnsaved,
+  loadUnsaved,
+  nothingToRestore,
+  unsavedKey,
+  wasDropped,
+  type UnsavedEdits,
+} from "./unsaved";
 
 type SaveState =
   | { kind: "idle" }
@@ -36,6 +44,9 @@ const STICKY: SaveFailure[] = ["signed_out", "conflict", "deleted"];
 
 // Set once the database turns out not to have migration 0002's version check.
 let versionCheckMissing = false;
+function noteVersionCheckMissing() {
+  versionCheckMissing = true;
+}
 
 export interface PropertyEditorProps {
   propertyId?: string;
@@ -91,12 +102,24 @@ export default function PropertyEditor({
   userId,
 }: PropertyEditorProps) {
   const router = useRouter();
-  const backupKey = unsavedKey(userId, propertyId);
+  const backupKey = unsavedKey(userId, propertyId, importFromCalculator);
+  const [currentYear] = useState(() => new Date().getFullYear());
   // Rendered client-only (see PropertyEditorLoader), so localStorage is safe here.
-  const [restored, setRestored] = useState(() => loadUnsaved(backupKey));
-  const startingDraft = () => (importFromCalculator ? loadDraft() : initialDraft);
+  // An import starts from the calculator's work in this browser as it is now.
+  const [calculator] = useState(() => {
+    if (!importFromCalculator) return null;
+    const work = loadDraft();
+    return { draft: work, stored: JSON.stringify(work) };
+  });
+  const startingDraft = calculator?.draft ?? initialDraft;
+  const [restored, setRestored] = useState(() => {
+    const kept = loadUnsaved(backupKey);
+    // Not over newer calculator work, and not when it matches what's already here.
+    if (!kept || (calculator && kept.calculator !== calculator.stored)) return null;
+    return nothingToRestore(kept, initialName, startingDraft, currentYear) ? null : kept;
+  });
   const [name, setName] = useState(() => restored?.name ?? initialName);
-  const [draft, setDraft] = useState<Draft>(() => restored?.draft ?? startingDraft());
+  const [draft, setDraft] = useState<Draft>(() => restored?.draft ?? startingDraft);
   // The copy in the database. Restored edits keep the version they started from, so
   // saving them over a newer copy is caught.
   const [saved, setSaved] = useState(() => ({
@@ -107,9 +130,11 @@ export default function PropertyEditor({
   const [savedId, setSavedId] = useState(propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
-  const [currentYear] = useState(() => new Date().getFullYear());
   const busy = useRef(false);
   const leaving = useRef(false);
+  const mounted = useRef(true);
+  // The unsaved edits last kept in this browser; null when there are none.
+  const lastKept = useRef<Omit<UnsavedEdits, "keptAt"> | null>(null);
 
   const dirty = name !== saved.name || draft !== saved.draft;
   const signedOut =
@@ -132,6 +157,15 @@ export default function PropertyEditor({
     const warn = (event: BeforeUnloadEvent) => {
       if (!leaving.current) event.preventDefault();
     };
+    const askToLeave = (event: Event) => {
+      if (window.confirm("You have unsaved changes. Leave without saving them?")) {
+        leaving.current = true;
+        clearUnsaved(backupKey);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    };
     // Links inside the app change pages without unloading this one, so ask here too.
     const confirmLeave = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0) return;
@@ -143,37 +177,65 @@ export default function PropertyEditor({
       const to = new URL(link.href);
       const here = window.location;
       if (to.origin !== here.origin || (to.pathname === here.pathname && to.search === here.search)) return;
-      if (window.confirm("You have unsaved changes. Leave without saving them?")) {
-        leaving.current = true;
-        clearUnsaved(backupKey);
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
+      askToLeave(event);
+    };
+    // Forms that go to another page (Sign out) ask the same way, before signing out
+    // drops the kept copy.
+    const confirmSubmit = (event: SubmitEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.target instanceof HTMLFormElement && event.target.hasAttribute("action")) askToLeave(event);
     };
     window.addEventListener("beforeunload", warn);
     document.addEventListener("click", confirmLeave, true);
+    document.addEventListener("submit", confirmSubmit, true);
     return () => {
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", confirmLeave, true);
+      document.removeEventListener("submit", confirmSubmit, true);
     };
   }, [dirty, backupKey]);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Unsaved edits are kept in this browser, so leaving another way (Back, a lost
   // session, an error page taking over) doesn't lose them. They come back next time
   // this property (or a new one) is opened.
   useEffect(() => {
     if (!dirty) {
+      lastKept.current = null;
       clearUnsaved(backupKey);
       return;
     }
-    const edits = { name, draft, baseUpdatedAt: saved.updatedAt };
+    const edits = {
+      name,
+      draft,
+      baseUpdatedAt: saved.updatedAt,
+      ...(calculator ? { calculator: calculator.stored } : {}),
+    };
+    lastKept.current = edits;
     keepUnsaved(backupKey, edits);
-    // Kept again on the way out, in case another tab saved or dropped this copy.
+    // Another tab can drop this copy: signing out drops every copy, and saving the
+    // same property drops its copy. These edits are still here unsaved, so keep them again.
+    const keepAgain = (event: StorageEvent) => {
+      if (!leaving.current && wasDropped(event, backupKey)) keepUnsaved(backupKey, edits);
+    };
+    window.addEventListener("storage", keepAgain);
+    // Kept again on the way out too.
     return () => {
+      window.removeEventListener("storage", keepAgain);
       if (!leaving.current) keepUnsaved(backupKey, edits);
     };
-  }, [dirty, backupKey, name, draft, saved.updatedAt]);
+  }, [dirty, backupKey, name, draft, saved.updatedAt, calculator]);
+
+  /** Makes sure the edits are kept after a failed save, as the message says. */
+  function keepAfterFailure() {
+    if (!leaving.current && lastKept.current) keepUnsaved(backupKey, lastKept.current);
+  }
 
   function edited() {
     setSave((s) =>
@@ -214,6 +276,7 @@ export default function PropertyEditor({
       if ("failure" in checked) {
         busy.current = false;
         const out = checked.failure !== "conflict" && (await isSignedOut());
+        keepAfterFailure();
         setSave({ kind: "failed", failure: out ? "signed_out" : checked.failure });
         return;
       }
@@ -225,7 +288,7 @@ export default function PropertyEditor({
     let result = await supabase.rpc("save_property", expected ? { ...args, p_expected_updated_at: expected } : args);
     if (expected && result.error?.code === FUNCTION_NOT_FOUND) {
       // The database hasn't had migration 0002 yet: save without the version check.
-      versionCheckMissing = true;
+      noteVersionCheckMissing();
       result = await supabase.rpc("save_property", args);
     }
     const { data: newId, error, status } = result;
@@ -233,6 +296,7 @@ export default function PropertyEditor({
       busy.current = false;
       let failure = saveFailure(error, status);
       if (failure === "network" && (await isSignedOut())) failure = "signed_out";
+      keepAfterFailure();
       setSave({ kind: "failed", failure });
       return;
     }
@@ -241,9 +305,19 @@ export default function PropertyEditor({
       components: String(input.components.length),
       source: importFromCalculator ? "calculator" : id ? "edit" : "new",
     });
-    if (importFromCalculator) saveDraft(EMPTY_DRAFT);
+    // Only the calculator work this came from: newer work there (from another tab) stays.
+    if (calculator && JSON.stringify(loadDraft()) === calculator.stored) saveDraft(EMPTY_DRAFT);
     // The kept copy goes once nothing is unsaved (see the effect above).
     setRestored(null);
+
+    if (!mounted.current && !id) {
+      // The owner left while it saved, and the form was locked, so the copy kept on
+      // the way out is what was just saved. Stay where they went.
+      busy.current = false;
+      if (!leaving.current) clearUnsaved(backupKey);
+      router.refresh();
+      return;
+    }
 
     if (!id) {
       // The form stays locked until the property's own page opens, so nothing typed is lost.
@@ -258,6 +332,11 @@ export default function PropertyEditor({
     // Anything edited while saving is kept, and stays unsaved.
     const back = await readBack(newId);
     busy.current = false;
+    if (!mounted.current) {
+      settleAfterLeaving(input, sent, back);
+      router.refresh();
+      return;
+    }
     if (!back?.property) {
       // Saved, but its new version is unknown. The next save checks it first.
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
@@ -273,6 +352,26 @@ export default function PropertyEditor({
     }
     setSave({ kind: "saved" });
     router.refresh();
+  }
+
+  /**
+   * The owner left while a save was in flight, and the copy kept on the way out
+   * still starts from the old version. Drop it if it's what was saved, or move edits
+   * made during the save onto the new version.
+   */
+  function settleAfterLeaving(input: SaveInput, sent: { name: string; draft: Draft }, back: ReadBack | null) {
+    const left = lastKept.current;
+    if (leaving.current || !left) return;
+    if (left.name === sent.name && left.draft === sent.draft) {
+      clearUnsaved(backupKey);
+    } else if (back?.property && matchesSaved(input, back.property, back.components)) {
+      const ids = [...back.components].sort((a, b) => a.sort_order - b.sort_order).map((c) => c.id);
+      keepUnsaved(backupKey, {
+        ...left,
+        draft: withSavedIds(left.draft, sent.draft, ids),
+        baseUpdatedAt: back.property.updated_at,
+      });
+    }
   }
 
   async function onDelete() {
@@ -301,7 +400,7 @@ export default function PropertyEditor({
     clearUnsaved(backupKey);
     setRestored(null);
     setName(initialName);
-    setDraft(startingDraft());
+    setDraft(startingDraft);
     setSaved((s) => ({ ...s, updatedAt: initialUpdatedAt ?? null }));
     setSave({ kind: "idle" });
   }
