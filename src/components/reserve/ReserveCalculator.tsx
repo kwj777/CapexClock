@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { readReserveInputs } from "@/lib/reserve/inputs";
+import { readReserveInputs, shownFields, type ExpenseField } from "@/lib/reserve/inputs";
 import { sinkingFund } from "@/lib/reserve/sinking-fund";
 
 const input =
@@ -26,13 +26,40 @@ export default function ReserveCalculator() {
   ]);
   const [balance, setBalance] = useState("");
   const [units, setUnits] = useState("");
-  const balanceErrorId = useId();
-  const unitsErrorId = useId();
+  const baseId = useId();
+  const balanceErrorId = `${baseId}-balance-error`;
+  const unitsErrorId = `${baseId}-units-error`;
+  // Fields the owner has left at least once ("<row id>:cost"); a row is only checked field by field after that.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  // Field to focus after the next render (after removing a row).
+  const focusNext = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  });
 
   const update = (id: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const touch = (id: number, field: ExpenseField) =>
+    setTouched((t) => (t.has(`${id}:${field}`) ? t : new Set(t).add(`${id}:${field}`)));
+
+  function remove(id: number) {
+    const i = rows.findIndex((r) => r.id === id);
+    const next = rows[i + 1] ?? rows[i - 1];
+    if (next) focusNext.current = `${baseId}-${next.id}-name`;
+    setRows((rs) => rs.filter((x) => x.id !== id));
+  }
 
   const inputs = readReserveInputs(rows, balance, units);
   const problems = inputs.rowProblems;
+  const flagged = new Map(
+    rows.map((r) => [
+      r.id,
+      shownFields(problems.get(r.id), new Set((["cost", "years"] as const).filter((f) => touched.has(`${r.id}:${f}`)))),
+    ]),
+  );
+  const anyFlagged = [...flagged.values()].some((fields) => fields.length > 0);
   const result = inputs.expenses.length && problems.size === 0 && !inputs.balanceProblem
     ? sinkingFund({ expenses: inputs.expenses, currentBalance: inputs.balance, units: inputs.units })
     : null;
@@ -42,34 +69,68 @@ export default function ReserveCalculator() {
       <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Upcoming expenses</h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Costs in today&apos;s dollars. Use 0 years for anything due now.</p>
       <div className="mt-4 space-y-3">
-        {rows.map((r, i) => (
-          <div key={r.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
-            <label className="col-span-3 sm:col-span-1">
-              <span className={label}>What</span>
-              <input className={input} placeholder={i === 0 ? "e.g. Roof" : "e.g. Boiler"} value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} />
-            </label>
-            <label>
-              <span className={label}>Cost</span>
-              <input className={input} inputMode="decimal" placeholder="$" value={r.cost} onChange={(e) => update(r.id, { cost: e.target.value })} aria-invalid={problems.has(r.id)} />
-            </label>
-            <label>
-              <span className={label}>Years until due</span>
-              <input className={input} inputMode="numeric" value={r.years} onChange={(e) => update(r.id, { years: e.target.value })} aria-invalid={problems.has(r.id)} />
-            </label>
-            <button
-              type="button"
-              onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
-              disabled={rows.length === 1}
-              className="self-end rounded-md px-2 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 dark:hover:text-white"
-              aria-label={`Remove ${r.name || `expense ${i + 1}`}`}
-            >
-              ✕
-            </button>
-            {problems.has(r.id) && (
-              <p className="col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400">{problems.get(r.id)}</p>
-            )}
-          </div>
-        ))}
+        {rows.map((r, i) => {
+          // Row names keep each field's label unique, starting with the visible label.
+          const rowName = r.name.trim() || `expense ${i + 1}`;
+          const errorId = `${baseId}-${r.id}-error`;
+          const fields = flagged.get(r.id) ?? [];
+          const flag = (field: ExpenseField) =>
+            fields.includes(field) ? { "aria-invalid": true, "aria-describedby": errorId } : {};
+          return (
+            <div key={r.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+              <label className="col-span-3 sm:col-span-1">
+                <span className={label}>What</span>
+                <input
+                  id={`${baseId}-${r.id}-name`}
+                  className={input}
+                  placeholder={i === 0 ? "e.g. Roof" : "e.g. Boiler"}
+                  value={r.name}
+                  aria-label={`What, expense ${i + 1}`}
+                  onChange={(e) => update(r.id, { name: e.target.value })}
+                />
+              </label>
+              <label>
+                <span className={label}>Cost</span>
+                <input
+                  className={input}
+                  inputMode="decimal"
+                  placeholder="$"
+                  value={r.cost}
+                  aria-label={`Cost, ${rowName}`}
+                  {...flag("cost")}
+                  onChange={(e) => update(r.id, { cost: e.target.value })}
+                  onBlur={() => touch(r.id, "cost")}
+                />
+              </label>
+              <label>
+                <span className={label}>Years until due</span>
+                <input
+                  className={input}
+                  inputMode="numeric"
+                  value={r.years}
+                  aria-label={`Years until due, ${rowName}`}
+                  {...flag("years")}
+                  onChange={(e) => update(r.id, { years: e.target.value })}
+                  onBlur={() => touch(r.id, "years")}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => remove(r.id)}
+                disabled={rows.length === 1}
+                className="self-end rounded-md px-2 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
+                aria-label={`Remove ${rowName}`}
+              >
+                ✕
+              </button>
+              {fields.length > 0 && (
+                <p id={errorId} className="col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400">
+                  {problems.get(r.id)?.message}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
       <button
         type="button"
@@ -143,8 +204,10 @@ export default function ReserveCalculator() {
               {result.shortfallNow > 0 && " Your balance doesn't cover what's due now, so that gap needs to be funded separately."}
             </p>
           </>
-        ) : problems.size > 0 || inputs.balanceProblem ? (
+        ) : anyFlagged || inputs.balanceProblem ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">Fix the highlighted fields to see your monthly amount.</p>
+        ) : problems.size > 0 ? (
+          <p className="text-sm text-slate-600 dark:text-slate-400">Finish each expense&apos;s cost and years until due to see your monthly amount.</p>
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">Enter at least one cost and when it&apos;s due to see your monthly amount.</p>
         )}

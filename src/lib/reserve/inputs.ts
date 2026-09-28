@@ -6,10 +6,18 @@ export interface ExpenseFields {
   years: string;
 }
 
+export type ExpenseField = "cost" | "years";
+
+export interface RowProblem {
+  message: string;
+  /** The fields that need fixing, so only those are marked. */
+  fields: ExpenseField[];
+}
+
 export interface ReserveInputs {
   expenses: PlannedExpense[];
   /** What's wrong with each row that can't be used, by row id. */
-  rowProblems: Map<number, string>;
+  rowProblems: Map<number, RowProblem>;
   /** Blank counts as 0. */
   balance: number;
   balanceProblem: string | null;
@@ -38,25 +46,20 @@ export const UNITS_PROBLEM = "Enter units as a whole number, like 12.";
  */
 export function readReserveInputs(rows: ExpenseFields[], balance: string, units: string): ReserveInputs {
   const expenses: PlannedExpense[] = [];
-  const rowProblems = new Map<number, string>();
+  const rowProblems = new Map<number, RowProblem>();
   for (const r of rows) {
     const cost = num(r.cost);
     const years = num(r.years);
     if (cost === null && years === null) continue;
     if (years !== null && Number.isInteger(years) && years >= 1900) {
-      rowProblems.set(r.id, YEAR_TYPED_PROBLEM);
+      rowProblems.set(r.id, { message: YEAR_TYPED_PROBLEM, fields: ["years"] });
       continue;
     }
-    if (
-      cost === null ||
-      Number.isNaN(cost) ||
-      cost < 0 ||
-      years === null ||
-      !Number.isInteger(years) ||
-      years < 0 ||
-      years > MAX_YEARS_UNTIL_DUE
-    ) {
-      rowProblems.set(r.id, ROW_PROBLEM);
+    const fields: ExpenseField[] = [];
+    if (cost === null || Number.isNaN(cost) || cost < 0) fields.push("cost");
+    if (years === null || !Number.isInteger(years) || years < 0 || years > MAX_YEARS_UNTIL_DUE) fields.push("years");
+    if (cost === null || years === null || fields.length > 0) {
+      rowProblems.set(r.id, { message: ROW_PROBLEM, fields });
       continue;
     }
     expenses.push({ cost, yearsUntilDue: years });
@@ -75,4 +78,12 @@ export function readReserveInputs(rows: ExpenseFields[], balance: string, units:
     units: unitsOk ? (unitsValue ?? 0) : 0,
     unitsProblem: unitsOk ? null : UNITS_PROBLEM,
   };
+}
+
+/**
+ * The fields to mark as wrong right now. A field is only checked once the owner
+ * has left it, so typing a cost doesn't flag the years they haven't reached yet.
+ */
+export function shownFields(problem: RowProblem | undefined, touched: ReadonlySet<ExpenseField>): ExpenseField[] {
+  return problem ? problem.fields.filter((f) => touched.has(f)) : [];
 }
