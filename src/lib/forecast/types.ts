@@ -69,5 +69,10 @@ export interface Forecast {
   monthlyReserve: number;
   /** Null when the unit count is zero. */
   monthlyReservePerUnit: number | null;
+  /**
+   * Replacements after the window that the monthly reserve is already saving
+   * for, up to the year that sets its amount. Empty when the window explains it.
+   */
+  savingAhead: Replacement[];
   atRisk: AtRiskItem[];
 }

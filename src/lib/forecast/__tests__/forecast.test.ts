@@ -2,6 +2,7 @@ import {
   atRiskItems,
   computeForecast,
   endOfLifeYear,
+  nextReplacementReserve,
   replacementYears,
   validateComponent,
   type ForecastComponent,
@@ -135,6 +136,25 @@ describe("reserve totals and per-unit math", () => {
     expect(r.monthlyReserve).toBeCloseTo(120000 / 120, 6);
   });
 
+  it("looks a full 30 years ahead, counting a bill due in exactly 30 years", () => {
+    const at30 = component({ installYear: 2016, usefulLifeYears: 40, replacementCostEach: 60000 }); // 2056
+    expect(computeForecast({ startYear: START, unitCount: 1, components: [at30] }).monthlyReserve).toBeCloseTo(60000 / 360, 6);
+    const at31 = component({ installYear: 2017, usefulLifeYears: 40, replacementCostEach: 60000 }); // 2057
+    expect(computeForecast({ startYear: START, unitCount: 1, components: [at31] }).monthlyReserve).toBe(0);
+  });
+
+  it("lists the replacements after the window that set the monthly reserve", () => {
+    const roof = component({ id: "roof", name: "Roof", installYear: 2014, usefulLifeYears: 23, replacementCostEach: 38000 }); // 2037
+    const r = computeForecast({ startYear: START, unitCount: 12, components: [roof] });
+    expect(r.total).toBe(0);
+    expect(r.monthlyReserve).toBeCloseTo(38000 / 132, 6);
+    expect(r.savingAhead.map((x) => [x.year, x.name, x.cost])).toEqual([[2037, "Roof", 38000]]);
+  });
+
+  it("lists nothing extra when the window already explains the reserve", () => {
+    expect(f.savingAhead).toEqual([]);
+  });
+
   it("does not spread first-year costs into the monthly reserve", () => {
     const once = component({ installYear: 1990, usefulLifeYears: 36, replacementCostEach: 5000 }); // 2026, next 2062
     const r = computeForecast({ startYear: START, unitCount: 1, components: [once] });
@@ -170,6 +190,31 @@ describe("reserve totals and per-unit math", () => {
     expect(five.total).toBe(33600 + 36000);
     // The reserve still looks past a short window.
     expect(five.monthlyReserve).toBeCloseTo(f.monthlyReserve, 6);
+  });
+});
+
+describe("single-component reserve (lifespan pages)", () => {
+  it("matches the forecast's reserve when the next replacement is inside the horizon", () => {
+    for (const c of [
+      component({ installYear: 2020, usefulLifeYears: 10, quantity: 12, replacementCostEach: 1400 }), // due 2030
+      component({ installYear: 2005, usefulLifeYears: 8, replacementCostEach: 5000 }), // overdue
+      component({ installYear: 2016, usefulLifeYears: 10, replacementCostEach: 900 }), // due this year
+    ]) {
+      const f = computeForecast({ startYear: START, unitCount: 0, components: [c] });
+      const one = nextReplacementReserve(c, START);
+      expect(one.monthly).toBeCloseTo(f.monthlyReserve, 6);
+      expect(one.neededNow).toBe(f.neededNow);
+    }
+  });
+
+  it("still gives a monthly amount when the item is due more than 30 years out", () => {
+    const panel = component({ installYear: 2024, usefulLifeYears: 33, quantity: 12, replacementCostEach: 3000 }); // 2057
+    expect(nextReplacementReserve(panel, START)).toEqual({ neededNow: 0, monthly: 36000 / (31 * 12) });
+  });
+
+  it("saves for the replacement after this one when it's due now", () => {
+    const due = component({ installYear: 2000, usefulLifeYears: 20, replacementCostEach: 24000 });
+    expect(nextReplacementReserve(due, START)).toEqual({ neededNow: 24000, monthly: 24000 / 240 });
   });
 });
 
