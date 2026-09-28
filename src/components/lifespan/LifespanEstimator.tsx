@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
@@ -33,6 +33,13 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
   const [cost, setCost] = useState("");
   // Set when the calculator already has this component, so the owner picks update or add.
   const [alreadyAdded, setAlreadyAdded] = useState(false);
+  const alreadyPrompt = useRef<HTMLParagraphElement>(null);
+
+  // The prompt takes the place of the button that was pressed, so move focus to
+  // it: screen readers read the question, and Tab goes on to its buttons.
+  useEffect(() => {
+    if (alreadyAdded) alreadyPrompt.current?.focus();
+  }, [alreadyAdded]);
 
   const life = defaultLife(item);
   const year = num(installYear);
@@ -181,7 +188,12 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
 
       {alreadyAdded ? (
         <div className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-800" role="group" aria-labelledby={`${item.slug}-already`}>
-          <p id={`${item.slug}-already`} className="text-sm text-slate-700 dark:text-slate-300">
+          <p
+            ref={alreadyPrompt}
+            id={`${item.slug}-already`}
+            tabIndex={-1}
+            className="text-sm text-slate-700 focus:outline-none dark:text-slate-300"
+          >
             Your forecast already has {subjectFor(item).noun}. Update that row with these details, or add another?
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
