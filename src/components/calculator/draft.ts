@@ -1,7 +1,6 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
-import { DRAFT_STORAGE_KEY } from "./storage-key";
 
 // Form state keeps raw strings so inputs can be empty or mid-edit.
 export interface DraftRow {
@@ -33,7 +32,7 @@ export interface Draft {
 
 export const EMPTY_DRAFT: Draft = { unitCount: "", yearBuilt: "", rows: [] };
 
-const STORAGE_KEY = DRAFT_STORAGE_KEY;
+export const STORAGE_KEY = "capexclock:calculator:v1";
 
 export function loadDraft(): Draft {
   try {
@@ -132,15 +131,28 @@ export function customRow(): DraftRow {
 }
 
 /**
+ * True when a row's quantity is still the one its way of counting started with
+ * (or blank), so changing how it's counted loses nothing the owner typed.
+ */
+function hasStartingQuantity(row: DraftRow): boolean {
+  const quantity = row.quantity.trim();
+  if (quantity === "") return true;
+  if (row.unitLabel === "per_unit") return row.followsUnitCount === true;
+  return row.unitLabel === "per_building" && quantity === "1";
+}
+
+/**
  * Applies an edit to one row. Typing a quantity stops it following the unit
- * count. Changing how it's counted resets the quantity to fit the new way.
+ * count. Changing how it's counted resets a starting quantity to fit the new
+ * way, but keeps one the owner typed, so arrowing through the picker (which
+ * changes it on every key press in some browsers) never loses their number.
  */
 export function editRow(row: DraftRow, patch: Partial<DraftRow>, unitCount: string): DraftRow {
   const next = { ...row, ...patch };
-  if (patch.unitLabel !== undefined && patch.unitLabel !== row.unitLabel) {
+  if (patch.quantity !== undefined) return { ...next, followsUnitCount: false };
+  if (patch.unitLabel !== undefined && patch.unitLabel !== row.unitLabel && hasStartingQuantity(row)) {
     return { ...next, ...quantityFor(patch.unitLabel, unitCount) };
   }
-  if (patch.quantity !== undefined) next.followsUnitCount = false;
   return next;
 }
 

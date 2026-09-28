@@ -14,6 +14,7 @@ import {
   problemText,
   rowFromLibrary,
   rowTotal,
+  STORAGE_KEY,
   toComponents,
   upgradeDraft,
   withLibraryItem,
@@ -22,6 +23,7 @@ import {
   type DraftRow,
 } from "../draft";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { DRAFT_STORAGE_KEY } from "../storage-key";
 
 const waterHeater = COMPONENT_LIBRARY.find((c) => c.slug === "tank-water-heater")!;
 const washer = COMPONENT_LIBRARY.find((c) => c.slug === "washer-dryer")!;
@@ -248,6 +250,30 @@ describe("how a row is counted", () => {
     expect(rowFromLibrary(carpet, "12")).toMatchObject({ quantity: "", followsUnitCount: false });
   });
 
+  // Some browsers change a closed picker on every arrow key, so each step is an edit.
+  const pick = (row: DraftRow, ...labels: DraftRow["unitLabel"][]) =>
+    labels.reduce((r, unitLabel) => editRow(r, { unitLabel }, "12"), row);
+
+  it("keeps a typed quantity when the owner arrows through the picker and back", () => {
+    const windows = editRow(draftRow(), { quantity: "90" }, "12");
+    expect(pick(windows, "per_building")).toMatchObject({ quantity: "90", followsUnitCount: false });
+    expect(pick(windows, "per_building", "per_unit")).toMatchObject({ quantity: "90", followsUnitCount: false });
+    expect(pick(windows, "per_building", "per_sq_ft", "per_building", "per_unit").quantity).toBe("90");
+    expect(pick(editRow(rowFromLibrary(carpet, "12"), { quantity: "9600" }, "12"), "per_unit", "per_sq_ft").quantity).toBe("9600");
+  });
+
+  it("gives a starting quantity back when the owner arrows through and back", () => {
+    const row = pick(draftRow(), "per_building", "per_sq_ft", "per_building", "per_unit");
+    expect(row).toMatchObject({ quantity: "12", followsUnitCount: true });
+    expect(pick(rowFromLibrary(roof, "12"), "per_sq_ft", "per_unit", "per_building").quantity).toBe("1");
+  });
+
+  it("counts a typed quantity as the owner's after a picker change, so the unit count leaves it alone", () => {
+    const row = pick(editRow(draftRow(), { quantity: "90" }, "12"), "per_building", "per_unit");
+    expect(withUnitCount({ unitCount: "12", yearBuilt: "", rows: [row] }, "14").rows[0].quantity).toBe("90");
+    expect(costLabel(row)).toBe("Cost each");
+  });
+
   it("leaves the quantity alone when another field changes", () => {
     const row = editRow(draftRow(), { costEach: "1400" }, "12");
     expect(row).toMatchObject({ quantity: "12", followsUnitCount: true, costEach: "1400" });
@@ -270,6 +296,12 @@ describe("how a row is counted", () => {
     expect(rowTotal({ quantity: "12", costEach: "$650" })).toEqual({ quantity: 12, each: 650, total: 7800 });
     expect(rowTotal({ quantity: "", costEach: "650" })).toBeNull();
     expect(rowTotal({ quantity: "12", costEach: "1.4k" })).toBeNull();
+  });
+});
+
+describe("where the draft is kept", () => {
+  it("is the key the loader reads to size its placeholder", () => {
+    expect(STORAGE_KEY).toBe(DRAFT_STORAGE_KEY);
   });
 });
 
