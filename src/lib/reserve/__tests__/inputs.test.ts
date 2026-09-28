@@ -32,19 +32,28 @@ describe("reading the reserve calculator's fields", () => {
     for (const bad of ["12 units", "0", "2.5", "-3"]) {
       expect(readReserveInputs([row("60000", "5")], "", bad).unitsProblem).toBe(UNITS_PROBLEM);
     }
+    // The message covers 0, which is a whole number.
+    expect(UNITS_PROBLEM).toMatch(/above 0/);
   });
 
   it("flags a calendar year typed as years until due", () => {
-    expect(readReserveInputs([row("60000", "2031")], "", "").rowProblems.get(1)).toEqual({
-      message: YEAR_TYPED_PROBLEM,
-      fields: ["years"],
-    });
+    for (const year of ["2031", "1998", "2199"]) {
+      expect(readReserveInputs([row("60000", year)], "", "").rowProblems.get(1)).toEqual({
+        message: YEAR_TYPED_PROBLEM,
+        fields: ["years"],
+      });
+    }
   });
 
   it("caps years until due at 100", () => {
     expect(readReserveInputs([row("60000", "100")], "", "").expenses).toEqual([{ cost: 60000, yearsUntilDue: 100 }]);
-    expect(readReserveInputs([row("60000", "101")], "", "").rowProblems.get(1)?.message).toBe(ROW_PROBLEM);
-    expect(readReserveInputs([row("60000", "10000000")], "", "").rowProblems.get(1)?.message).toBe(YEAR_TYPED_PROBLEM);
+    // Too many years, but not a year, so it isn't called one.
+    for (const tooMany of ["101", "1899", "2200", "10000000"]) {
+      expect(readReserveInputs([row("60000", tooMany)], "", "").rowProblems.get(1)).toEqual({
+        message: ROW_PROBLEM,
+        fields: ["years"],
+      });
+    }
   });
 
   it("flags half-filled and unreadable rows", () => {

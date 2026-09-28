@@ -37,7 +37,12 @@ function num(value: string): number | null {
 export const ROW_PROBLEM = `Enter a cost and a whole number of years from 0 to ${MAX_YEARS_UNTIL_DUE}.`;
 export const YEAR_TYPED_PROBLEM = "Enter how many years from now it's due, like 5, not the year.";
 export const BALANCE_PROBLEM = "Enter your balance as a plain number, like 30000.";
-export const UNITS_PROBLEM = "Enter units as a whole number, like 12.";
+export const UNITS_PROBLEM = "Enter units as a whole number above 0, like 12.";
+
+/** Due years someone might type by mistake (2031 for "in 5 years"); bigger numbers are just too many years. */
+function looksLikeYear(years: number): boolean {
+  return Number.isInteger(years) && years >= 1900 && years <= 2199;
+}
 
 /**
  * Reads the reserve calculator's fields. Anything typed that can't be used is
@@ -51,7 +56,7 @@ export function readReserveInputs(rows: ExpenseFields[], balance: string, units:
     const cost = num(r.cost);
     const years = num(r.years);
     if (cost === null && years === null) continue;
-    if (years !== null && Number.isInteger(years) && years >= 1900) {
+    if (years !== null && looksLikeYear(years)) {
       rowProblems.set(r.id, { message: YEAR_TYPED_PROBLEM, fields: ["years"] });
       continue;
     }
