@@ -2,6 +2,7 @@ import type { CaptureResult } from "posthog-js";
 import {
   daysSinceLastVisit,
   DEFAULT_POSTHOG_HOST,
+  identifyPerson,
   localDay,
   posthogHost,
   recordVisit,
@@ -94,5 +95,47 @@ describe("recordVisit", () => {
       throw new Error("SecurityError");
     }, day3);
     expect(capture).not.toHaveBeenCalled();
+  });
+});
+
+describe("identifyPerson", () => {
+  function fakePostHog(state: { distinctId: string; identified: boolean }) {
+    return {
+      calls: [] as string[],
+      get_property(name: string) {
+        return name === "$user_state" ? (state.identified ? "identified" : "anonymous") : undefined;
+      },
+      get_distinct_id() {
+        return state.distinctId;
+      },
+      reset() {
+        this.calls.push("reset");
+        state.distinctId = "new-anonymous-id";
+        state.identified = false;
+      },
+      identify(id: string) {
+        this.calls.push(`identify:${id}`);
+        state.distinctId = id;
+        state.identified = true;
+      },
+    };
+  }
+
+  it("identifies an anonymous visitor by user id", () => {
+    const posthog = fakePostHog({ distinctId: "anon-1", identified: false });
+    identifyPerson(posthog, "user-a");
+    expect(posthog.calls).toEqual(["identify:user-a"]);
+  });
+
+  it("does nothing new for the same signed-in user", () => {
+    const posthog = fakePostHog({ distinctId: "user-a", identified: true });
+    identifyPerson(posthog, "user-a");
+    expect(posthog.calls).toEqual(["identify:user-a"]);
+  });
+
+  it("starts a new person when a different account signs in on the same browser", () => {
+    const posthog = fakePostHog({ distinctId: "user-a", identified: true });
+    identifyPerson(posthog, "user-b");
+    expect(posthog.calls).toEqual(["reset", "identify:user-b"]);
   });
 });

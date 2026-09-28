@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import SignOutButton from "@/components/account/SignOutButton";
 import TrackWelcome from "@/components/account/TrackWelcome";
 import { SiteFooter } from "@/components/SiteChrome";
 import { supabaseEnv } from "@/lib/supabase/env";
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/app">) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const email = typeof data?.claims.email === "string" ? data.claims.email : null;
+  const userId = typeof data?.claims.sub === "string" ? data.claims.sub : null;
 
   return (
     <>
@@ -39,16 +41,12 @@ export default async function AppLayout({ children }: LayoutProps<"/app">) {
           </nav>
           <div className="flex items-center gap-3">
             {email && <span className="hidden text-sm text-slate-500 sm:inline dark:text-slate-400">{email}</span>}
-            <form action="/auth/sign-out" method="post">
-              <button type="submit" className={navLink}>
-                Sign out
-              </button>
-            </form>
+            <SignOutButton className={navLink} />
           </div>
         </div>
       </header>
       <Suspense>
-        <TrackWelcome />
+        <TrackWelcome userId={userId} />
       </Suspense>
       <main className="flex-1">{children}</main>
       <SiteFooter />

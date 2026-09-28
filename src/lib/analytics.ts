@@ -80,3 +80,38 @@ export function recordVisit(
     // Storage blocked: return visits can't be told apart, so none are sent.
   }
 }
+
+type Identity = Pick<PostHog, "get_property" | "get_distinct_id" | "reset" | "identify">;
+
+/** Ties events to the account by its Supabase user id. Never the email. */
+export function identifyPerson(posthog: Identity, userId: string): void {
+  // Someone else was signed in on this browser and didn't sign out: start a
+  // new person so the two accounts aren't merged.
+  if (posthog.get_property("$user_state") === "identified" && posthog.get_distinct_id() !== userId) {
+    posthog.reset();
+  }
+  posthog.identify(userId);
+}
+
+export async function identifyUser(userId: string): Promise<void> {
+  const posthog = await initAnalytics();
+  if (posthog) identifyPerson(posthog, userId);
+}
+
+/** On sign-out: forget the person, so whoever uses this browser next starts anonymous. */
+export async function resetAnalytics(): Promise<void> {
+  const posthog = await initAnalytics();
+  posthog?.reset();
+}
+
+/** account_created, at most once per account in this browser even if the welcome link is opened again. */
+export async function trackAccountCreated(userId: string): Promise<void> {
+  try {
+    const key = `capexclock:account-created:${userId}`;
+    if (window.localStorage.getItem(key)) return;
+    window.localStorage.setItem(key, "1");
+  } catch {
+    // Storage blocked: the server still only sends the welcome flag once.
+  }
+  await track("account_created", {});
+}
