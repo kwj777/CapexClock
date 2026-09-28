@@ -22,6 +22,10 @@ const FAQ = [
     a: "It's the smallest steady monthly amount that, starting from zero, has the cash ready for every replacement on time. We look 30 years ahead so a big item due just after the 10-year chart is still saved for. Anything overdue or due this year is shown separately as needed now, since there's no time to save for it. The per-unit figure divides the monthly reserve by your number of units.",
   },
   {
+    q: "How do I enter costs?",
+    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per unit are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 × $650 = $7,800.",
+  },
+  {
     q: "What if I don't know when something was installed?",
     a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm.",
   },
