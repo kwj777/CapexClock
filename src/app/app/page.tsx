@@ -1,6 +1,6 @@
 import Link from "next/link";
 import ImportDraftPrompt from "@/components/account/ImportDraftPrompt";
-import { formatMoney } from "@/components/calculator/format";
+import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { forecastForProperty } from "@/lib/properties/convert";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,10 +54,10 @@ export default async function PortfolioPage() {
       ) : (
         <>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Monthly reserve, all properties" value={formatMoney(totals.monthly)} emphasis />
+            <Stat label="Monthly reserve, all properties" value={formatReserve(totals.monthly)} emphasis />
             <Stat
               label="Per unit, per month"
-              value={totals.units > 0 ? formatMoney(totals.monthly / totals.units) : "Add units"}
+              value={totals.units > 0 ? formatReserve(totals.monthly / totals.units) : "Add units"}
               emphasis
             />
             <Stat label={`Needed in ${startYear}`} value={formatMoney(totals.neededNow)} />
@@ -80,13 +80,13 @@ export default async function PortfolioPage() {
                     <div>
                       <dt className="text-slate-500 dark:text-slate-400">Monthly</dt>
                       <dd className="font-semibold tabular-nums text-slate-950 dark:text-white">
-                        {formatMoney(forecast.monthlyReserve)}
+                        {formatReserve(forecast.monthlyReserve)}
                       </dd>
                     </div>
                     <div>
                       <dt className="text-slate-500 dark:text-slate-400">Per unit</dt>
                       <dd className="font-semibold tabular-nums text-slate-950 dark:text-white">
-                        {forecast.monthlyReservePerUnit === null ? "–" : formatMoney(forecast.monthlyReservePerUnit)}
+                        {forecast.monthlyReservePerUnit === null ? "–" : formatReserve(forecast.monthlyReservePerUnit)}
                       </dd>
                     </div>
                     <div>

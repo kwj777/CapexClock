@@ -11,8 +11,9 @@ export const DEFAULT_WINDOW_YEARS = 10;
 /** A component is "at risk" when it is this many years or fewer from end of life. */
 export const AT_RISK_YEARS = 2;
 /**
- * The reserve looks this far ahead, past the displayed window, so a big item due
- * just after year 10 is still saved for instead of dropping out of the number.
+ * The reserve looks this many years past the current year, well beyond the
+ * displayed window, so a big item due just after year 10 is still saved for
+ * instead of dropping out of the number.
  */
 export const RESERVE_HORIZON_YEARS = 30;
 
@@ -138,13 +139,48 @@ function buildYears(components: ForecastComponent[], startYear: number, count: n
  * included: there's no time to save for them, so they're reported as needed now.
  */
 export function levelMonthlyReserve(years: ForecastYear[]): number {
+  return tightestPoint(years).monthly;
+}
+
+/** The level monthly deposit and the index of the earliest year that sets it (0 when nothing does). */
+function tightestPoint(years: ForecastYear[]): { monthly: number; index: number } {
   let cumulative = 0;
-  let needed = 0;
+  let monthly = 0;
+  let index = 0;
   for (let k = 1; k < years.length; k++) {
     cumulative += years[k].total;
-    needed = Math.max(needed, cumulative / (k * 12));
+    const needed = cumulative / (k * 12);
+    if (needed > monthly) {
+      monthly = needed;
+      index = k;
+    }
   }
-  return needed;
+  return { monthly, index };
+}
+
+/**
+ * Level monthly amount to have the cash ready for one component's next
+ * replacement that can still be saved for (savingFor): the one at end of life,
+ * or, when that's this year or overdue, the one after it. It matches the
+ * forecast's reserve for a single component but has no horizon, so long-lived
+ * items still get a figure. The forecast leaves out a replacement due after
+ * startYear + RESERVE_HORIZON_YEARS until it comes within the horizon.
+ */
+export function nextReplacementReserve(
+  component: ForecastComponent,
+  startYear: number,
+): { neededNow: number; monthly: number; savingFor: number } {
+  assertValid(component);
+  const cost = replacementCost(component);
+  const yearsUntilDue = endOfLifeYear(component) - startYear;
+  if (component.scenario === "replace_now" || yearsUntilDue <= 0) {
+    return {
+      neededNow: cost,
+      monthly: cost / (12 * component.usefulLifeYears),
+      savingFor: startYear + component.usefulLifeYears,
+    };
+  }
+  return { neededNow: 0, monthly: cost / (12 * yearsUntilDue), savingFor: startYear + yearsUntilDue };
 }
 
 export function computeForecast(input: ForecastInput): Forecast {
@@ -160,14 +196,16 @@ export function computeForecast(input: ForecastInput): Forecast {
   }
 
   const startYear = input.startYear;
+  // This year plus the RESERVE_HORIZON_YEARS after it.
   const horizon = buildYears(
     input.components,
     startYear,
-    Math.max(windowYears, RESERVE_HORIZON_YEARS),
+    Math.max(windowYears, RESERVE_HORIZON_YEARS + 1),
   );
   const years = horizon.slice(0, windowYears);
   const total = years.reduce((sum, y) => sum + y.total, 0);
-  const monthlyReserve = levelMonthlyReserve(horizon);
+  const { monthly: monthlyReserve, index: tightest } = tightestPoint(horizon);
+  const savingAhead = horizon.slice(windowYears, tightest + 1).flatMap((y) => y.replacements);
 
   return {
     startYear,
@@ -177,6 +215,7 @@ export function computeForecast(input: ForecastInput): Forecast {
     neededNow: years[0].total,
     monthlyReserve,
     monthlyReservePerUnit: input.unitCount > 0 ? monthlyReserve / input.unitCount : null,
+    savingAhead,
     atRisk: atRiskItems(input.components, startYear),
   };
 }

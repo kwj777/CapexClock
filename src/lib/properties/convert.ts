@@ -1,5 +1,5 @@
 import type { Draft, DraftRow } from "@/components/calculator/draft";
-import { EARLIEST_INSTALL_YEAR } from "@/components/calculator/draft";
+import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT } from "@/components/calculator/draft";
 import { computeForecast, type Forecast, type ForecastComponent } from "@/lib/forecast";
 import type {
   ComponentRow,
@@ -28,6 +28,7 @@ export function draftFromRows(property: PropertyRow, components: ComponentRow[])
           usefulLife: String(c.useful_life_years),
           costEach: c.replacement_cost_each === null ? "" : String(c.replacement_cost_each),
           scenario: c.scenario,
+          followsUnitCount: c.unit_label === "per_unit" && String(c.quantity) === String(property.unit_count),
         }),
       ),
   };
@@ -46,7 +47,7 @@ export const SAVE_PROBLEM_TEXT: Record<SaveProblem, string> = {
   life: "Useful life must be a whole number from 1 to 100.",
   install_year: `Install years must be 4-digit years from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
   cost: "Costs must be plain numbers like 1400, or blank.",
-  year_built: `Year built must be a 4-digit year from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
+  year_built: `Year built must be a 4-digit year from ${EARLIEST_YEAR_BUILT} to this year, or blank.`,
   unit_count: "Rental units must be a whole number.",
 };
 
@@ -57,8 +58,8 @@ export interface SaveInput {
   problems: Record<string, SaveProblem>;
 }
 
-function validYear(year: number | null, currentYear: number): boolean {
-  return year === null || (Number.isInteger(year) && year >= EARLIEST_INSTALL_YEAR && year <= currentYear);
+function validYear(year: number | null, currentYear: number, earliest = EARLIEST_INSTALL_YEAR): boolean {
+  return year === null || (Number.isInteger(year) && year >= earliest && year <= currentYear);
 }
 
 /**
@@ -76,7 +77,7 @@ export function toSaveInput(
   const unitCount = parse(draft.unitCount) ?? 0;
   const yearBuilt = parse(draft.yearBuilt);
   if (!Number.isInteger(unitCount) || unitCount < 0) problems.property = "unit_count";
-  else if (!validYear(yearBuilt, currentYear)) problems.property = "year_built";
+  else if (!validYear(yearBuilt, currentYear, EARLIEST_YEAR_BUILT)) problems.property = "year_built";
 
   const components: SaveComponentInput[] = [];
   draft.rows.forEach((row, index) => {

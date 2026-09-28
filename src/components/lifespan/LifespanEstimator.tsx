@@ -1,70 +1,117 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { formatMoney } from "@/components/calculator/format";
-import { loadDraft, rowFromLibrary, saveDraft } from "@/components/calculator/draft";
+import { useEffect, useId, useRef, useState } from "react";
+import { formatMoney, formatReserve } from "@/components/calculator/format";
+import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
-import { computeForecast } from "@/lib/forecast";
+import { nextReplacementReserve, RESERVE_HORIZON_YEARS } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
+import { subjectFor } from "@/lib/library/phrasing";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
 const label = "text-xs font-medium text-slate-600 dark:text-slate-400";
 
+/** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
 function num(value: string): number | null {
   const cleaned = value.replace(/[$,\s]/g, "");
   if (cleaned === "") return null;
   const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? n : NaN;
 }
 
 /** "When will mine need replacing, and what should I set aside?" for one component. */
 export default function LifespanEstimator({ item }: { item: LibraryComponent }) {
   const router = useRouter();
+  const baseId = useId();
+  const yearNoteId = `${baseId}-year-note`;
+  const moneyNoteId = `${baseId}-money-note`;
   const [startYear] = useState(() => new Date().getFullYear());
   const [installYear, setInstallYear] = useState("");
   const [quantity, setQuantity] = useState(item.unitLabel === "per_building" ? "1" : "");
   const [cost, setCost] = useState("");
+  // Set when the calculator already has this component, so the owner picks update or add.
+  const [alreadyAdded, setAlreadyAdded] = useState(false);
+  const alreadyPrompt = useRef<HTMLParagraphElement>(null);
+
+  // The prompt takes the place of the button that was pressed, so move focus to
+  // it: screen readers read the question, and Tab goes on to its buttons.
+  useEffect(() => {
+    if (alreadyAdded) alreadyPrompt.current?.focus();
+  }, [alreadyAdded]);
 
   const life = defaultLife(item);
   const year = num(installYear);
   const validYear = year !== null && Number.isInteger(year) && year >= 1900 && year <= startYear;
-  const qty = num(quantity) ?? 0;
+  const qty = num(quantity);
   const each = num(cost);
+  const sqFt = item.unitLabel === "per_sq_ft";
 
-  let result: { due: number; low: number; high: number; monthly: number | null; neededNow: number | null } | null = null;
+  let result: {
+    due: number;
+    low: number;
+    high: number;
+    monthly: number | null;
+    neededNow: number | null;
+    /** The replacement the monthly amount saves for. */
+    savingFor: number | null;
+  } | null = null;
+  // Why no dollar figure shows yet, once a cost has been typed, and which field it's about.
+  let moneyHint: { text: string; field: "cost" | "quantity"; invalid: boolean } | null = null;
   if (validYear) {
     let monthly: number | null = null;
     let neededNow: number | null = null;
-    if (each !== null && each >= 0 && qty > 0) {
-      const f = computeForecast({
+    let savingFor: number | null = null;
+    if (each !== null && (Number.isNaN(each) || each < 0)) {
+      moneyHint = { text: "Enter the cost as a plain number, like 1400.", field: "cost", invalid: true };
+    } else if (each !== null && qty === null) {
+      moneyHint = {
+        text: sqFt ? "Enter the square feet to see a monthly amount." : "Enter how many to see a monthly amount.",
+        field: "quantity",
+        invalid: false,
+      };
+    } else if (each !== null && qty !== null && (Number.isNaN(qty) || qty <= 0)) {
+      moneyHint = {
+        text: sqFt ? "Enter the square feet as a number, like 1200." : "Enter how many as a number, like 12.",
+        field: "quantity",
+        invalid: true,
+      };
+    } else if (each !== null && qty !== null) {
+      const r = nextReplacementReserve(
+        { id: item.slug, category: item.category, name: item.name, quantity: qty, installYear: year, usefulLifeYears: life, replacementCostEach: each },
         startYear,
-        unitCount: 0,
-        components: [
-          { id: item.slug, category: item.category, name: item.name, quantity: qty, installYear: year, usefulLifeYears: life, replacementCostEach: each },
-        ],
-      });
-      monthly = f.monthlyReserve;
-      neededNow = f.neededNow;
+      );
+      monthly = r.monthly;
+      neededNow = r.neededNow;
+      savingFor = r.savingFor;
     }
-    result = { due: year + life, low: year + item.lifeLow, high: year + item.lifeHigh, monthly, neededNow };
+    result = { due: year + life, low: year + item.lifeLow, high: year + item.lifeHigh, monthly, neededNow, savingFor };
   }
 
-  function addToForecast() {
+  function addToForecast(mode?: "add" | "update") {
     const draft = loadDraft();
-    const row = {
-      ...rowFromLibrary(item, draft.unitCount),
-      installYear: installYear.trim(),
-      ...(quantity.trim() ? { quantity: quantity.trim() } : {}),
-      costEach: cost.trim(),
-    };
-    saveDraft({ ...draft, rows: [...draft.rows, row] });
+    if (!mode && draft.rows.some((r) => r.librarySlug === item.slug)) {
+      setAlreadyAdded(true);
+      return;
+    }
+    saveDraft(withLibraryItem(draft, item, { installYear, quantity, costEach: cost }, mode ?? "add"));
     void track("lifespan_added_to_calculator", { component: item.slug });
     router.push("/capex-calculator");
   }
 
   const yearsLeft = result ? result.due - startYear : 0;
+  // The building forecast looks RESERVE_HORIZON_YEARS ahead, so it leaves out a later replacement for now.
+  const forecastCountsFrom =
+    result?.savingFor != null && result.savingFor > startYear + RESERVE_HORIZON_YEARS
+      ? result.savingFor - RESERVE_HORIZON_YEARS
+      : null;
+  const badYear = installYear.trim() !== "" && !validYear;
+  // Points a field at the note below it, and marks it when what's typed can't be read.
+  const noteFor = (field: "cost" | "quantity") =>
+    moneyHint?.field === field
+      ? { "aria-describedby": moneyNoteId, "aria-invalid": moneyHint.invalid || undefined }
+      : {};
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -72,22 +119,47 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <label className="block">
           <span className={label}>Year installed</span>
-          <input className={input} inputMode="numeric" placeholder="e.g. 2014" value={installYear} onChange={(e) => setInstallYear(e.target.value)} />
+          <input
+            className={input}
+            inputMode="numeric"
+            placeholder="e.g. 2014"
+            value={installYear}
+            aria-invalid={badYear || undefined}
+            aria-describedby={badYear ? yearNoteId : undefined}
+            onChange={(e) => setInstallYear(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className={label}>{item.unitLabel === "per_sq_ft" ? "Square feet" : "How many"}</span>
-          <input className={input} inputMode="numeric" placeholder={item.unitLabel === "per_sq_ft" ? "e.g. 1,200" : "e.g. 12"} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <input
+            className={input}
+            inputMode="numeric"
+            placeholder={item.unitLabel === "per_sq_ft" ? "e.g. 1,200" : "e.g. 12"}
+            value={quantity}
+            {...noteFor("quantity")}
+            onChange={(e) => setQuantity(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className={label}>Replacement cost {item.unitLabel === "per_sq_ft" ? "per sq ft" : "each"}</span>
-          <input className={input} inputMode="decimal" placeholder="Your cost" value={cost} onChange={(e) => setCost(e.target.value)} />
+          <input
+            className={input}
+            inputMode="decimal"
+            placeholder="Quote or estimate"
+            value={cost}
+            {...noteFor("cost")}
+            onChange={(e) => setCost(e.target.value)}
+          />
         </label>
       </div>
 
       <div className="mt-5 text-slate-700 dark:text-slate-300" aria-live="polite">
         {!result ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {installYear.trim() && !validYear
+          <p
+            id={yearNoteId}
+            className={badYear ? "text-sm text-amber-800 dark:text-amber-300" : "text-sm text-slate-500 dark:text-slate-400"}
+          >
+            {badYear
               ? `Enter a 4-digit year from 1900 to ${startYear}.`
               : "Enter the install year to see when replacement is due."}
           </p>
@@ -105,6 +177,11 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Typical range {result.low}–{result.high}, from a typical life of {item.lifeLow}–{item.lifeHigh} years.
             </p>
+            {moneyHint && (
+              <p id={moneyNoteId} className="text-sm text-amber-800 dark:text-amber-300">
+                {moneyHint.text}
+              </p>
+            )}
             {result.monthly !== null && result.neededNow !== null && (
               <p className="text-sm">
                 {result.neededNow > 0 && (
@@ -114,8 +191,15 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
                 )}
                 {result.monthly > 0 && (
                   <>
-                    Set aside <strong className="text-slate-950 dark:text-white">{formatMoney(result.monthly)}/month</strong> to
+                    Set aside <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong> to
                     have the cash ready for the next replacement.
+                  </>
+                )}
+                {result.monthly > 0 && forecastCountsFrom !== null && (
+                  <>
+                    {" "}
+                    The building forecast looks {RESERVE_HORIZON_YEARS} years ahead, so its monthly reserve won&apos;t
+                    count this replacement until {forecastCountsFrom}.
                   </>
                 )}
               </p>
@@ -124,18 +208,47 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
         )}
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={addToForecast}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
-        >
-          Add to my building&apos;s forecast
-        </button>
-        <span className="text-sm text-slate-500 dark:text-slate-400">
-          Opens the free calculator with this item filled in.
-        </span>
-      </div>
+      {alreadyAdded ? (
+        <div className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-800" role="group" aria-labelledby={`${item.slug}-already`}>
+          <p
+            ref={alreadyPrompt}
+            id={`${item.slug}-already`}
+            tabIndex={-1}
+            className="text-sm text-slate-700 focus:outline-none dark:text-slate-300"
+          >
+            Your forecast already has {subjectFor(item).noun}. Update that row with these details, or add another?
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => addToForecast("update")}
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+            >
+              Update the one I have
+            </button>
+            <button
+              type="button"
+              onClick={() => addToForecast("add")}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800"
+            >
+              Add another
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={() => addToForecast()}
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+          >
+            Add to my building&apos;s forecast
+          </button>
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Opens the free calculator with this item filled in.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

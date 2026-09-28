@@ -1,5 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { formatMoney, formatUnitPrice } from "@/components/calculator/format";
+import { formatMoney, formatReserve, formatUnitPrice } from "@/components/calculator/format";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons).
@@ -56,10 +56,10 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
         </Text>
 
         <View style={s.stats}>
-          <Stat label="Monthly reserve" value={formatMoney(forecast.monthlyReserve)} />
+          <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} />
           <Stat
             label="Per unit, per month"
-            value={forecast.monthlyReservePerUnit === null ? "–" : formatMoney(forecast.monthlyReservePerUnit)}
+            value={forecast.monthlyReservePerUnit === null ? "–" : formatReserve(forecast.monthlyReservePerUnit)}
           />
           <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
           <Stat label="10-year total" value={formatMoney(forecast.total)} />
@@ -123,6 +123,22 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
           );
         })}
         {replacements.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
+
+        {/* Later replacements the monthly reserve is already saving for, so it isn't a mystery. */}
+        {forecast.savingAhead.length > 0 && (
+          <View>
+            <Text style={s.h2} minPresenceAhead={40}>
+              The monthly reserve is {forecast.years.some((y) => y.replacements.length > 0) ? "also " : ""}saving for
+            </Text>
+            {forecast.savingAhead.map((r, i) => (
+              <View key={`${r.componentId}-${r.year}-${i}`} style={s.tr} wrap={false}>
+                <Text style={{ width: cols.year }}>{r.year}</Text>
+                <Text style={{ flex: 1 }}>{r.name}</Text>
+                <Text style={{ width: cols.total, textAlign: "right" }}>{formatMoney(r.cost)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={s.footer} fixed>
           <Text>capexclock.com</Text>

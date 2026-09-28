@@ -1,4 +1,4 @@
-import { exampleDraft } from "@/components/calculator/draft";
+import { editRow, exampleDraft, withUnitCount } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { draftFromRows, forecastForProperty, toSaveInput } from "../convert";
 
@@ -79,6 +79,12 @@ describe("saving an editor draft", () => {
     });
     expect(input.property.name).toBe("Untitled property");
   });
+
+  it("accepts a year built back to 1800, as the database does", () => {
+    const draft = { ...exampleDraft(), yearBuilt: "1890" };
+    expect(toSaveInput("x", draft, 2026).problems).toEqual({});
+    expect(toSaveInput("x", { ...draft, yearBuilt: "1799" }, 2026).problems).toEqual({ property: "year_built" });
+  });
 });
 
 describe("loading a saved property", () => {
@@ -89,6 +95,25 @@ describe("loading a saved property", () => {
     expect(draft.rows[0]).toMatchObject({ installYear: "", costEach: "" });
     const back = toSaveInput(property.name, draft, 2026, property.id);
     expect(back.components.map((c) => c.id)).toEqual(rows.map((r) => r.id).reverse());
+  });
+
+  it("lets per-unit rows at the unit count follow it, and keeps other quantities as saved", () => {
+    const rows = [
+      component({}),
+      component({ id: "b1d7c1e2-0000-4000-8000-000000000004", library_slug: "washer-dryer", name: "Washer / dryer", quantity: 1, sort_order: 1 }),
+      component({ id: "b1d7c1e2-0000-4000-8000-000000000005", unit_label: "per_building", quantity: 12, sort_order: 2 }),
+    ];
+    const draft = draftFromRows(property, rows);
+    expect(draft.rows.map((r) => r.followsUnitCount)).toEqual([true, false, false]);
+    const typed = ["1", "14"].reduce(withUnitCount, draft);
+    expect(typed.rows.map((r) => r.quantity)).toEqual(["14", "1", "12"]);
+    // Once the owner types a quantity it stays put.
+    const edited = { ...typed, rows: typed.rows.map((r, i) => (i === 0 ? editRow(r, { quantity: "10" }, typed.unitCount) : r)) };
+    expect(withUnitCount(edited, "16").rows[0].quantity).toBe("10");
+    // What's saved is unchanged: no new fields reach the database.
+    expect(Object.keys(toSaveInput("x", typed, 2026, property.id).components[0]).sort()).toEqual(
+      ["category", "id", "install_year", "library_slug", "name", "quantity", "replacement_cost_each", "scenario", "sort_order", "unit_label", "useful_life_years"],
+    );
   });
 
   it("forecasts saved rows, using year built for blank install years and skipping blank costs", () => {
