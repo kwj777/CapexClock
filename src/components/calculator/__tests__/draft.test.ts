@@ -177,9 +177,16 @@ describe("how a row is counted", () => {
   });
 
   it("labels the cost by what it pays for", () => {
-    expect(costLabel("per_unit")).toBe("Cost per apartment");
-    expect(costLabel("per_building")).toBe("Cost for the building");
-    expect(costLabel("per_sq_ft")).toBe("Cost per sq ft");
+    expect(costLabel(rowFromLibrary(washer, "12"))).toBe("Cost per apartment");
+    expect(costLabel(rowFromLibrary(roof, "12"))).toBe("Cost for the building");
+    expect(costLabel(rowFromLibrary(carpet, "12"))).toBe("Cost per sq ft");
+    expect(costLabel(editRow(draftRow(), { unitLabel: "per_sq_ft" }, "12"))).toBe("Cost per sq ft");
+  });
+
+  it("labels the cost each once the owner sets their own count", () => {
+    expect(costLabel(editRow(rowFromLibrary(washer, "12"), { quantity: "1" }, "12"))).toBe("Cost each");
+    expect(costLabel(editRow(rowFromLibrary(roof, "12"), { quantity: "2" }, "12"))).toBe("Cost each");
+    expect(costLabel(customRow())).toBe("Cost for the building");
   });
 
   it("shows the row total once quantity and cost are readable", () => {

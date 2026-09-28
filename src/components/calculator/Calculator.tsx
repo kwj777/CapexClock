@@ -468,7 +468,7 @@ function ComponentRow({
           )}
         </label>
         <label className="block">
-          <span className={`${labelClass} lg:sr-only`}>{costLabel(row.unitLabel)}</span>
+          <span className={`${labelClass} lg:sr-only`}>{costLabel(row)}</span>
           <div className="relative mt-1 lg:mt-0">
             <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500">
               $
@@ -478,7 +478,7 @@ function ComponentRow({
               inputMode="decimal"
               value={row.costEach}
               placeholder="Quote or estimate"
-              aria-label={`${costLabel(row.unitLabel)}, ${label}`}
+              aria-label={`${costLabel(row)}, ${label}`}
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
@@ -513,7 +513,7 @@ function CostNote({ row }: { row: DraftRow }) {
   if (total === null) {
     return (
       <span className="mt-1 hidden text-xs text-slate-500 lg:block dark:text-slate-400">
-        {costLabel(row.unitLabel).replace(/^Cost /, "")}
+        {costLabel(row).replace(/^Cost /, "")}
       </span>
     );
   }

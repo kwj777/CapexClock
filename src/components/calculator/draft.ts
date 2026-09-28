@@ -186,11 +186,15 @@ export function rowTotal(row: Pick<DraftRow, "quantity" | "costEach">): { quanti
   return { quantity, each, total: quantity * each };
 }
 
-/** The cost field's label: what one "cost" buys, given how the row is counted. */
-export function costLabel(unitLabel: UnitLabel): string {
-  if (unitLabel === "per_unit") return "Cost per apartment";
-  if (unitLabel === "per_building") return "Cost for the building";
-  return "Cost per sq ft";
+/**
+ * The cost field's label: what one "cost" pays for, so the quantity × cost math
+ * reads right. A per-unit row at the unit count is priced per apartment (all its
+ * windows, say); once the owner types their own count it's priced each.
+ */
+export function costLabel(row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">): string {
+  if (row.unitLabel === "per_sq_ft") return "Cost per sq ft";
+  if (row.unitLabel === "per_unit") return row.followsUnitCount ? "Cost per apartment" : "Cost each";
+  return row.quantity.trim() === "1" ? "Cost for the building" : "Cost each";
 }
 
 /** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
