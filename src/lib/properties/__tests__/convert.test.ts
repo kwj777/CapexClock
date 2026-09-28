@@ -79,6 +79,32 @@ describe("saving an editor draft", () => {
     });
     expect(input.property.name).toBe("Untitled property");
   });
+
+  it("reports values over the database's limits instead of failing the save", () => {
+    const draft = exampleDraft();
+    const [a, b, c] = draft.rows;
+    draft.rows = [
+      { ...a, name: "x".repeat(201) },
+      { ...b, quantity: "1e400" },
+      { ...c, costEach: "2000000000000" },
+    ];
+    draft.unitCount = "150000";
+    const input = toSaveInput("x", draft, 2026);
+    expect(input.problems).toEqual({
+      property: "unit_count",
+      [a.id]: "name_length",
+      [b.id]: "quantity",
+      [c.id]: "cost",
+    });
+    expect(input.property.unit_count).toBe(0);
+  });
+
+  it("accepts values right at the limits", () => {
+    const draft = exampleDraft();
+    draft.rows = [{ ...draft.rows[0], name: "x".repeat(200), quantity: "999999999", costEach: "999999999999" }];
+    draft.unitCount = "100000";
+    expect(toSaveInput("x", draft, 2026).problems).toEqual({});
+  });
 });
 
 describe("loading a saved property", () => {
