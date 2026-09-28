@@ -68,7 +68,10 @@ const FAQ = [
   { q: "Is it free?", a: "Yes, the core forecaster is free." },
   { q: "Who is it for?", a: "Owners of roughly 5–100 rental units." },
   { q: "Do I need to connect my accounting software?", a: "No." },
-  { q: "When does it launch?", a: "Early access is rolling out soon." },
+  {
+    q: "Can I use it now?",
+    a: "Yes. The calculator is open to everyone, and a free account saves your properties. Replacement reminders and a lender-ready condition report are coming next. Join the early access list to try them first.",
+  },
 ];
 
 const faqJsonLd = {
@@ -83,12 +86,12 @@ const faqJsonLd = {
 
 function CtaButton({ className = "" }: { className?: string }) {
   return (
-    <a
-      href="#signup"
+    <Link
+      href="/capex-calculator"
       className={`inline-flex items-center justify-center rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${className}`}
     >
-      Get early access. It&apos;s free.
-    </a>
+      Try the free calculator
+    </Link>
   );
 }
 
@@ -200,10 +203,11 @@ export default function Home() {
         <section id="signup" className="scroll-mt-8 bg-slate-950 dark:border-y dark:border-slate-800 dark:bg-slate-900">
           <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2">
             <div className="text-white">
-              <h2 className="text-3xl font-semibold tracking-tight">Get early access</h2>
+              <h2 className="text-3xl font-semibold tracking-tight">Get early access to what&apos;s next</h2>
               <p className="mt-4 max-w-md text-lg text-slate-300">
-                CapexClock is free. Join the list and we&apos;ll let you in as soon as early
-                access opens. Your answers help us build the right thing first.
+                The calculator is free to use today. Next we&apos;re building replacement reminders
+                and a lender-ready condition report. Join the list to try them early. Your answers
+                help us build the right thing first.
               </p>
             </div>
             <div className="rounded-2xl bg-white p-6 sm:p-8 dark:bg-slate-950 dark:ring-1 dark:ring-slate-800">
