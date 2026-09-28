@@ -78,15 +78,22 @@ export async function forecastPdfBlob(
   props: Omit<ForecastPdfProps, "printable" | "keepTableTogether">,
 ): Promise<Blob> {
   const printable = await printableText();
-  const rows = exportRows(props.forecast, props.components, props.details?.unitLabels);
+  const { rows, money } = tableData(props);
   // A short table is kept on one page, but only if it fits on one: a block
   // that can't break and is taller than a page squeezes the whole page
   // together. Laying the table out on its own shows whether it fits. If it
   // doesn't, it starts on a new page and runs on, like a long table.
   const keepTableTogether =
     rows.length <= MAX_ROWS_KEPT_TOGETHER &&
-    (await pageCount(<DueTable rows={rows} money={moneyColumn(rows.map((r) => r.total))} printable={printable} />)) === 1;
+    (await pageCount(<DueTable rows={rows} money={money} printable={printable} />)) === 1;
   return pdf(<ForecastPdf {...props} printable={printable} keepTableTogether={keepTableTogether} />).toBlob();
+}
+
+/** The table's rows, and the money format the whole PDF uses. */
+function tableData({ forecast, components, details }: Pick<ForecastPdfProps, "forecast" | "components" | "details">) {
+  const rows = exportRows(forecast, components, details?.unitLabels);
+  // Shows cents everywhere when any row has them, so rows add up to the totals.
+  return { rows, money: moneyColumn(rows.map((r) => r.total)) };
 }
 
 /** How many pages some content takes on its own. */
@@ -177,13 +184,11 @@ export default function ForecastPdf({
   printable = (text) => text,
   keepTableTogether = false,
 }: ForecastPdfProps) {
-  const rows = exportRows(forecast, components, details.unitLabels);
+  const { rows, money } = tableData({ forecast, components, details });
   // Totals add up the rounded rows, so they match the table to the cent.
   const years = forecast.years.map((y) => ({ year: y.year, total: sumTotals(rows.filter((r) => r.year === y.year)) }));
   const maxYear = Math.max(1, ...years.map((y) => y.total));
   const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
-  // Shows cents everywhere when any row has them, so rows add up to the totals.
-  const money = moneyColumn(rows.map((r) => r.total));
 
   return (
     <Document title={`${name} CapEx forecast`} author="CapexClock">
