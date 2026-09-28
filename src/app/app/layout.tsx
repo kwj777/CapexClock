@@ -19,7 +19,7 @@ const navLink =
 export default async function AppLayout({ children }: LayoutProps<"/app">) {
   // Accounts aren't set up on this deployment.
   if (!supabaseEnv()) notFound();
-  const { email } = await getAccount();
+  const { id: userId, email } = await getAccount();
 
   return (
     <>
@@ -43,7 +43,7 @@ export default async function AppLayout({ children }: LayoutProps<"/app">) {
         </div>
       </header>
       <Suspense>
-        <TrackWelcome />
+        <TrackWelcome userId={userId} />
       </Suspense>
       <main className="flex-1">{children}</main>
       <SiteFooter />

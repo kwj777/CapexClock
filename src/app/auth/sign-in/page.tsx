@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { safeNext } from "@/lib/safe-next";
+import { supabaseEnv } from "@/lib/supabase/env";
 import SignInForm from "./SignInForm";
 
 export const metadata: Metadata = {
@@ -9,6 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default async function SignInPage({ searchParams }: PageProps<"/auth/sign-in">) {
+  // Accounts aren't set up on this deployment (same as the /app layout).
+  if (!supabaseEnv()) notFound();
   const params = await searchParams;
   const next = safeNext(typeof params.next === "string" ? params.next : null);
   const linkFailed = params.error === "link";

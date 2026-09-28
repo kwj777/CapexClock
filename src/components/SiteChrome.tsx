@@ -33,8 +33,9 @@ export function SiteHeader() {
           <Link href="/#signup" className={`${navLink} hidden lg:inline`}>
             Early access
           </Link>
+          {/* No prefetch: /app runs the auth proxy, which public pages shouldn't trigger. */}
           {supabaseEnv() && (
-            <Link href="/app" className={navLink}>
+            <Link href="/app" prefetch={false} className={navLink}>
               Sign in
             </Link>
           )}
@@ -64,9 +65,14 @@ export function SiteFooter() {
             Component lifespans
           </Link>
         </nav>
-        <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900 dark:hover:text-white">
-          {CONTACT_EMAIL}
-        </a>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
+            Privacy
+          </Link>
+          <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900 dark:hover:text-white">
+            {CONTACT_EMAIL}
+          </a>
+        </div>
       </div>
     </footer>
   );
