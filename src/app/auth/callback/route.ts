@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      const destination = new URL(next, origin);
+      let destination = new URL(next, origin);
+      // safeNext already keeps us on this site; check again before redirecting.
+      if (destination.origin !== origin) destination = new URL("/app", origin);
       // First confirmation of this email means a new account (used for analytics).
       const user = data.user;
       if (user?.email_confirmed_at && user.last_sign_in_at) {
