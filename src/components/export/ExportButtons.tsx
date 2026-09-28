@@ -3,19 +3,11 @@
 import { useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
-import type { ExportDetails } from "@/lib/export/rows";
-import type { Forecast, ForecastComponent, UnitLabel } from "@/lib/forecast";
+import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
+import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import PayQuestion from "./PayQuestion";
 
 type Format = "csv" | "pdf";
-
-/** A calculator form row, as far as the exports need it. */
-export interface ExportFormRow {
-  id: string;
-  name: string;
-  category: string;
-  unitLabel: UnitLabel;
-}
 
 function download(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -56,13 +48,7 @@ export default function ExportButtons({
     if (busy) return;
     setBusy(format);
     setFailed(false);
-    const included = new Set(components.map((c) => c.id));
-    const details: ExportDetails = {
-      unitLabels: new Map(rows.map((r) => [r.id, r.unitLabel])),
-      leftOut: rows
-        .filter((r) => !included.has(r.id))
-        .map((r) => ({ name: r.name.trim() || "Unnamed component", category: r.category })),
-    };
+    const details = exportDetails(rows, components);
     try {
       if (format === "csv") {
         // The byte-order mark makes Excel read the file as UTF-8.

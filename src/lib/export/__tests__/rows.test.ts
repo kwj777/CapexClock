@@ -1,6 +1,6 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
 import { formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
-import { exportRows, leftOutSummary, sumTotals, toCents } from "../rows";
+import { exportDetails, exportRows, leftOutSummary, sumTotals, toCents, type ExportFormRow } from "../rows";
 
 const components: ForecastComponent[] = [
   { id: "furnace", category: "HVAC", name: "Gas furnace", quantity: 12, installYear: 2012, installYearIsEstimate: true, usefulLifeYears: 18, replacementCostEach: 4200 },
@@ -84,6 +84,31 @@ describe("money in exports", () => {
     expect(formatCostEach({ costEach: 0.125, unit: "sq ft" })).toBe("$0.125/sq ft");
     expect(formatCostEach({ costEach: 4200, unit: "each" })).toBe("$4,200");
     expect(formatCostEach({ costEach: null, unit: "each" })).toBe("");
+  });
+});
+
+describe("export details", () => {
+  const formRows: ExportFormRow[] = [
+    { id: "furnace", name: "Gas furnace", category: "HVAC", unitLabel: "per_unit" },
+    { id: "carpet", name: "Carpet", category: "Flooring", unitLabel: "per_sq_ft" },
+    { id: "boiler", name: "  Boiler ", category: "HVAC", unitLabel: "per_building" },
+    { id: "blank", name: "   ", category: "Other", unitLabel: "per_building" },
+  ];
+  const details = exportDetails(formRows, [{ id: "furnace" }, { id: "carpet" }]);
+
+  it("lists the form rows the forecast left out, in form order", () => {
+    expect(details.leftOut).toEqual([
+      { name: "Boiler", category: "HVAC" },
+      { name: "Unnamed component", category: "Other" },
+    ]);
+    expect(exportDetails(formRows.slice(0, 2), [{ id: "furnace" }, { id: "carpet" }]).leftOut).toEqual([]);
+  });
+
+  it("keeps each row's unit, so area items print sq ft", () => {
+    expect(details.unitLabels?.get("carpet")).toBe("per_sq_ft");
+    const withUnits = exportRows(forecast, components, details.unitLabels);
+    expect(withUnits.find((r) => r.name === "Carpet")?.unit).toBe("sq ft");
+    expect(withUnits.find((r) => r.name === "Gas furnace")?.unit).toBe("each");
   });
 });
 

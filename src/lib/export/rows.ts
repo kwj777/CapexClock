@@ -14,6 +14,31 @@ export interface ExportDetails {
   leftOut?: LeftOut[];
 }
 
+/** A calculator form row, as far as the exports need it. */
+export interface ExportFormRow {
+  id: string;
+  name: string;
+  category: string;
+  unitLabel: UnitLabel;
+}
+
+/**
+ * The units of every form row, and the rows the forecast left out because
+ * their details aren't complete (the forecast only has the complete ones).
+ */
+export function exportDetails(
+  formRows: readonly ExportFormRow[],
+  components: readonly Pick<ForecastComponent, "id">[],
+): ExportDetails {
+  const included = new Set(components.map((c) => c.id));
+  return {
+    unitLabels: new Map(formRows.map((r) => [r.id, r.unitLabel])),
+    leftOut: formRows
+      .filter((r) => !included.has(r.id))
+      .map((r) => ({ name: r.name.trim() || "Unnamed component", category: r.category })),
+  };
+}
+
 /** One replacement as both the CSV and the PDF show it. */
 export interface ExportRow {
   year: number;
@@ -24,7 +49,7 @@ export interface ExportRow {
   /** Unit of measure for the quantity and the cost each. */
   unit: "sq ft" | "each";
   costEach: number | null;
-  /** Quantity × cost each, in whole cents. */
+  /** Quantity × cost each, in dollars rounded to the cent. */
   total: number;
   notes: string[];
 }
