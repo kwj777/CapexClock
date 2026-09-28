@@ -26,6 +26,27 @@ body {
   }
 }
 
+/*
+ * Keyboard focus on form fields: a solid 2px outline with strong contrast in
+ * both themes (5:1 on white, 10:1 on dark). It's an outline, not a shadow
+ * ring, so Windows High Contrast still draws it, and it sits outside any
+ * @layer so it wins over the focus:outline-none some fields carry.
+ */
+:root {
+  --focus-ring: #b45309;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --focus-ring: #fbbf24;
+  }
+}
+
+:where(input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* Chart palette (validated categorical order; see calculator ForecastChart). */
 .viz-root {
   --viz-surface: #ffffff;
