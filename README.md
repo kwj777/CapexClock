@@ -5,11 +5,14 @@ Free CapEx forecaster for small rental property owners. Live at capexclock.com.
 ## Phase 1: early-access landing page
 
 - Next.js (App Router), TypeScript strict, Tailwind v4
-- Not a static site any more: public pages are prerendered and refreshed hourly (ISR), `/app`
-  and `/auth` render on each request, and `src/proxy.ts` checks the session on `/app` only
-- A `/lifespan/<slug>` that doesn't exist shows the 404 page, which is cached for up to an hour
-  like the other lifespan pages (a new library row appears within the hour either way). On
-  Netlify that cache is per deploy, so it starts empty on every deploy
+- Not a static site any more: `/`, `/privacy` and `/reserve-calculator` are fully static, the
+  pages built from the lifespan library (`/capex-calculator`, `/lifespan`, `/lifespan/<slug>` and
+  the sitemap) are rebuilt at most once an hour (ISR), `/app` and `/auth` render on each request,
+  and `src/proxy.ts` checks the session on `/app` only
+- A `/lifespan/<slug>` that doesn't exist shows the 404 page, which is cached like the other
+  lifespan pages. A new library row usually shows up within an hour or two, but a URL visited
+  before the row existed may show the 404 once more after that. On Netlify that cache is per
+  deploy, so it starts empty on every deploy
 - Hosted on Netlify with the Next.js runtime (`@netlify/plugin-nextjs`), declared in `netlify.toml`
 - Signups go to the Netlify Form `early-access`
 - Optional PostHog analytics (product events only; `/privacy` says what is sent)
