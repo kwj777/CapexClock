@@ -85,8 +85,9 @@ Accounts use Supabase magic-link sign-in. All data is protected by Row Level Sec
 owner can only read or change their own properties.
 
 1. **Create the tables.** In the Supabase dashboard open **SQL Editor → New query**, paste
-   `supabase/migrations/0001_init.sql`, and run it. Then do the same with `supabase/seed.sql`
-   (the component library; safe to run again).
+   `supabase/migrations/0001_init.sql`, and run it. Then run each later migration in order
+   (`0002_safer_saves.sql`, …), and then `supabase/seed.sql` (the component library; safe to
+   run again).
 2. **Allow the sign-in links to return to the site.** Under **Authentication → URL
    Configuration**, set **Site URL** to `https://capexclock.com` and add these **Redirect URLs**:
    - `https://capexclock.com/auth/callback`
@@ -97,6 +98,17 @@ owner can only read or change their own properties.
 4. **Email.** Supabase's built-in email sender is rate-limited and meant for testing. Before
    launch, add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
    Resend or Postmark, sending from support@capexclock.com).
+
+### Updating the database
+
+When a new file appears in `supabase/migrations`, run it once on the live project: open
+**SQL Editor → New query**, paste the whole file and click **Run**. Run them in number order.
+
+- `0002_safer_saves.sql`: stops a save from one tab or device silently overwriting a newer
+  save from another, rejects quantities and costs that aren't real numbers, and keeps service
+  records tied to their own component's assets. It's safe to run again, and the site works
+  both before and after it runs. If it notes that some existing rows break a rule, those rows
+  are left as they are and every new save is still checked.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
