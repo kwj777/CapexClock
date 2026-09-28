@@ -1,10 +1,45 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatMoney } from "@/components/calculator/format";
 import { formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import { ESTIMATED_NOTE, exportRows, leftOutSummary, type ExportDetails } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 
-// Loaded only when someone clicks "Download PDF" (see ExportButtons).
+// Loaded only when someone clicks "Download PDF" (see ExportButtons), so the
+// fonts are only fetched then too.
+
+// The PDF's built-in Helvetica only covers Western European letters. DejaVu Sans
+// (public/fonts, license alongside) adds Polish, Czech, Vietnamese, Greek,
+// Cyrillic and common symbols. It has no Chinese, Japanese, Korean, Thai or
+// Indic characters and no emoji; see printableText.
+const font = "DejaVu Sans";
+const faces = [{ fontFamily: font }, { fontFamily: font, fontWeight: 700 }];
+Font.register({
+  family: font,
+  fonts: [
+    { src: "/fonts/DejaVuSans.ttf" },
+    { src: "/fonts/DejaVuSans-Bold.ttf", fontWeight: 700 },
+  ],
+});
+
+/**
+ * Swaps characters the fonts can't draw for "□". Left alone, the PDF falls back
+ * to Helvetica for them, which prints garbled, overlapping glyphs.
+ */
+async function printableText(): Promise<(text: string) => string> {
+  await Promise.all(faces.map((face) => Font.load(face)));
+  const loaded = faces.map((face) => Font.getFont(face).data);
+  const canDraw = (ch: string) =>
+    loaded.every((f) => f?.hasGlyphForCodePoint(ch.codePointAt(0) ?? 0) ?? false);
+  // Spaces and invisible format characters are left to the layout. An accent
+  // or emoji style mark the fonts lack is dropped rather than boxed.
+  return (text) => text.replace(/[^\s\p{C}]/gu, (ch) => (canDraw(ch) ? ch : /\p{M}/u.test(ch) ? "" : "□"));
+}
+
+/** Renders the PDF once its fonts are loaded. */
+export async function forecastPdfBlob(props: Omit<ForecastPdfProps, "printable">): Promise<Blob> {
+  const printable = await printableText();
+  return pdf(<ForecastPdf {...props} printable={printable} />).toBlob();
+}
 
 const ink = "#0f172a";
 const muted = "#64748b";
@@ -13,16 +48,16 @@ const amber = "#f59e0b";
 const warning = "#92400e";
 
 const s = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, color: ink, fontFamily: "Helvetica" },
+  page: { padding: 40, fontSize: 10, color: ink, fontFamily: font },
   brand: { fontSize: 9, color: muted, marginBottom: 4 },
-  title: { fontSize: 20, fontFamily: "Helvetica-Bold" },
+  title: { fontSize: 20, fontWeight: "bold" },
   subtitle: { fontSize: 10, color: muted, marginTop: 4 },
   stats: { flexDirection: "row", gap: 8, marginTop: 18 },
   stat: { flex: 1, borderWidth: 1, borderColor: line, borderRadius: 6, padding: 10 },
   statLabel: { fontSize: 8, color: muted },
-  statValue: { fontSize: 15, fontFamily: "Helvetica-Bold", marginTop: 3 },
-  leftOut: { fontSize: 9, color: warning, fontFamily: "Helvetica-Bold", marginTop: 8, lineHeight: 1.4 },
-  h2: { fontSize: 12, fontFamily: "Helvetica-Bold", marginTop: 20, marginBottom: 6 },
+  statValue: { fontSize: 14, fontWeight: "bold", marginTop: 3 },
+  leftOut: { fontSize: 9, color: warning, fontWeight: "bold", marginTop: 8, lineHeight: 1.4 },
+  h2: { fontSize: 12, fontWeight: "bold", marginTop: 20, marginBottom: 6 },
   note: { fontSize: 8.5, color: muted, marginTop: 6, lineHeight: 1.4 },
   barRow: { flexDirection: "row", alignItems: "center", marginBottom: 3 },
   barYear: { width: 34, fontSize: 9, color: muted },
@@ -31,7 +66,7 @@ const s = StyleSheet.create({
   barValue: { width: 80, textAlign: "right", fontSize: 9 },
   table: { fontSize: 9 },
   tr: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: line, paddingVertical: 4 },
-  th: { fontSize: 8, color: muted, fontFamily: "Helvetica-Bold" },
+  th: { fontSize: 8, color: muted, fontWeight: "bold" },
   num: { textAlign: "right" },
   noteCell: { flex: 1, paddingLeft: 10, fontSize: 8, color: muted },
   footer: { position: "absolute", bottom: 24, left: 40, right: 40, fontSize: 8, color: muted, flexDirection: "row", justifyContent: "space-between" },
@@ -46,12 +81,22 @@ export interface ForecastPdfProps {
   components: ForecastComponent[];
   details?: ExportDetails;
   generatedOn: string;
+  /** Makes names safe to print; see printableText. */
+  printable?: (text: string) => string;
 }
 
-export default function ForecastPdf({ name, unitCount, forecast, components, details = {}, generatedOn }: ForecastPdfProps) {
+export default function ForecastPdf({
+  name,
+  unitCount,
+  forecast,
+  components,
+  details = {},
+  generatedOn,
+  printable = (text) => text,
+}: ForecastPdfProps) {
   const maxYear = Math.max(1, ...forecast.years.map((y) => y.total));
   const rows = exportRows(forecast, components, details.unitLabels);
-  const leftOut = details.leftOut ?? [];
+  const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
   // Shows cents everywhere when any row has them, so rows add up to the year totals.
   const money = moneyColumn(rows.map((r) => r.total));
   const longTable = rows.length > 12;
@@ -60,7 +105,7 @@ export default function ForecastPdf({ name, unitCount, forecast, components, det
     <Document title={`${name} CapEx forecast`} author="CapexClock">
       <Page size="LETTER" style={s.page}>
         <Text style={s.brand}>CAPEXCLOCK · CAPEX FORECAST</Text>
-        <Text style={s.title}>{name}</Text>
+        <Text style={s.title}>{printable(name)}</Text>
         <Text style={s.subtitle}>
           {unitCount > 0 ? `${unitCount.toLocaleString("en-US")} ${unitCount === 1 ? "unit" : "units"} · ` : ""}
           {forecast.startYear}–{forecast.endYear} · prepared {generatedOn}
@@ -98,7 +143,7 @@ export default function ForecastPdf({ name, unitCount, forecast, components, det
             <Text style={s.h2}>At risk</Text>
             {forecast.atRisk.map((a) => (
               <Text key={a.componentId} style={{ marginBottom: 2 }}>
-                {a.name}:{" "}
+                {printable(a.name)}:{" "}
                 {a.status === "overdue"
                   ? `${-a.yearsRemaining} yr${a.yearsRemaining === -1 ? "" : "s"} past end of life`
                   : a.yearsRemaining === 0
@@ -125,7 +170,7 @@ export default function ForecastPdf({ name, unitCount, forecast, components, det
           {rows.map((r, i) => (
             <View key={`${r.name}-${r.year}-${i}`} style={s.tr} wrap={false}>
               <Text style={{ width: cols.year }}>{r.year}</Text>
-              <Text style={{ width: cols.name }}>{r.name}</Text>
+              <Text style={{ width: cols.name }}>{printable(r.name)}</Text>
               <Text style={[s.num, { width: cols.qty }]}>{formatQuantity(r)}</Text>
               <Text style={[s.num, { width: cols.each }]}>{formatCostEach(r)}</Text>
               <Text style={[s.num, { width: cols.total }]}>{money(r.total)}</Text>

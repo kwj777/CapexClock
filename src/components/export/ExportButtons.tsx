@@ -67,21 +67,9 @@ export default function ExportButtons({
         download(new Blob([csv], { type: "text/csv;charset=utf-8" }), exportFileName(name, "csv", forecast.startYear));
       } else {
         // The PDF library is large, so it's only loaded when asked for.
-        const [{ pdf }, { default: ForecastPdf }] = await Promise.all([
-          import("@react-pdf/renderer"),
-          import("./ForecastPdf"),
-        ]);
+        const { forecastPdfBlob } = await import("./ForecastPdf");
         const generatedOn = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        const blob = await pdf(
-          <ForecastPdf
-            name={name}
-            unitCount={unitCount}
-            forecast={forecast}
-            components={components}
-            details={details}
-            generatedOn={generatedOn}
-          />,
-        ).toBlob();
+        const blob = await forecastPdfBlob({ name, unitCount, forecast, components, details, generatedOn });
         download(blob, exportFileName(name, "pdf", forecast.startYear));
       }
       void track(format === "pdf" ? "pdf_exported" : "csv_exported", { components: String(components.length) });
