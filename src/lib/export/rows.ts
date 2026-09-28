@@ -37,6 +37,11 @@ export function toCents(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Adds up rounded row totals, so a total matches the rows it covers to the cent. */
+export function sumTotals(rows: readonly Pick<ExportRow, "total">[]): number {
+  return toCents(rows.reduce((sum, r) => sum + r.total, 0));
+}
+
 /** Every replacement in the window, in year order. */
 export function exportRows(
   forecast: Forecast,

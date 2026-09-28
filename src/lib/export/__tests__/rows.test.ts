@@ -1,6 +1,6 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
 import { formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
-import { exportRows, leftOutSummary, toCents } from "../rows";
+import { exportRows, leftOutSummary, sumTotals, toCents } from "../rows";
 
 const components: ForecastComponent[] = [
   { id: "furnace", category: "HVAC", name: "Gas furnace", quantity: 12, installYear: 2012, installYearIsEstimate: true, usefulLifeYears: 18, replacementCostEach: 4200 },
@@ -32,6 +32,26 @@ describe("export rows", () => {
     const sum = rows.reduce((total, r) => total + r.total, 0);
     expect(toCents(sum)).toBe(toCents(forecast.total));
     expect(rows.filter((r) => r.name === "Dishwasher").map((r) => r.total)).toEqual([650.5, 650.5, 650.5, 650.5]);
+  });
+});
+
+describe("export totals", () => {
+  it("add up the rounded rows, so totals match the table to the cent", () => {
+    const striping = ["a", "b", "c"].map(
+      (id): ForecastComponent => ({ id, category: "Site", name: `Striping ${id}`, quantity: 3333, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 0.125 }),
+    );
+    const f = computeForecast({ startYear: 2026, unitCount: 12, components: striping });
+    const due = exportRows(f, striping).filter((r) => r.year === 2026);
+    expect(due.map((r) => r.total)).toEqual([416.63, 416.63, 416.63]);
+    // The unrounded year total, 1249.875, would print as $1,249.88.
+    expect(toCents(f.years[0].total)).toBe(1249.88);
+    expect(sumTotals(due)).toBe(1249.89);
+  });
+
+  it("clear float noise from the sum", () => {
+    expect(sumTotals([{ total: 0.1 }, { total: 0.2 }])).toBe(0.3);
+    expect(sumTotals(rows)).toBe(toCents(forecast.total));
+    expect(sumTotals([])).toBe(0);
   });
 });
 

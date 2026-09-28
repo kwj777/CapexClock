@@ -1,7 +1,7 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatMoney } from "@/components/calculator/format";
 import { formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
-import { ESTIMATED_NOTE, exportRows, leftOutSummary, type ExportDetails } from "@/lib/export/rows";
+import { ESTIMATED_NOTE, exportRows, leftOutSummary, sumTotals, type ExportDetails } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons), so the
@@ -97,12 +97,14 @@ const s = StyleSheet.create({
   table: { fontSize: 9 },
   tr: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: line, paddingVertical: 4 },
   th: { fontSize: 8, color: muted, fontWeight: "bold" },
-  num: { textAlign: "right" },
+  // The padding keeps long amounts in neighbouring columns from running together.
+  num: { textAlign: "right", paddingLeft: 8 },
   noteCell: { flex: 1, paddingLeft: 10, fontSize: 8, color: muted },
   footer: { position: "absolute", bottom: 24, left: 40, right: 40, fontSize: 8, color: muted, flexDirection: "row", justifyContent: "space-between" },
 });
 
-const cols = { year: 32, name: 164, qty: 64, each: 66, total: 70 };
+// Wide enough for "250,000 sq ft", "$9,999,999.99" each and "$99,999,999.99" in total.
+const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84 };
 
 export interface ForecastPdfProps {
   name: string;
@@ -124,10 +126,12 @@ export default function ForecastPdf({
   generatedOn,
   printable = (text) => text,
 }: ForecastPdfProps) {
-  const maxYear = Math.max(1, ...forecast.years.map((y) => y.total));
   const rows = exportRows(forecast, components, details.unitLabels);
+  // Totals add up the rounded rows, so they match the table to the cent.
+  const years = forecast.years.map((y) => ({ year: y.year, total: sumTotals(rows.filter((r) => r.year === y.year)) }));
+  const maxYear = Math.max(1, ...years.map((y) => y.total));
   const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
-  // Shows cents everywhere when any row has them, so rows add up to the year totals.
+  // Shows cents everywhere when any row has them, so rows add up to the totals.
   const money = moneyColumn(rows.map((r) => r.total));
   const longTable = rows.length > 12;
 
@@ -147,8 +151,8 @@ export default function ForecastPdf({
             label="Per unit, per month"
             value={forecast.monthlyReservePerUnit === null ? "–" : formatMoney(forecast.monthlyReservePerUnit)}
           />
-          <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
-          <Stat label="10-year total" value={formatMoney(forecast.total)} />
+          <Stat label={`Needed in ${forecast.startYear}`} value={money(years[0].total)} />
+          <Stat label="10-year total" value={money(sumTotals(rows))} />
         </View>
         {leftOut.length > 0 && <Text style={s.leftOut}>{leftOutSummary(leftOut)}</Text>}
         <Text style={s.note}>
@@ -158,7 +162,7 @@ export default function ForecastPdf({
         </Text>
 
         <Text style={s.h2}>Replacement costs by year</Text>
-        {forecast.years.map((y) => (
+        {years.map((y) => (
           <View key={y.year} style={s.barRow}>
             <Text style={s.barYear}>{y.year}</Text>
             <View style={s.barTrack}>
@@ -225,10 +229,12 @@ export default function ForecastPdf({
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  // Smaller type for long amounts ("$1,234,567.89"), so they stay on one line.
+  const fontSize = value.length <= 11 ? 14 : value.length <= 13 ? 12 : 10;
   return (
     <View style={s.stat}>
       <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
+      <Text style={[s.statValue, { fontSize }]}>{value}</Text>
     </View>
   );
 }
