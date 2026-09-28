@@ -28,11 +28,12 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   "gas-furnace": {
     factors: ["Filter changes: clogged filters strain the blower and heat exchanger", "Annual service and cleaning", "Correct sizing for the unit", "Climate and hours of use"],
     signs: ["Rising repair calls, especially ignition and blower parts", "Uneven heat or short cycling", "Climbing gas use for the same comfort", "Parts getting hard to find for an older model"],
-    safety: "A cracked heat exchanger can leak carbon monoxide. If a technician finds one or a CO alarm goes off, shut the furnace off and call a licensed HVAC pro now.",
+    safety: "A cracked heat exchanger can leak carbon monoxide. If a CO alarm goes off or you smell gas, get everyone outside and call 911. If a technician finds a crack, shut the furnace off and call a licensed HVAC pro now.",
   },
   "central-ac": {
     factors: ["Coil cleaning and filter changes", "Coastal salt air or heavy dust", "Correct refrigerant charge", "Runtime in hot climates"],
-    signs: ["Longer run times and weaker cooling", "Refrigerant leaks or compressor trouble", "Obsolete refrigerant making repairs costly", "Loud operation or frequent breaker trips"],
+    signs: ["Longer run times and weaker cooling", "Refrigerant leaks or compressor trouble", "Obsolete refrigerant making repairs costly", "Louder, rougher running as parts wear"],
+    safety: "A breaker that keeps tripping, a burning smell or scorched wires at the unit are fire risks. Don't keep resetting the breaker. Turn the AC off and call a licensed HVAC pro now.",
   },
   "heat-pump": {
     factors: ["Year-round runtime (it heats and cools)", "Coil and filter maintenance", "Defrost performance in cold climates", "Correct sizing and refrigerant charge"],
@@ -40,18 +41,18 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   },
   boiler: {
     factors: ["Water treatment and annual flushing", "Cast-iron vs. steel vs. high-efficiency condensing design", "Short cycling from oversizing", "Service of burners and controls"],
-    signs: ["Leaks at sections or the heat exchanger", "Frequent pressure or pilot problems", "Rising fuel use", "Parts that are hard to source"],
-    safety: "A gas or oil boiler can leak carbon monoxide. If a CO alarm goes off, or you see soot or a yellow, flickering flame, shut it off and call a licensed pro now.",
+    signs: ["Leaks at sections or the heat exchanger", "More frequent repairs to pumps and controls", "Rising fuel use", "Parts that are hard to source"],
+    safety: "A gas or oil boiler can leak carbon monoxide. If a CO alarm goes off or you smell gas, get everyone outside and call 911. If you see soot, a yellow, flickering flame or a relief valve that drips or sprays, shut the boiler off and call a licensed pro now.",
   },
   "tank-water-heater": {
     factors: ["Water hardness: sediment builds up in the tank", "Flushing the tank and checking the anode rod", "Temperature setting and demand", "Installation in unheated spaces"],
     signs: ["Rusty or discolored hot water", "Rumbling or popping from sediment", "Moisture or a slow leak at the base", "Hot water running out sooner than it used to"],
-    safety: "A relief valve that drips or sprays, or soot or a CO alarm near a gas heater, is a safety problem. Turn the heater off and call a licensed plumber now.",
+    safety: "If a CO alarm goes off or you smell gas, get everyone outside and call 911. If the relief valve drips or sprays, or you see soot around a gas heater, turn the heater off and call a licensed plumber now.",
   },
   "tankless-water-heater": {
     factors: ["Descaling in hard-water areas", "Venting and combustion-air quality", "Inlet filter cleaning", "Correct sizing for peak demand"],
     signs: ["Error codes and ignition failures", "Temperature swings during use", "Scale-related flow restrictions", "Heat exchanger leaks"],
-    safety: "On a gas model, soot at the vent, a burning smell or a CO alarm can mean carbon monoxide. Turn the heater off and call a licensed pro now.",
+    safety: "If a CO alarm goes off or you smell gas, get everyone outside and call 911. On a gas model, soot at the vent or a burning smell can mean carbon monoxide. Turn the heater off and call a licensed pro now.",
   },
   refrigerator: {
     factors: ["Coil cleaning", "Door gasket condition", "Placement near heat sources", "Tenant use and moves"],
@@ -60,7 +61,7 @@ export const LIFESPAN_NOTES: Record<string, LifespanNotes> = {
   "range-oven": {
     factors: ["Gas vs. electric", "Cleaning between tenants", "Igniter and element wear", "Control board failures"],
     signs: ["Uneven or unreliable heating", "Failed igniters or burners", "Broken controls or door seals", "Hard-to-find parts"],
-    safety: "If you smell gas near a gas range, don't light it or flip any switches. Get everyone out and call the gas company from outside.",
+    safety: "If you smell gas near a gas range, don't light it or flip any switches. Get everyone out and call 911 or the gas company from outside.",
   },
   dishwasher: {
     factors: ["Water hardness", "Filter cleaning", "Tenant use", "Pump and seal wear"],

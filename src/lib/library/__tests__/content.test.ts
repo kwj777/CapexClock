@@ -10,6 +10,7 @@ describe("lifespan notes", () => {
   it("put hazards in a safety note that says to act now, not in the budgeting signs", () => {
     for (const slug of [
       "gas-furnace",
+      "central-ac",
       "boiler",
       "tank-water-heater",
       "tankless-water-heater",
@@ -22,11 +23,24 @@ describe("lifespan notes", () => {
     }
     expect(notesFor("gas-furnace")?.safety).toMatch(/carbon monoxide/);
     expect(notesFor("electrical-panel")?.safety).toMatch(/electrician/);
+    expect(notesFor("central-ac")?.safety).toMatch(/tripping/);
+    expect(notesFor("boiler")?.safety).toMatch(/relief valve/);
 
-    const hazards = /heat exchanger|scorch|feel warm|trouble signal|drying time|carbon monoxide|gas smell/i;
-    const furnaceAndPanels = ["gas-furnace", "electrical-panel", "fire-alarm-panel", "washer-dryer"];
-    for (const slug of furnaceAndPanels) {
-      for (const sign of notesFor(slug)?.signs ?? []) expect(sign).not.toMatch(hazards);
+    const hazards =
+      /cracked heat exchanger|scorch|feel warm|burning|smoke|spark|soot|\btrip(s|ping)?\b|pressure|pilot|relief valve|trouble signal|drying time|carbon monoxide|\bCO\b|gas smell|smell gas/i;
+    for (const [slug, notes] of Object.entries(LIFESPAN_NOTES)) {
+      for (const sign of notes.signs) expect(`${slug}: ${sign}`).not.toMatch(hazards);
+    }
+  });
+
+  it("gets people out and calls 911 before anything else when there may be carbon monoxide or gas", () => {
+    for (const [slug, notes] of Object.entries(LIFESPAN_NOTES)) {
+      const safety = notes.safety ?? "";
+      if (!/CO alarm|carbon monoxide|smell gas/.test(safety)) continue;
+      const leave = safety.search(/get everyone out(side)? and call 911/i);
+      expect(`${slug}: ${leave}`).not.toBe(`${slug}: -1`);
+      const pro = safety.search(/call a licensed|call your/i);
+      if (pro >= 0) expect(leave).toBeLessThan(pro);
     }
   });
 
