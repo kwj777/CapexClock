@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
@@ -24,6 +24,9 @@ function num(value: string): number | null {
 /** "When will mine need replacing, and what should I set aside?" for one component. */
 export default function LifespanEstimator({ item }: { item: LibraryComponent }) {
   const router = useRouter();
+  const baseId = useId();
+  const yearNoteId = `${baseId}-year-note`;
+  const moneyNoteId = `${baseId}-money-note`;
   const [startYear] = useState(() => new Date().getFullYear());
   const [installYear, setInstallYear] = useState("");
   const [quantity, setQuantity] = useState(item.unitLabel === "per_building" ? "1" : "");
@@ -39,17 +42,25 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
   const sqFt = item.unitLabel === "per_sq_ft";
 
   let result: { due: number; low: number; high: number; monthly: number | null; neededNow: number | null } | null = null;
-  // Why no dollar figure shows yet, once a cost has been typed.
-  let moneyHint: string | null = null;
+  // Why no dollar figure shows yet, once a cost has been typed, and which field it's about.
+  let moneyHint: { text: string; field: "cost" | "quantity"; invalid: boolean } | null = null;
   if (validYear) {
     let monthly: number | null = null;
     let neededNow: number | null = null;
     if (each !== null && (Number.isNaN(each) || each < 0)) {
-      moneyHint = "Enter the cost as a plain number, like 1400.";
+      moneyHint = { text: "Enter the cost as a plain number, like 1400.", field: "cost", invalid: true };
     } else if (each !== null && qty === null) {
-      moneyHint = sqFt ? "Enter the square feet to see a monthly amount." : "Enter how many to see a monthly amount.";
+      moneyHint = {
+        text: sqFt ? "Enter the square feet to see a monthly amount." : "Enter how many to see a monthly amount.",
+        field: "quantity",
+        invalid: false,
+      };
     } else if (each !== null && qty !== null && (Number.isNaN(qty) || qty <= 0)) {
-      moneyHint = sqFt ? "Enter the square feet as a number, like 1200." : "Enter how many as a number, like 12.";
+      moneyHint = {
+        text: sqFt ? "Enter the square feet as a number, like 1200." : "Enter how many as a number, like 12.",
+        field: "quantity",
+        invalid: true,
+      };
     } else if (each !== null && qty !== null) {
       const r = nextReplacementReserve(
         { id: item.slug, category: item.category, name: item.name, quantity: qty, installYear: year, usefulLifeYears: life, replacementCostEach: each },
@@ -73,6 +84,12 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
   }
 
   const yearsLeft = result ? result.due - startYear : 0;
+  const badYear = installYear.trim() !== "" && !validYear;
+  // Points a field at the note below it, and marks it when what's typed can't be read.
+  const noteFor = (field: "cost" | "quantity") =>
+    moneyHint?.field === field
+      ? { "aria-describedby": moneyNoteId, "aria-invalid": moneyHint.invalid || undefined }
+      : {};
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -80,22 +97,47 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <label className="block">
           <span className={label}>Year installed</span>
-          <input className={input} inputMode="numeric" placeholder="e.g. 2014" value={installYear} onChange={(e) => setInstallYear(e.target.value)} />
+          <input
+            className={input}
+            inputMode="numeric"
+            placeholder="e.g. 2014"
+            value={installYear}
+            aria-invalid={badYear || undefined}
+            aria-describedby={badYear ? yearNoteId : undefined}
+            onChange={(e) => setInstallYear(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className={label}>{item.unitLabel === "per_sq_ft" ? "Square feet" : "How many"}</span>
-          <input className={input} inputMode="numeric" placeholder={item.unitLabel === "per_sq_ft" ? "e.g. 1,200" : "e.g. 12"} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <input
+            className={input}
+            inputMode="numeric"
+            placeholder={item.unitLabel === "per_sq_ft" ? "e.g. 1,200" : "e.g. 12"}
+            value={quantity}
+            {...noteFor("quantity")}
+            onChange={(e) => setQuantity(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className={label}>Replacement cost {item.unitLabel === "per_sq_ft" ? "per sq ft" : "each"}</span>
-          <input className={input} inputMode="decimal" placeholder="Quote or estimate" value={cost} onChange={(e) => setCost(e.target.value)} />
+          <input
+            className={input}
+            inputMode="decimal"
+            placeholder="Quote or estimate"
+            value={cost}
+            {...noteFor("cost")}
+            onChange={(e) => setCost(e.target.value)}
+          />
         </label>
       </div>
 
       <div className="mt-5 text-slate-700 dark:text-slate-300" aria-live="polite">
         {!result ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {installYear.trim() && !validYear
+          <p
+            id={yearNoteId}
+            className={badYear ? "text-sm text-amber-800 dark:text-amber-300" : "text-sm text-slate-500 dark:text-slate-400"}
+          >
+            {badYear
               ? `Enter a 4-digit year from 1900 to ${startYear}.`
               : "Enter the install year to see when replacement is due."}
           </p>
@@ -113,7 +155,11 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Typical range {result.low}–{result.high}, from a typical life of {item.lifeLow}–{item.lifeHigh} years.
             </p>
-            {moneyHint && <p className="text-sm text-amber-800 dark:text-amber-300">{moneyHint}</p>}
+            {moneyHint && (
+              <p id={moneyNoteId} className="text-sm text-amber-800 dark:text-amber-300">
+                {moneyHint.text}
+              </p>
+            )}
             {result.monthly !== null && result.neededNow !== null && (
               <p className="text-sm">
                 {result.neededNow > 0 && (
