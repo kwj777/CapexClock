@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
+import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import PayQuestion from "./PayQuestion";
 
@@ -20,42 +21,44 @@ function download(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+// aria-disabled rather than disabled while busy, so keyboard focus stays on the button.
 const button =
-  "rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-60 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800";
+  "rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 aria-disabled:opacity-60 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800";
 
 export default function ExportButtons({
   name,
   unitCount,
   forecast,
   components,
+  rows,
 }: {
   name: string;
   unitCount: number;
   forecast: Forecast;
   components: ForecastComponent[];
+  /** Every form row, so exports show units and name the rows left out. */
+  rows: ExportFormRow[];
 }) {
   const [busy, setBusy] = useState<Format | null>(null);
   const [exported, setExported] = useState<Format | null>(null);
   const [failed, setFailed] = useState(false);
+  const buttons = useRef<Record<Format, HTMLButtonElement | null>>({ csv: null, pdf: null });
 
   async function exportAs(format: Format) {
+    if (busy) return;
     setBusy(format);
     setFailed(false);
+    const details = exportDetails(rows, components);
     try {
       if (format === "csv") {
         // The byte-order mark makes Excel read the file as UTF-8.
-        const csv = "﻿" + forecastCsv(forecast, components);
+        const csv = "﻿" + forecastCsv(forecast, components, details);
         download(new Blob([csv], { type: "text/csv;charset=utf-8" }), exportFileName(name, "csv", forecast.startYear));
       } else {
         // The PDF library is large, so it's only loaded when asked for.
-        const [{ pdf }, { default: ForecastPdf }] = await Promise.all([
-          import("@react-pdf/renderer"),
-          import("./ForecastPdf"),
-        ]);
+        const { forecastPdfBlob } = await import("./ForecastPdf");
         const generatedOn = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        const blob = await pdf(
-          <ForecastPdf name={name} unitCount={unitCount} forecast={forecast} components={components} generatedOn={generatedOn} />,
-        ).toBlob();
+        const blob = await forecastPdfBlob({ name, unitCount, forecast, components, details, generatedOn });
         download(blob, exportFileName(name, "pdf", forecast.startYear));
       }
       void track(format === "pdf" ? "pdf_exported" : "csv_exported", { components: String(components.length) });
@@ -68,12 +71,28 @@ export default function ExportButtons({
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={button} disabled={busy !== null} onClick={() => exportAs("pdf")}>
+        <button
+          ref={(el) => {
+            buttons.current.pdf = el;
+          }}
+          type="button"
+          className={button}
+          aria-disabled={busy !== null}
+          onClick={() => exportAs("pdf")}
+        >
           {busy === "pdf" ? "Preparing PDF…" : "Download PDF"}
         </button>
-        <button type="button" className={button} disabled={busy !== null} onClick={() => exportAs("csv")}>
+        <button
+          ref={(el) => {
+            buttons.current.csv = el;
+          }}
+          type="button"
+          className={button}
+          aria-disabled={busy !== null}
+          onClick={() => exportAs("csv")}
+        >
           Download CSV
         </button>
         {failed && (
@@ -82,7 +101,7 @@ export default function ExportButtons({
           </span>
         )}
       </div>
-      {exported && <PayQuestion trigger={exported} />}
+      <PayQuestion trigger={exported} onDismiss={() => exported && buttons.current[exported]?.focus()} />
     </div>
   );
 }

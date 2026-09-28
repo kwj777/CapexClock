@@ -2,22 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary } from "@/lib/library/source";
+import { pageMetadata } from "@/lib/metadata";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "How Long Do Building Components Last? Lifespan Chart | CapexClock",
+export const metadata: Metadata = pageMetadata({
+  title: "How Long Do Building Components Last? Lifespan Chart",
   description:
     "Typical useful life of roofs, HVAC, water heaters, appliances, flooring and more in rental buildings, with a free calculator for when yours are due.",
-  alternates: { canonical: "/lifespan" },
-};
+  path: "/lifespan",
+});
 
 export default async function LifespanIndex() {
   const library = await getLibrary();
-  const groups = library.reduce<Record<string, typeof library>>((acc, c) => {
-    (acc[c.category] ??= []).push(c);
-    return acc;
-  }, {});
+  // A Map, so a category named like a built-in object property ("constructor") still groups.
+  const groups = new Map<string, typeof library>();
+  for (const c of library) {
+    const group = groups.get(c.category);
+    if (group) group.push(c);
+    else groups.set(c.category, [c]);
+  }
 
   return (
     <>
@@ -32,7 +36,7 @@ export default async function LifespanIndex() {
             when yours is likely due.
           </p>
           <div className="mt-10 space-y-8">
-            {Object.entries(groups).map(([category, items]) => (
+            {[...groups].map(([category, items]) => (
               <section key={category}>
                 <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{category}</h2>
                 <table className="mt-2 w-full text-left">

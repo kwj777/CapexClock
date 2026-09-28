@@ -1,4 +1,4 @@
-// Hand-written to match supabase/migrations/0001_init.sql, in the shape
+// Hand-written to match supabase/migrations (0001_init.sql, 0002_safer_saves.sql), in the shape
 // `supabase gen types typescript` produces. Only the tables the app uses so far.
 
 export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
@@ -110,7 +110,12 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       save_property: {
-        Args: { p_property: SavePropertyInput; p_components: SaveComponentInput[] };
+        Args: {
+          p_property: SavePropertyInput;
+          p_components: SaveComponentInput[];
+          /** 0002: refuse the save (PT409) if the property was saved since this version. */
+          p_expected_updated_at?: string | null;
+        };
         Returns: string;
       };
     };

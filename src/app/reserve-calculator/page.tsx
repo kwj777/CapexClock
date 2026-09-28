@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ReserveCalculator from "@/components/reserve/ReserveCalculator";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { pageMetadata } from "@/lib/metadata";
 
-const title = "Reserve Calculator for Rental Properties | CapexClock";
-const description =
-  "Enter upcoming replacements, when they're due and your current reserve balance. Get the monthly amount to save, and per unit, so the cash is there on time. Free, no signup.";
-
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: "/reserve-calculator" },
-  openGraph: { title, description, url: "/reserve-calculator" },
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Reserve Calculator for Rental Properties | CapexClock",
+  description:
+    "Enter upcoming replacements, when they're due and your current balance. Get the monthly amount to save so the cash is there on time. Free, no signup.",
+  path: "/reserve-calculator",
+});
 
 const FAQ = [
   {

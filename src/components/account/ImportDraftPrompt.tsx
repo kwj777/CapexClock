@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { loadDraft } from "@/components/calculator/draft";
 
-function subscribe(): () => void {
-  return () => {};
+// Follows the calculator in other tabs, so the prompt goes once that work is saved.
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
 }
 
 /** Offers to save calculator work from this browser as a property. */

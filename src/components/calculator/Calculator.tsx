@@ -1,53 +1,78 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from "react";
 import ExportButtons from "@/components/export/ExportButtons";
-import { computeForecast } from "@/lib/forecast";
+import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
+import { moneyColumn } from "@/lib/export/format";
 import {
   COMPONENT_LIBRARY,
   UNIT_LABEL_TEXT,
   type LibraryComponent,
 } from "@/lib/library/components";
 import {
+  badYearBuilt,
+  costLabel,
   customRow,
+  editRow,
   exampleDraft,
   EMPTY_DRAFT,
+  hasEntries,
+  STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
-  PROBLEM_TEXT,
+  neighborRowId,
   parseUnitCount,
+  problemFields,
+  problemText,
   rowFromLibrary,
+  rowTotal,
   saveDraft,
   toComponents,
   withUnitCount,
+  YEAR_BUILT_TEXT,
   type Draft,
   type DraftRow,
+  type RowField,
 } from "./draft";
-import ForecastChart from "./ForecastChart";
-import { formatMoney } from "./format";
+import { forecastSummary } from "./announce";
+import { toChartRows } from "./chartData";
+import { formatMoney, formatReserve, formatUnitPrice } from "./format";
+
+// Recharts is big; load it only once there's a forecast to draw.
+const ForecastChart = dynamic(() => import("./ForecastChart"), {
+  ssr: false,
+  loading: () => <div className="h-72 w-full sm:h-80" />,
+});
 
 const CUSTOM = "__custom__";
+// Plans a replacement this year. Not "now", which reads like "I just replaced it".
+const REPLACE_LABEL = "Replace this year";
 
 function groupByCategory(library: LibraryComponent[]): Record<string, LibraryComponent[]> {
   return library.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
     (acc[c.category] ??= []).push(c);
     return acc;
-  }, {});
+    // No prototype, so a category named "constructor" can't collide with Object's own keys.
+  }, Object.create(null) as Record<string, LibraryComponent[]>);
 }
 
 const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
+// Shared by the column headings and every row so they line up on wide screens.
+const rowGridClass =
+  "lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_4.5rem_4.5rem]";
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 
@@ -62,6 +87,14 @@ export default function Calculator({
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
   useEffect(() => saveDraft(draft), [draft]);
+  // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === DRAFT_STORAGE_KEY || event.key === null) setDraft(loadDraft());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <CalculatorView
@@ -105,6 +138,17 @@ export interface CalculatorViewProps {
   exportName?: string;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
+  /**
+   * Notes by row id that replace the row's forecast note, e.g. why it can't be saved,
+   * with the fields they're about (marked invalid and pointed at the note).
+   */
+  rowNotes?: Record<string, RowNote>;
+}
+
+/** A note shown under a row, and the row's fields it's about. */
+export interface RowNote {
+  text: string;
+  fields: RowField[];
 }
 
 export function CalculatorView({
@@ -116,11 +160,25 @@ export function CalculatorView({
   footer,
   exportName = "My property",
   library = COMPONENT_LIBRARY,
+  rowNotes,
 }: CalculatorViewProps) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
-  const tracked = useRef({ started: !trackEvents || draft.rows.length > 0, generated: !trackEvents });
+  const tracked = useRef({ started: !trackEvents || draft.rows.length > 0 });
+  const baseId = useId();
+  const yearBuiltErrorId = `${baseId}-year-built-error`;
+  const unitsId = `${baseId}-units`;
+  const addId = `${baseId}-add`;
+  const undoId = `${baseId}-undo`;
+  const rowIdPrefix = (rowId: string) => `${baseId}-${rowId}`;
+  const [editingYearBuilt, setEditingYearBuilt] = useState(false);
+  const [picked, setPicked] = useState("");
+  // What Load an example or Clear replaced, offered back until the next edit.
+  const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" } | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  // Element to focus once the next render is on screen (after removing a row, say).
+  const focusNext = useRef<string | null>(null);
 
   const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
   const unitCount = parseUnitCount(draft.unitCount);
@@ -128,13 +186,18 @@ export function CalculatorView({
     () => computeForecast({ startYear, unitCount, components }),
     [startYear, unitCount, components],
   );
+  const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, startYear);
+  const showYearBuiltError = yearBuiltIsBad && !editingYearBuilt;
 
+  // Once per draft, as soon as it shows a forecast (the reserve can come from items after year 10).
+  const trackedDraft = useRef<Draft | null>(null);
+  const showsForecast = components.length > 0;
   useEffect(() => {
-    if (forecast.total > 0 && !tracked.current.generated) {
-      tracked.current.generated = true;
-      void track("forecast_generated", { components: String(components.length) });
-    }
-  }, [forecast.total, components.length]);
+    if (!trackEvents || !showsForecast || draft.forecastTracked || trackedDraft.current === draft) return;
+    trackedDraft.current = draft;
+    setDraft((d) => ({ ...d, forecastTracked: true }));
+    void track("forecast_generated", { components: String(components.length) });
+  }, [trackEvents, showsForecast, draft, setDraft, components.length]);
 
   function markStarted(source: string) {
     if (tracked.current.started) return;
@@ -147,32 +210,94 @@ export function CalculatorView({
   }
 
   function updateRow(id: string, patch: Partial<DraftRow>) {
-    setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+    setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? editRow(r, patch, d.unitCount) : r)) }));
+  }
+
+  function announce(message: string) {
+    // A repeat of the same words wouldn't be read again, so vary it invisibly.
+    setAnnouncement((current) => (current === message ? `${message}\u00a0` : message));
   }
 
   function removeRow(id: string) {
+    const removed = draft.rows.find((r) => r.id === id);
+    const next = neighborRowId(draft.rows, id);
+    focusNext.current = next ? `${rowIdPrefix(next)}-name` : addId;
     setDraft((d) => ({ ...d, rows: d.rows.filter((r) => r.id !== id) }));
+    announce(`Removed ${removed?.name.trim() || "the component"}.`);
   }
 
-  function addComponent(event: ChangeEvent<HTMLSelectElement>) {
-    const value = event.target.value;
-    event.target.value = "";
-    if (!value) return;
-    const item = libraryBySlug.get(value);
+  // Adding takes a pick and a press of Add, so arrowing through the list adds nothing.
+  function addComponent() {
+    if (!picked) return;
+    const item = libraryBySlug.get(picked);
     const row = item ? rowFromLibrary(item, draft.unitCount) : customRow();
     setDraft((d) => ({ ...d, rows: [...d.rows, row] }));
+    setPicked("");
+    // A custom row needs a name first; otherwise stay on the list to add the next one.
+    focusNext.current = item ? addId : `${rowIdPrefix(row.id)}-name`;
+    announce(item ? `Added ${item.name}.` : "Added a custom component. Give it a name.");
     markStarted("add_component");
   }
 
+  /** Load an example and Clear replace everything, so they offer an undo. */
+  function replaceDraft(next: Draft, action: "clear" | "example") {
+    setUndo(hasEntries(draft) ? { before: draft, after: next, action } : null);
+    setDraft(next);
+  }
+
   function loadExample() {
-    setDraft(exampleDraft());
+    replaceDraft(exampleDraft(), "example");
+    announce(hasEntries(draft) ? "Loaded the example in place of your entries. Undo brings them back." : "Loaded the example.");
     markStarted("example");
   }
 
+  function clearDraft() {
+    replaceDraft(EMPTY_DRAFT, "clear");
+    // Clear disappears with the rows, so move to Undo.
+    focusNext.current = undoId;
+    announce("Cleared your entries.");
+  }
+
+  function undoReplace() {
+    if (!undo) return;
+    setDraft(undo.before);
+    setUndo(null);
+    focusNext.current = unitsId;
+    announce("Your entries are back.");
+  }
+
+  // Undo is offered until anything else changes the draft (tracking flags aside).
+  const canUndo =
+    undo !== null &&
+    undo.after.rows === draft.rows &&
+    undo.after.unitCount === draft.unitCount &&
+    undo.after.yearBuilt === draft.yearBuilt;
+
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  });
+
   const incomplete = Object.keys(problems).length;
+
+  // Screen readers hear the new totals once typing pauses, not on every keystroke.
+  const summary = forecastSummary(components.length > 0 ? forecast : null, incomplete);
+  const spokenSummary = useRef(summary);
+  useEffect(() => {
+    if (summary === spokenSummary.current) return;
+    const timer = window.setTimeout(() => {
+      spokenSummary.current = summary;
+      setAnnouncement(summary);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [summary]);
 
   return (
     <div className="space-y-8">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       {/* Property */}
       <section className={cardClass} aria-labelledby="property-heading">
         {header}
@@ -184,6 +309,7 @@ export function CalculatorView({
             <label className="block w-36">
               <span className={labelClass}>Rental units</span>
               <input
+                id={unitsId}
                 className={`${inputClass} mt-1`}
                 inputMode="numeric"
                 placeholder="e.g. 12"
@@ -201,6 +327,10 @@ export function CalculatorView({
                 inputMode="numeric"
                 placeholder="e.g. 1998"
                 value={draft.yearBuilt}
+                aria-invalid={showYearBuiltError || undefined}
+                aria-describedby={showYearBuiltError ? yearBuiltErrorId : undefined}
+                onFocus={() => setEditingYearBuilt(true)}
+                onBlur={() => setEditingYearBuilt(false)}
                 onChange={(e) => updateDraft({ yearBuilt: e.target.value })}
               />
             </label>
@@ -218,7 +348,7 @@ export function CalculatorView({
             {showExample && draft.rows.length > 0 && (
               <button
                 type="button"
-                onClick={() => setDraft(EMPTY_DRAFT)}
+                onClick={clearDraft}
                 className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               >
                 Clear
@@ -226,9 +356,34 @@ export function CalculatorView({
             )}
           </div>
         </div>
-        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Year built fills in any install year you leave blank, marked as an estimate.
-        </p>
+        {canUndo && (
+          <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
+            {undo.action === "clear" ? "Your entries were cleared." : "The example replaced your entries."}{" "}
+            <button
+              id={undoId}
+              type="button"
+              onClick={undoReplace}
+              className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+            >
+              Undo
+            </button>
+          </p>
+        )}
+        {/* The error takes the hint's place in one grid cell, sized for the longer of the two, so
+            showing it when the field is left never moves the button the owner is clicking. */}
+        <div className="mt-3 grid text-sm">
+          <p
+            id={yearBuiltErrorId}
+            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${showYearBuiltError ? "" : "invisible"}`}
+          >
+            {YEAR_BUILT_TEXT}
+          </p>
+          <p
+            className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${showYearBuiltError ? "invisible" : ""}`}
+          >
+            Year built fills in any install year you leave blank, marked as an estimate.
+          </p>
+        </div>
       </section>
 
       {/* Components */}
@@ -237,15 +392,18 @@ export function CalculatorView({
           <h2 id="components-heading" className="text-lg font-semibold text-slate-950 dark:text-white">
             Components
           </h2>
-          <label className="flex items-center gap-2">
-            <span className="sr-only">Add a component</span>
+          <div className="flex items-center gap-2">
+            <label htmlFor={addId} className="sr-only">
+              Choose a component to add
+            </label>
             <select
-              defaultValue=""
-              onChange={addComponent}
-              className={`${inputClass} w-64 font-medium`}
+              id={addId}
+              value={picked}
+              onChange={(e) => setPicked(e.target.value)}
+              className={`${inputClass} w-56 font-medium sm:w-64`}
             >
               <option value="" disabled>
-                + Add a component…
+                Choose a component…
               </option>
               {Object.entries(libraryGroups).map(([category, items]) => (
                 <optgroup key={category} label={category}>
@@ -258,38 +416,59 @@ export function CalculatorView({
               ))}
               <option value={CUSTOM}>Custom component…</option>
             </select>
-          </label>
+            <button
+              type="button"
+              onClick={addComponent}
+              disabled={!picked}
+              className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
         </div>
 
         {draft.rows.length === 0 ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            Add your roofs, HVAC, water heaters and other big-ticket items, or load an example to
-            see how it works.
+            Add your roofs, HVAC, water heaters and other big-ticket items
+            {showExample ? ", or load an example to see how it works." : "."}
           </p>
         ) : (
           <div className="mt-5">
-            <div className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_auto_auto] gap-3 border-b border-slate-200 pb-2 lg:grid dark:border-slate-800">
-              {["Component", "Quantity", "Installed", "Life (yrs)", "Cost each", "Replace now", ""].map(
-                (h) => (
-                  <span key={h} className={labelClass}>
-                    {h}
-                  </span>
-                ),
-              )}
+            <div
+              className={`hidden items-end gap-3 border-b border-slate-200 pb-2 lg:grid ${rowGridClass} dark:border-slate-800`}
+              aria-hidden="true"
+            >
+              {["Component", "Quantity", "Installed", "Life (yrs)", "Cost", REPLACE_LABEL, ""].map((h) => (
+                <span key={h} className={`${labelClass} ${h === REPLACE_LABEL ? "text-center" : ""}`}>
+                  {h}
+                </span>
+              ))}
             </div>
             <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-              {draft.rows.map((row) => (
-                <ComponentRow
-                  key={row.id}
-                  row={row}
-                  yearBuilt={draft.yearBuilt}
-                  lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
-                  problem={problems[row.id] ? PROBLEM_TEXT[problems[row.id]] : null}
-                  onChange={(patch) => updateRow(row.id, patch)}
-                  onRemove={() => removeRow(row.id)}
-                />
-              ))}
+              {draft.rows.map((row) => {
+                const problem = problems[row.id];
+                return (
+                  <ComponentRow
+                    key={row.id}
+                    row={row}
+                    idPrefix={rowIdPrefix(row.id)}
+                    yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
+                    lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
+                    problem={
+                      rowNotes?.[row.id] ??
+                      (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)
+                    }
+                    onChange={(patch) => updateRow(row.id, patch)}
+                    onRemove={() => removeRow(row.id)}
+                  />
+                );
+              })}
             </ul>
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              Tick {REPLACE_LABEL} to plan a replacement in {startYear}, even if it isn&apos;t worn
+              out yet. Its cycle starts again from there. If you already replaced something, change
+              its install year instead.
+            </p>
           </div>
         )}
       </section>
@@ -302,13 +481,13 @@ export function CalculatorView({
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Monthly reserve" value={formatMoney(forecast.monthlyReserve)} emphasis />
+            <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} emphasis />
             <Stat
               label="Per unit, per month"
               value={
                 forecast.monthlyReservePerUnit === null
                   ? "Add units"
-                  : formatMoney(forecast.monthlyReservePerUnit)
+                  : formatReserve(forecast.monthlyReservePerUnit)
               }
               emphasis
             />
@@ -335,7 +514,18 @@ export function CalculatorView({
             <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               In today&apos;s dollars, no inflation.
             </p>
-            <ForecastChart forecast={forecast} />
+            {forecast.total > 0 ? (
+              <>
+                <ForecastChart forecast={forecast} />
+                <ForecastTable forecast={forecast} />
+              </>
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Nothing comes due from {forecast.startYear} to {forecast.endYear}.
+                {forecast.savingAhead.length > 0 &&
+                  " The monthly reserve is saving ahead for the later replacements listed under What's due when."}
+              </p>
+            )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
@@ -348,6 +538,7 @@ export function CalculatorView({
             unitCount={unitCount}
             forecast={forecast}
             components={components}
+            rows={draft.rows}
           />
         </section>
       )}
@@ -358,6 +549,7 @@ export function CalculatorView({
 
 function ComponentRow({
   row,
+  idPrefix,
   yearBuilt,
   lib,
   problem,
@@ -365,23 +557,32 @@ function ComponentRow({
   onRemove,
 }: {
   row: DraftRow;
+  /** Starts the ids of this row's fields and note, e.g. `${idPrefix}-name`. */
+  idPrefix: string;
   yearBuilt: string;
   lib: LibraryComponent | undefined;
-  problem: string | null;
+  problem: RowNote | null;
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
-  const label = row.name || "this component";
+  const label = row.name.trim() || "this component";
+  const problemId = `${idPrefix}-problem`;
+  // Marks the field the row's note is about and points it at the note.
+  const flag = (field: RowField) =>
+    problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
 
   return (
     <li className="py-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_auto_auto] lg:items-center">
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${rowGridClass} lg:items-center`}>
         <label className="col-span-2 block sm:col-span-3 lg:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>Component</span>
           <input
+            id={`${idPrefix}-name`}
             className={`${inputClass} mt-1 font-medium lg:mt-0`}
             value={row.name}
+            maxLength={200}
             placeholder="e.g. Elevator"
+            {...flag("name")}
             onChange={(e) => onChange({ name: e.target.value })}
           />
           <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{row.category}</span>
@@ -393,7 +594,9 @@ function ComponentRow({
               className={inputClass}
               inputMode="decimal"
               value={row.quantity}
+              placeholder={row.unitLabel === "per_sq_ft" ? "Sq ft" : undefined}
               aria-label={`Quantity of ${label}`}
+              {...flag("quantity")}
               onChange={(e) => onChange({ quantity: e.target.value })}
             />
             <select
@@ -410,6 +613,7 @@ function ComponentRow({
             </select>
           </div>
         </label>
+        {/* Each name starts with the visible label, so "click Installed" works by voice. */}
         <label className="block">
           <span className={`${labelClass} lg:sr-only`}>Installed</span>
           <input
@@ -417,7 +621,8 @@ function ComponentRow({
             inputMode="numeric"
             value={row.installYear}
             placeholder={yearBuilt ? `${yearBuilt} (est.)` : "Year"}
-            aria-label={`Install year of ${label}`}
+            aria-label={`Installed, ${label}`}
+            {...flag("installYear")}
             onChange={(e) => onChange({ installYear: e.target.value })}
           />
         </label>
@@ -427,7 +632,8 @@ function ComponentRow({
             className={`${inputClass} mt-1 lg:mt-0`}
             inputMode="numeric"
             value={row.usefulLife}
-            aria-label={`Useful life of ${label} in years`}
+            aria-label={`Life (yrs), ${label}`}
+            {...flag("usefulLife")}
             onChange={(e) => onChange({ usefulLife: e.target.value })}
           />
           {lib && (
@@ -437,41 +643,66 @@ function ComponentRow({
           )}
         </label>
         <label className="block">
-          <span className={`${labelClass} lg:sr-only`}>Cost each</span>
+          <span className={`${labelClass} lg:sr-only`}>{costLabel(row)}</span>
           <div className="relative mt-1 lg:mt-0">
-            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500">
+            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500 dark:text-slate-400">
               $
             </span>
             <input
               className={`${inputClass} pl-6`}
               inputMode="decimal"
               value={row.costEach}
-              placeholder="Your cost"
-              aria-label={`Replacement cost ${UNIT_LABEL_TEXT[row.unitLabel]} for ${label}`}
+              placeholder="Quote or estimate"
+              aria-label={`${costLabel(row)}, ${label}`}
+              {...flag("costEach")}
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
+          <CostNote row={row} />
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-700 lg:justify-center dark:text-slate-300">
           <input
             type="checkbox"
             checked={row.scenario === "replace_now"}
+            aria-label={`${REPLACE_LABEL}, ${label}`}
             onChange={(e) => onChange({ scenario: e.target.checked ? "replace_now" : "run_to_failure" })}
             className="h-4 w-4 accent-amber-500"
           />
-          <span className="lg:sr-only">Replace now</span>
+          <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${label}`}
-          className="justify-self-end rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+          className="justify-self-end rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
         >
           Remove
         </button>
       </div>
-      {problem && <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">{problem}</p>}
+      {problem && (
+        <p id={problemId} className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+          {problem.text}
+        </p>
+      )}
     </li>
+  );
+}
+
+/** Shows the multiplication behind a row ("12 × $650 = $7,800"), or what the cost is for. */
+function CostNote({ row }: { row: DraftRow }) {
+  const total = rowTotal(row);
+  if (total === null) {
+    return (
+      <span className="mt-1 hidden text-xs text-slate-500 lg:block dark:text-slate-400">
+        {costLabel(row).replace(/^Cost /, "")}
+      </span>
+    );
+  }
+  const quantity = `${total.quantity.toLocaleString("en-US")}${row.unitLabel === "per_sq_ft" ? " sq ft" : ""}`;
+  return (
+    <span className="mt-1 block text-xs text-slate-500 tabular-nums dark:text-slate-400">
+      {quantity} × {formatUnitPrice(total.each)} = {formatMoney(total.total)}
+    </span>
   );
 }
 
@@ -492,7 +723,43 @@ function Stat({ label, value, emphasis = false }: { label: string; value: string
   );
 }
 
-function AtRisk({ forecast }: { forecast: ReturnType<typeof computeForecast> }) {
+/** The chart's numbers as a table, for screen readers (the chart itself is hidden from them). */
+function ForecastTable({ forecast }: { forecast: Forecast }) {
+  const { rows, present } = toChartRows(forecast);
+  return (
+    <div className="sr-only">
+      <table>
+        <caption>
+          Replacement costs by year and category, {forecast.startYear} to {forecast.endYear}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Year</th>
+            <th scope="col">Total</th>
+            {present.map((c) => (
+              <th key={c} scope="col">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.year}>
+              <th scope="row">{r.year}</th>
+              <td>{formatMoney(r.total)}</td>
+              {present.map((c) => (
+                <td key={c}>{formatMoney(r[c] ?? 0)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AtRisk({ forecast }: { forecast: Forecast }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
@@ -506,7 +773,10 @@ function AtRisk({ forecast }: { forecast: ReturnType<typeof computeForecast> }) 
               <span className="text-slate-900 dark:text-white">
                 {item.name}
                 {item.installYearIsEstimate && (
-                  <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
+                  <>
+                    {" "}
+                    <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
+                  </>
                 )}
               </span>
               <span
@@ -528,8 +798,10 @@ function AtRisk({ forecast }: { forecast: ReturnType<typeof computeForecast> }) 
   );
 }
 
-function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }) {
+function DueTable({ forecast }: { forecast: Forecast }) {
   const rows = forecast.years.flatMap((y) => y.replacements);
+  // Every row shows cents once any row has them, so the rows add up.
+  const money = moneyColumn(rows.map((r) => r.cost));
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">What&apos;s due when</h3>
@@ -554,16 +826,42 @@ function DueTable({ forecast }: { forecast: ReturnType<typeof computeForecast> }
                   <td className="py-2 pr-3 text-slate-900 dark:text-white">
                     {r.name}
                     {r.overdue && (
-                      <span className="ml-1.5 text-xs text-red-700 dark:text-red-400">overdue</span>
+                      <>
+                        {" "}
+                        <span className="ml-0.5 text-xs text-red-700 dark:text-red-400">overdue</span>
+                      </>
+                    )}
+                    {r.installYearIsEstimate && (
+                      <>
+                        {" "}
+                        <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
+                      </>
                     )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
-                    {formatMoney(r.cost)}
+                    {money(r.cost)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {forecast.savingAhead.length > 0 && (
+        <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
+            The monthly reserve is {rows.length > 0 && "also "}saving for
+          </h4>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {forecast.savingAhead.map((r) => (
+              <li key={`${r.componentId}-${r.year}`} className="flex justify-between gap-3">
+                <span className="text-slate-900 dark:text-white">
+                  <span className="tabular-nums text-slate-600 dark:text-slate-300">{r.year}</span> {r.name}
+                </span>
+                <span className="tabular-nums text-slate-900 dark:text-white">{formatMoney(r.cost)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

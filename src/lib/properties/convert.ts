@@ -1,6 +1,6 @@
-import type { Draft, DraftRow } from "@/components/calculator/draft";
-import { EARLIEST_INSTALL_YEAR } from "@/components/calculator/draft";
-import { computeForecast, type Forecast, type ForecastComponent } from "@/lib/forecast";
+import type { Draft, DraftRow, RowField } from "@/components/calculator/draft";
+import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT } from "@/components/calculator/draft";
+import { computeForecast, validateComponent, type Forecast, type ForecastComponent } from "@/lib/forecast";
 import type {
   ComponentRow,
   PropertyRow,
@@ -28,6 +28,7 @@ export function draftFromRows(property: PropertyRow, components: ComponentRow[])
           usefulLife: String(c.useful_life_years),
           costEach: c.replacement_cost_each === null ? "" : String(c.replacement_cost_each),
           scenario: c.scenario,
+          followsUnitCount: c.unit_label === "per_unit" && String(c.quantity) === String(property.unit_count),
         }),
       ),
   };
@@ -38,17 +39,53 @@ function parse(value: string): number | null {
   return cleaned === "" ? null : Number(cleaned);
 }
 
-export type SaveProblem = "name" | "quantity" | "life" | "install_year" | "cost" | "year_built" | "unit_count";
+export type SaveProblem =
+  | "name"
+  | "name_length"
+  | "quantity"
+  | "life"
+  | "install_year"
+  | "cost"
+  | "year_built"
+  | "unit_count";
+
+// The database's limits (supabase/migrations), checked here so the owner sees
+// which field to fix instead of a failed save.
+export const MAX_NAME_LENGTH = 200;
+export const MAX_UNIT_COUNT = 100_000;
+export const MAX_QUANTITY = 1e9;
+export const MAX_COST = 1e12;
 
 export const SAVE_PROBLEM_TEXT: Record<SaveProblem, string> = {
   name: "Give every component a name.",
-  quantity: "Quantities must be above 0.",
+  name_length: `Component names can be up to ${MAX_NAME_LENGTH} characters.`,
+  quantity: "Quantities must be above 0 and under 1 billion.",
   life: "Useful life must be a whole number from 1 to 100.",
   install_year: `Install years must be 4-digit years from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
   cost: "Costs must be plain numbers like 1400, or blank.",
-  year_built: `Year built must be a 4-digit year from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
-  unit_count: "Rental units must be a whole number.",
+  year_built: `Year built must be a 4-digit year from ${EARLIEST_YEAR_BUILT} to this year, or blank.`,
+  unit_count: "Rental units must be a whole number up to 100,000.",
 };
+
+/** The row field a row's save problem is about, so the editor can mark it. */
+export function saveProblemFields(problem: SaveProblem): RowField[] {
+  switch (problem) {
+    case "name":
+    case "name_length":
+      return ["name"];
+    case "quantity":
+      return ["quantity"];
+    case "life":
+      return ["usefulLife"];
+    case "install_year":
+      return ["installYear"];
+    case "cost":
+      return ["costEach"];
+    case "year_built":
+    case "unit_count":
+      return [];
+  }
+}
 
 export interface SaveInput {
   property: SavePropertyInput;
@@ -57,8 +94,8 @@ export interface SaveInput {
   problems: Record<string, SaveProblem>;
 }
 
-function validYear(year: number | null, currentYear: number): boolean {
-  return year === null || (Number.isInteger(year) && year >= EARLIEST_INSTALL_YEAR && year <= currentYear);
+function validYear(year: number | null, currentYear: number, earliest = EARLIEST_INSTALL_YEAR): boolean {
+  return year === null || (Number.isInteger(year) && year >= earliest && year <= currentYear);
 }
 
 /**
@@ -75,8 +112,8 @@ export function toSaveInput(
   const problems: Record<string, SaveProblem> = {};
   const unitCount = parse(draft.unitCount) ?? 0;
   const yearBuilt = parse(draft.yearBuilt);
-  if (!Number.isInteger(unitCount) || unitCount < 0) problems.property = "unit_count";
-  else if (!validYear(yearBuilt, currentYear)) problems.property = "year_built";
+  if (!Number.isInteger(unitCount) || unitCount < 0 || unitCount > MAX_UNIT_COUNT) problems.property = "unit_count";
+  else if (!validYear(yearBuilt, currentYear, EARLIEST_YEAR_BUILT)) problems.property = "year_built";
 
   const components: SaveComponentInput[] = [];
   draft.rows.forEach((row, index) => {
@@ -86,10 +123,11 @@ export function toSaveInput(
     const cost = parse(row.costEach);
     let problem: SaveProblem | null = null;
     if (!row.name.trim()) problem = "name";
-    else if (quantity === null || !Number.isFinite(quantity) || quantity <= 0) problem = "quantity";
+    else if (row.name.trim().length > MAX_NAME_LENGTH) problem = "name_length";
+    else if (quantity === null || !(quantity > 0 && quantity < MAX_QUANTITY)) problem = "quantity";
     else if (life === null || !Number.isInteger(life) || life < 1 || life > 100) problem = "life";
     else if (!validYear(installYear, currentYear)) problem = "install_year";
-    else if (cost !== null && (!Number.isFinite(cost) || cost < 0)) problem = "cost";
+    else if (cost !== null && !(cost >= 0 && cost < MAX_COST)) problem = "cost";
     if (problem) {
       problems[row.id] = problem;
       return;
@@ -113,7 +151,7 @@ export function toSaveInput(
     property: {
       ...(propertyId ? { id: propertyId } : {}),
       name: name.trim() || "Untitled property",
-      unit_count: Number.isInteger(unitCount) && unitCount >= 0 ? unitCount : 0,
+      unit_count: problems.property === "unit_count" ? 0 : unitCount,
       year_built: yearBuilt,
     },
     components,
@@ -121,7 +159,11 @@ export function toSaveInput(
   };
 }
 
-/** Forecast for a saved property. Rows without a cost or any install year are left out. */
+/**
+ * Forecast for a saved property. Rows without a cost or any install year are left
+ * out, and so is any row the forecast can't use (such as a quantity that isn't a
+ * finite number), so one bad row can't break the page.
+ */
 export function forecastForProperty(
   property: PropertyRow,
   components: ComponentRow[],
@@ -131,7 +173,7 @@ export function forecastForProperty(
   for (const c of components) {
     const installYear = c.install_year ?? property.year_built;
     if (c.replacement_cost_each === null || installYear === null) continue;
-    included.push({
+    const component: ForecastComponent = {
       id: c.id,
       category: c.category,
       name: c.name,
@@ -141,7 +183,8 @@ export function forecastForProperty(
       usefulLifeYears: c.useful_life_years,
       replacementCostEach: Number(c.replacement_cost_each),
       scenario: c.scenario,
-    });
+    };
+    if (validateComponent(component).length === 0) included.push(component);
   }
   return {
     forecast: computeForecast({ startYear, unitCount: property.unit_count, components: included }),

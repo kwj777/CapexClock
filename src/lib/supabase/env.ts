@@ -1,3 +1,9 @@
+/**
+ * Options for the Supabase auth cookies (they hold the refresh token). Secure in
+ * production so they're never sent over plain HTTP; `next dev` on http stays usable.
+ */
+export const AUTH_COOKIE_OPTIONS = { secure: process.env.NODE_ENV === "production" };
+
 /** Supabase settings from the environment. Null when accounts aren't configured. */
 export function supabaseEnv(): { url: string; key: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

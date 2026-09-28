@@ -1,7 +1,10 @@
+/** Longest a planned expense can be from now; anything later is almost always a typo. */
+export const MAX_YEARS_UNTIL_DUE = 100;
+
 export interface PlannedExpense {
   /** Cost in today's dollars. */
   cost: number;
-  /** Whole years from now until it's due. 0 means due now. */
+  /** Whole years from now until it's due, up to MAX_YEARS_UNTIL_DUE. 0 means due now. */
   yearsUntilDue: number;
 }
 
@@ -35,6 +38,9 @@ export interface SinkingFundResult {
  * everything due by year n.
  */
 export function sinkingFund({ expenses, currentBalance, units }: SinkingFundInput): SinkingFundResult {
+  if (expenses.some((e) => e.yearsUntilDue > MAX_YEARS_UNTIL_DUE)) {
+    throw new RangeError(`Years until due can't be more than ${MAX_YEARS_UNTIL_DUE}.`);
+  }
   const valid = expenses.filter((e) => e.cost > 0 && Number.isFinite(e.cost) && e.yearsUntilDue >= 0);
   const byYear = new Map<number, number>();
   for (const e of valid) {
@@ -46,10 +52,12 @@ export function sinkingFund({ expenses, currentBalance, units }: SinkingFundInpu
   const shortfallNow = Math.max(0, dueNow - balance);
   const available = Math.max(0, balance - dueNow);
 
-  const lastYear = Math.max(0, ...byYear.keys());
+  const dueYears = [...byYear.keys()].filter((n) => n > 0).sort((a, b) => a - b);
+  const lastYear = dueYears.at(-1) ?? 0;
+  // The tightest point is always a year something comes due.
   let monthly = 0;
   let cumulative = 0;
-  for (let n = 1; n <= lastYear; n++) {
+  for (const n of dueYears) {
     cumulative += byYear.get(n) ?? 0;
     monthly = Math.max(monthly, (cumulative - available) / (12 * n));
   }

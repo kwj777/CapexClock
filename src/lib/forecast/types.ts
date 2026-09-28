@@ -35,6 +35,8 @@ export interface Replacement {
   cost: number;
   /** Past end of life at the start of the window, so pulled into year one. */
   overdue: boolean;
+  /** True when the install year was defaulted to the building's year built. */
+  installYearIsEstimate: boolean;
 }
 
 export interface ForecastYear {
@@ -69,5 +71,10 @@ export interface Forecast {
   monthlyReserve: number;
   /** Null when the unit count is zero. */
   monthlyReservePerUnit: number | null;
+  /**
+   * Replacements after the window that the monthly reserve is already saving
+   * for, up to the year that sets its amount. Empty when the window explains it.
+   */
+  savingAhead: Replacement[];
   atRisk: AtRiskItem[];
 }

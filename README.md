@@ -4,17 +4,27 @@ Free CapEx forecaster for small rental property owners. Live at capexclock.com.
 
 ## Phase 1: early-access landing page
 
-- Next.js (App Router), TypeScript strict, Tailwind v4, fully static
-- Hosted on Netlify (Next.js runtime is auto-detected; see `netlify.toml`)
+- Next.js (App Router), TypeScript strict, Tailwind v4
+- Not a static site any more: `/`, `/privacy` and `/reserve-calculator` are fully static, the
+  pages built from the lifespan library (`/capex-calculator`, `/lifespan`, `/lifespan/<slug>` and
+  the sitemap) are rebuilt at most once an hour (ISR), `/app` and `/auth` render on each request,
+  and `src/proxy.ts` checks the session on `/app` only
+- A `/lifespan/<slug>` that doesn't exist shows the 404 page, which is cached like the other
+  lifespan pages. A new library row usually shows up within an hour or two, but a URL visited
+  before the row existed may show the 404 once more after that. On Netlify that cache is per
+  deploy, so it starts empty on every deploy
+- Hosted on Netlify with the Next.js runtime (`@netlify/plugin-nextjs`), declared in `netlify.toml`
 - Signups go to the Netlify Form `early-access`
-- Optional PostHog analytics (`early_access_signup` event on successful signup)
+- Optional PostHog analytics (product events only; `/privacy` says what is sent)
 
 ```bash
 cp .env.example .env.local   # optional: add a PostHog key
 npm install
-npm run dev     # http://localhost:3000
-npm run build
+npm run dev        # http://localhost:3000
 npm run lint
+npm test
+npm run typecheck  # generates Next's route types, then runs tsc
+npm run build
 ```
 
 ### Environment variables
@@ -41,8 +51,11 @@ Submissions only work on a Netlify deploy (or `netlify dev`), not `next dev`.
 ## Deploying to Netlify
 
 1. **Create the site.** In Netlify, **Add new project → Import an existing project → GitHub**,
-   pick `kwj777/CapexClock`, branch `main`. Build settings come from `netlify.toml`
-   (`npm run build`, Node 22). Netlify applies its Next.js runtime automatically; no plugin needed.
+   pick `kwj777/CapexClock`, branch `main`. Build settings come from `netlify.toml` (Node 22). The
+   build runs `npm run lint` and `npm test` before `npm run build`, so a failing check stops the
+   deploy. The Next.js runtime is declared there as a `[[plugins]]` entry on purpose: Netlify
+   didn't apply it automatically for this site, and without it deploys publish raw `.next` output
+   and 404. Keep that block.
 2. **Turn on forms.** **Project configuration → Forms → Enable form detection**, then
    trigger a redeploy (**Deploys → Trigger deploy**). The `early-access` form appears under
    **Forms** after that deploy.
@@ -85,18 +98,38 @@ Accounts use Supabase magic-link sign-in. All data is protected by Row Level Sec
 owner can only read or change their own properties.
 
 1. **Create the tables.** In the Supabase dashboard open **SQL Editor → New query**, paste
-   `supabase/migrations/0001_init.sql`, and run it. Then do the same with `supabase/seed.sql`
-   (the component library; safe to run again).
+   `supabase/migrations/0001_init.sql`, and run it. Then run each later migration in order
+   (`0002_safer_saves.sql`, then `0003_library_checks.sql`, …), and then `supabase/seed.sql` (the
+   component library; safe to run again).
 2. **Allow the sign-in links to return to the site.** Under **Authentication → URL
-   Configuration**, set **Site URL** to `https://capexclock.com` and add these **Redirect URLs**:
-   - `https://capexclock.com/auth/callback`
-   - `https://*--capexclock.netlify.app/auth/callback` (deploy previews)
-   - `http://localhost:3000/auth/callback` (local development)
+   Configuration**, set **Site URL** to `https://capexclock.com` and add these **Redirect URLs**.
+   They need the `/**` ending: the sign-in link comes back to `/auth/callback?next=…`, and an
+   entry without it doesn't match that query string, so the link would land on the production
+   home page instead.
+   - `https://capexclock.com/**`
+   - `https://*--capexclock.netlify.app/**` (deploy previews)
+   - `http://localhost:3000/**` (local development)
 3. **Environment variables.** Add `NEXT_PUBLIC_SUPABASE_URL` and
    `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Netlify (see above) and redeploy.
 4. **Email.** Supabase's built-in email sender is rate-limited and meant for testing. Before
    launch, add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
    Resend or Postmark, sending from support@capexclock.com).
+
+### Updating the database
+
+When a new file appears in `supabase/migrations`, run it once on the live project: open
+**SQL Editor → New query**, paste the whole file and click **Run**. Run them in number order.
+
+- `0002_safer_saves.sql`: stops a save from one tab or device silently overwriting a newer
+  save from another, rejects quantities and costs that aren't real numbers, and keeps service
+  records tied to their own component's assets. It's safe to run again, and the site works
+  both before and after it runs. If it notes that some existing rows break a rule, those rows
+  are left as they are and every new save is still checked.
+- `0003_library_checks.sql`: makes the table editor refuse a component library row the site
+  can't use (a slug with capitals or spaces, or a name or category with no letters or numbers)
+  instead of saving it and leaving it off the site. It's safe to run again. If it notes that
+  some existing rows break a rule, fix them under **Table Editor → component_library**; until
+  then the site skips them and logs why.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its

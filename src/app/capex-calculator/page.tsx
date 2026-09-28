@@ -3,18 +3,15 @@ import Link from "next/link";
 import CalculatorLoader from "@/components/calculator/CalculatorLoader";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary } from "@/lib/library/source";
+import { pageMetadata } from "@/lib/metadata";
 import { supabaseEnv } from "@/lib/supabase/env";
 
-const title = "Free CapEx Calculator for Rental Properties | CapexClock";
-const description =
-  "Enter your building's roof, HVAC, water heaters and other components with install years and costs. Get a 10-year replacement forecast and a monthly reserve per unit. Free, no signup.";
-
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: "/capex-calculator" },
-  openGraph: { title, description, url: "/capex-calculator" },
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Free CapEx Calculator for Rental Properties | CapexClock",
+  description:
+    "Enter your roof, HVAC, water heaters and more with install years and costs. Get a 10-year replacement forecast and a monthly reserve per unit. Free.",
+  path: "/capex-calculator",
+});
 
 const FAQ = [
   {
@@ -22,8 +19,16 @@ const FAQ = [
     a: "It's the smallest steady monthly amount that, starting from zero, has the cash ready for every replacement on time. We look 30 years ahead so a big item due just after the 10-year chart is still saved for. Anything overdue or due this year is shown separately as needed now, since there's no time to save for it. The per-unit figure divides the monthly reserve by your number of units.",
   },
   {
+    q: "How do I enter costs?",
+    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per unit are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 × $650 = $7,800.",
+  },
+  {
     q: "What if I don't know when something was installed?",
     a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm.",
+  },
+  {
+    q: "What does Replace this year do?",
+    a: "Tick it for anything you plan to replace this year, even if it still works. Its cost is added to this year's costs and its replacement cycle starts again from this year. If you already replaced something, don't tick it. Enter the year you replaced it as the install year instead.",
   },
   {
     q: "What happens to items that are already past their useful life?",
@@ -86,9 +91,9 @@ export default async function CapexCalculatorPage() {
               ))}
             </dl>
             <p className="mt-8 text-slate-600 dark:text-slate-300">
-              Want to save properties and get reminders?{" "}
+              Want a reminder before something comes due?{" "}
               <Link href="/#signup" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
-                Get early access
+                Get early access to reminders
               </Link>
               .
             </p>
