@@ -13,19 +13,49 @@ import type { Forecast, ForecastComponent } from "@/lib/forecast";
 // Indic characters and no emoji; see printableText.
 const font = "DejaVu Sans";
 const faces = [{ fontFamily: font }, { fontFamily: font, fontWeight: 700 }];
-Font.register({
-  family: font,
-  fonts: [
-    { src: "/fonts/DejaVuSans.ttf" },
-    { src: "/fonts/DejaVuSans-Bold.ttf", fontWeight: 700 },
-  ],
-});
+let fontsReady: Promise<void> | null = null;
+
+/**
+ * Registers the fonts once both files have arrived. The PDF library keeps a
+ * failed download for good, so handing it the URLs would make every later try
+ * fail too. Registering the bytes instead lets the next click fetch them again.
+ */
+function loadFonts(): Promise<void> {
+  fontsReady ??= Promise.all([fontData("/fonts/DejaVuSans.ttf"), fontData("/fonts/DejaVuSans-Bold.ttf")])
+    .then(([regular, bold]) => {
+      Font.register({ family: font, fonts: [{ src: regular }, { src: bold, fontWeight: 700 }] });
+    })
+    .catch((error: unknown) => {
+      fontsReady = null;
+      throw error;
+    });
+  return fontsReady;
+}
+
+/** A font file as a data URL. Tries twice, since one dropped request is common on phones. */
+async function fontData(src: string, attempts = 2): Promise<string> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`Couldn't load ${src}: ${response.status}`);
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    if (attempts <= 1) throw error;
+    return fontData(src, attempts - 1);
+  }
+}
 
 /**
  * Swaps characters the fonts can't draw for "□". Left alone, the PDF falls back
  * to Helvetica for them, which prints garbled, overlapping glyphs.
  */
 async function printableText(): Promise<(text: string) => string> {
+  await loadFonts();
   await Promise.all(faces.map((face) => Font.load(face)));
   const loaded = faces.map((face) => Font.getFont(face).data);
   const canDraw = (ch: string) =>
@@ -35,7 +65,7 @@ async function printableText(): Promise<(text: string) => string> {
   return (text) => text.replace(/[^\s\p{C}]/gu, (ch) => (canDraw(ch) ? ch : /\p{M}/u.test(ch) ? "" : "□"));
 }
 
-/** Renders the PDF once its fonts are loaded. */
+/** Renders the PDF once its fonts are loaded. Render it only through here. */
 export async function forecastPdfBlob(props: Omit<ForecastPdfProps, "printable">): Promise<Blob> {
   const printable = await printableText();
   return pdf(<ForecastPdf {...props} printable={printable} />).toBlob();
