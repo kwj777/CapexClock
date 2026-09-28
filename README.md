@@ -104,3 +104,8 @@ own /lifespan page automatically (add sentence-friendly wording and notes in
 `src/lib/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be reached, the site
 falls back to the copy in `src/lib/library/components.ts`; a test keeps that file and
 `supabase/seed.sql` in sync.
+
+Also run `supabase/migrations/0003_library_checks.sql` once in the **SQL Editor**, after the
+earlier migrations. It makes the table editor refuse a row the site can't use (a slug with capitals or
+spaces, or a name or category with no letters or numbers) instead of saving it and leaving it off
+the site. It's safe to run again.

@@ -37,18 +37,21 @@ describe("component library rows from Supabase", () => {
         row("elevator-2"),
         row("blank-name", { name: "  " }),
         row("blank-category", { category: "" }),
+        row("punctuation-name", { name: "?" }),
+        row("note-only", { name: "(misc)" }),
         row("backwards", { default_useful_life_low: 9, default_useful_life_high: 2 }),
         row("odd-unit", { default_unit_label: "per_room" }),
       ],
       (reason) => reasons.push(reason),
     );
-    expect(items.map((c) => c.slug)).toEqual(["elevator-2"]);
+    expect(items.map((c) => c.slug)).toEqual(["elevator-2", "note-only"]);
     expect(reasons).toEqual([
       'Skipped component_library row "Elevator": the slug must be lower-case letters, numbers and hyphens only.',
       'Skipped component_library row "hydraulic_elevator": the slug must be lower-case letters, numbers and hyphens only.',
       'Skipped component_library row "elevator ": the slug must be lower-case letters, numbers and hyphens only.',
-      'Skipped component_library row "blank-name": the name and category can\'t be blank.',
-      'Skipped component_library row "blank-category": the name and category can\'t be blank.',
+      'Skipped component_library row "blank-name": the name and category each need at least one letter or number.',
+      'Skipped component_library row "blank-category": the name and category each need at least one letter or number.',
+      'Skipped component_library row "punctuation-name": the name and category each need at least one letter or number.',
       'Skipped component_library row "backwards": the useful life must run from low to high, between 1 and 100 years.',
       'Skipped component_library row "odd-unit": the unit label must be per_unit, per_building or per_sq_ft.',
     ]);
@@ -75,6 +78,7 @@ describe("component library rows from Supabase", () => {
       .join("\n");
     const check = sql.match(/check \(slug ~ '([^']+)'\)/);
     expect(check?.[1]).toBe(SLUG_PATTERN.source);
+    expect(sql).toContain("check (name ~ '[[:alnum:]]' and category ~ '[[:alnum:]]')");
   });
 
   it("returns nothing for a non-array response", () => {

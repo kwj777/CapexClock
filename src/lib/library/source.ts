@@ -6,11 +6,11 @@ const UNIT_LABELS: readonly UnitLabel[] = ["per_unit", "per_building", "per_sq_f
 
 /**
  * Slugs become page addresses (/lifespan/<slug>). The database enforces the same
- * rule, and the same "not blank" rule for names and categories, so the table
- * editor refuses a row the site would skip (supabase/migrations/0003).
+ * rule, and the same "has a letter or number" rule for names and categories, so
+ * the table editor refuses a row the site would skip (supabase/migrations/0003).
  */
 export const SLUG_PATTERN = /^[a-z0-9-]+$/;
-const NOT_BLANK = /\S/;
+const HAS_WORD = /[\p{L}\p{N}]/u;
 
 function isUnitLabel(value: string): value is UnitLabel {
   return (UNIT_LABELS as readonly string[]).includes(value);
@@ -25,8 +25,8 @@ function toComponent(r: Record<string, unknown>): LibraryComponent | string {
   if (typeof slug !== "string" || !SLUG_PATTERN.test(slug)) {
     return "the slug must be lower-case letters, numbers and hyphens only";
   }
-  if (typeof name !== "string" || !NOT_BLANK.test(name) || typeof category !== "string" || !NOT_BLANK.test(category)) {
-    return "the name and category can't be blank";
+  if (typeof name !== "string" || !HAS_WORD.test(name) || typeof category !== "string" || !HAS_WORD.test(category)) {
+    return "the name and category each need at least one letter or number";
   }
   if (typeof low !== "number" || typeof high !== "number" || low < 1 || low > high || high > 100) {
     return "the useful life must run from low to high, between 1 and 100 years";

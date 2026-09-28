@@ -49,6 +49,16 @@ describe("subjectFor", () => {
       ["HVAC rooftop unit", "an HVAC rooftop unit", false],
       ["LED lighting", "LED lighting", false],
       ["Gas", "a gas", false],
+      ["Carpet & pad", "carpet and pad", false],
+      ["Tile & grout", "tile and grout", false],
+      ["Sink & faucet", "a sink and faucet", false],
+      ["Doors & windows", "doors and windows", true],
+      ["Stairs and railing", "stairs and railing", true],
+      ["Hour meter", "an hour meter", false],
+      ["X-ray room", "an X-ray room", false],
+      ["U-bend", "a U-bend", false],
+      ["A/C condenser", "an A/C condenser", false],
+      ["(misc)", "a misc", false],
     ];
     for (const [name, noun, plural] of cases) expect(subjectFor(added(name))).toEqual({ noun, plural });
     expect(titleCase("a flat or membrane roof")).toBe("a Flat or Membrane Roof");
@@ -78,6 +88,27 @@ describe("lifespan titles and descriptions", () => {
     expect(lifespanTitle(bySlug("tank-water-heater"))).toBe("How Long Does a Tank Water Heater Last? (8–12 Years)");
     expect(lifespanTitle(bySlug("luxury-vinyl-plank"))).toBe("Luxury Vinyl Plank Flooring Lifespan: 15–25 Years");
     expect(lifespanTitle(added("Smoke detectors"))).toBe("How Long Do Smoke Detectors Last? (20–30 Years) | CapexClock");
+    expect(lifespanTitle(added("Carpet & pad"))).toBe("How Long Does Carpet and Pad Last? (20–30 Years)");
+    expect(lifespanTitle(added("(misc)"))).toBe("How Long Does a Misc Last? (20–30 Years) | CapexClock");
+  });
+
+  it("stay short for long names added later", () => {
+    const long = { ...added("Underground stormwater detention system"), lifeLow: 30, lifeHigh: 50 };
+    expect(lifespanTitle(long)).toBe("Underground Stormwater Detention System: 30–50 Years");
+    const longer = { ...long, name: "Underground stormwater detention system and pump station with backup generator" };
+    expect(lifespanTitle(longer)).toBe("Underground Stormwater Detention System…: 30–50 Years");
+    const longest = { ...long, name: "Commercial kitchen hood, grease duct, exhaust fan, make-up air unit and fire suppression system", lifeLow: 100, lifeHigh: 100 };
+    expect(lifespanTitle(longest)).toBe("Commercial Kitchen Hood, Grease Duct…: 100–100 Years");
+    for (const item of [long, longer, longest]) {
+      expect(lifespanTitle(item).length).toBeLessThanOrEqual(MAX_TITLE_LENGTH);
+      expect(lifespanTitle(item)).toContain(`${item.lifeLow}–${item.lifeHigh} Years`);
+      for (const hasNotes of [true, false]) {
+        expect(lifespanDescription(item, hasNotes).length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH);
+      }
+    }
+    expect(lifespanDescription(longer, false)).toBe(
+      "An underground stormwater detention system and pump station with backup generator typically lasts 30 to 50 years. See what to set aside to replace it.",
+    );
   });
 
   it("only promises the factors and signs when the page has them", () => {
@@ -107,6 +138,12 @@ describe("inSentence", () => {
     expect(categoryAsModifier("Finishes")).toBe("finish");
     expect(categoryAsModifier("Kitchen Fixtures")).toBe("kitchen fixture");
     expect(categoryAsModifier("Glass")).toBe("glass");
+    expect(categoryAsModifier("Glasses")).toBe("glass");
+    expect(categoryAsModifier("Doors & windows")).toBe("door and window");
+    expect(categoryAsModifier("Kitchens & Baths")).toBe("kitchen and bath");
+    expect(categoryAsModifier("Heating / Cooling")).toBe("heating and cooling");
+    expect(categoryAsModifier("HVAC & Plumbing")).toBe("HVAC and plumbing");
+    expect(categoryAsModifier("Grounds")).toBe("grounds");
   });
 });
 

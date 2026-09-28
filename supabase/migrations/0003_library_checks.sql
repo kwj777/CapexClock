@@ -7,7 +7,8 @@
 -- checks the table editor refuses the row when it's entered instead:
 -- 1. A slug is lower-case letters, numbers and hyphens only, since it becomes the
 --    page address (/lifespan/<slug>). Same pattern as SLUG_PATTERN in source.ts.
--- 2. Name and category can't be blank.
+-- 2. Name and category each need at least one letter or number, so a page never reads
+--    "How long does a ? last?".
 
 alter table public.component_library drop constraint if exists component_library_slug_check;
 alter table public.component_library add constraint component_library_slug_check
@@ -15,7 +16,7 @@ alter table public.component_library add constraint component_library_slug_check
 
 alter table public.component_library drop constraint if exists component_library_name_check;
 alter table public.component_library add constraint component_library_name_check
-  check (name ~ '\S' and category ~ '\S') not valid;
+  check (name ~ '[[:alnum:]]' and category ~ '[[:alnum:]]') not valid;
 
 -- Check the rows already there. If an old row breaks a rule, the rule still applies to
 -- every new or edited row and that row is left as it is (the site skips it and logs why).
