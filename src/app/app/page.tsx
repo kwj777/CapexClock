@@ -3,17 +3,19 @@ import ImportDraftPrompt from "@/components/account/ImportDraftPrompt";
 import Portfolio from "@/components/account/Portfolio";
 import { fetchAllRows } from "@/lib/properties/load";
 import { createClient } from "@/lib/supabase/server";
+import { getAccount } from "./account";
 
 export default async function PortfolioPage() {
   const supabase = await createClient();
   // Any failed or partial read throws to error.tsx: a missing list would show as $0.
-  const [properties, components] = await Promise.all([
+  const [properties, components, account] = await Promise.all([
     fetchAllRows((from, to) =>
       supabase.from("properties").select("*", { count: "exact" }).order("created_at").order("id").range(from, to),
     ),
     fetchAllRows((from, to) =>
       supabase.from("components").select("*", { count: "exact" }).order("id").range(from, to),
     ),
+    getAccount(),
   ]);
 
   return (
@@ -38,7 +40,12 @@ export default async function PortfolioPage() {
           </p>
         </div>
       ) : (
-        <Portfolio properties={properties} components={components} serverYear={new Date().getFullYear()} />
+        <Portfolio
+          properties={properties}
+          components={components}
+          userId={account.id}
+          serverYear={new Date().getFullYear()}
+        />
       )}
     </div>
   );

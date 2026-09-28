@@ -5,11 +5,28 @@ import { useMemo, useSyncExternalStore } from "react";
 import { formatMoney } from "@/components/calculator/format";
 import { summarizePortfolio } from "@/lib/properties/portfolio";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import { keptPropertyIds } from "./unsaved";
 
 const card = "rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900";
 
 function subscribe(): () => void {
   return () => {};
+}
+
+// Follows edits kept by the editor in other tabs.
+function subscribeToStorage(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+/** Properties with unsaved edits kept in this browser, as one string so it compares by value. */
+function keptSnapshot(userId: string | null): string {
+  if (!userId) return "";
+  try {
+    return keptPropertyIds(window.localStorage, userId, Date.now()).join(",");
+  } catch {
+    return "";
+  }
 }
 
 /** Says which properties the per-unit figure leaves out. */
@@ -28,13 +45,17 @@ function missingUnitsNote(properties: PropertyRow[]): string {
 export default function Portfolio({
   properties,
   components,
+  userId,
   serverYear,
 }: {
   properties: PropertyRow[];
   components: ComponentRow[];
+  userId: string | null;
   serverYear: number;
 }) {
   const startYear = useSyncExternalStore(subscribe, () => new Date().getFullYear(), () => serverYear);
+  const kept = useSyncExternalStore(subscribeToStorage, () => keptSnapshot(userId), () => "");
+  const unsaved = useMemo(() => new Set(kept.split(",")), [kept]);
   const { summaries, totals } = useMemo(
     () => summarizePortfolio(properties, components, startYear),
     [properties, components, startYear],
@@ -94,6 +115,11 @@ export default function Portfolio({
                 <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
                   {forecast.atRisk.length} at risk: {forecast.atRisk.slice(0, 3).map((a) => a.name).join(", ")}
                   {forecast.atRisk.length > 3 && "…"}
+                </p>
+              )}
+              {unsaved.has(property.id) && (
+                <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  You have unsaved changes to this property on this device. Open it to save them.
                 </p>
               )}
             </Link>

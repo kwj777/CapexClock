@@ -3,6 +3,7 @@ import Link from "next/link";
 import PropertyEditorLoader from "@/components/account/PropertyEditorLoader";
 import { getLibrary } from "@/lib/library/source";
 import { EMPTY_DRAFT } from "@/components/calculator/draft";
+import { getAccount } from "../../account";
 
 function heading(from: string | string[] | undefined): string {
   return from === "calculator" ? "Save your calculator work" : "Add a property";
@@ -16,7 +17,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/app/propert
 export default async function NewPropertyPage({ searchParams }: PageProps<"/app/properties/new">) {
   const params = await searchParams;
   const fromCalculator = params.from === "calculator";
-  const library = await getLibrary();
+  const [library, account] = await Promise.all([getLibrary(), getAccount()]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-6 sm:px-6">
@@ -27,7 +28,12 @@ export default async function NewPropertyPage({ searchParams }: PageProps<"/app/
         {heading(params.from)}
       </h1>
       <PropertyEditorLoader
-        library={library} initialName="" initialDraft={EMPTY_DRAFT} importFromCalculator={fromCalculator} />
+        library={library}
+        userId={account.id}
+        initialName=""
+        initialDraft={EMPTY_DRAFT}
+        importFromCalculator={fromCalculator}
+      />
     </div>
   );
 }

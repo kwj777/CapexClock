@@ -46,6 +46,8 @@ export interface PropertyEditorProps {
   /** New property started from the public calculator's work in this browser. */
   importFromCalculator?: boolean;
   library: LibraryComponent[];
+  /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
+  userId: string | null;
 }
 
 /** Reads a property and its components from the database; null if that fails. */
@@ -86,9 +88,10 @@ export default function PropertyEditor({
   initialDraft,
   importFromCalculator = false,
   library,
+  userId,
 }: PropertyEditorProps) {
   const router = useRouter();
-  const backupKey = unsavedKey(propertyId);
+  const backupKey = unsavedKey(userId, propertyId);
   // Rendered client-only (see PropertyEditorLoader), so localStorage is safe here.
   const [restored, setRestored] = useState(() => loadUnsaved(backupKey));
   const startingDraft = () => (importFromCalculator ? loadDraft() : initialDraft);
@@ -141,6 +144,7 @@ export default function PropertyEditor({
       const here = window.location;
       if (to.origin !== here.origin || (to.pathname === here.pathname && to.search === here.search)) return;
       if (window.confirm("You have unsaved changes. Leave without saving them?")) {
+        leaving.current = true;
         clearUnsaved(backupKey);
         return;
       }
@@ -155,10 +159,21 @@ export default function PropertyEditor({
     };
   }, [dirty, backupKey]);
 
-  // Signed out: keep the edits in this browser until the owner signs in to save them.
+  // Unsaved edits are kept in this browser, so leaving another way (Back, a lost
+  // session, an error page taking over) doesn't lose them. They come back next time
+  // this property (or a new one) is opened.
   useEffect(() => {
-    if (signedOut && dirty) keepUnsaved(backupKey, { name, draft, baseUpdatedAt: saved.updatedAt });
-  }, [signedOut, dirty, backupKey, name, draft, saved.updatedAt]);
+    if (!dirty) {
+      clearUnsaved(backupKey);
+      return;
+    }
+    const edits = { name, draft, baseUpdatedAt: saved.updatedAt };
+    keepUnsaved(backupKey, edits);
+    // Kept again on the way out, in case another tab saved or dropped this copy.
+    return () => {
+      if (!leaving.current) keepUnsaved(backupKey, edits);
+    };
+  }, [dirty, backupKey, name, draft, saved.updatedAt]);
 
   function edited() {
     setSave((s) =>
@@ -227,7 +242,7 @@ export default function PropertyEditor({
       source: importFromCalculator ? "calculator" : id ? "edit" : "new",
     });
     if (importFromCalculator) saveDraft(EMPTY_DRAFT);
-    clearUnsaved(backupKey);
+    // The kept copy goes once nothing is unsaved (see the effect above).
     setRestored(null);
 
     if (!id) {
@@ -275,6 +290,7 @@ export default function PropertyEditor({
       }
       // Signed in and nothing to delete: it was already deleted somewhere else.
     }
+    leaving.current = true;
     clearUnsaved(backupKey);
     setSaved({ name, draft, updatedAt: null });
     router.push("/app");

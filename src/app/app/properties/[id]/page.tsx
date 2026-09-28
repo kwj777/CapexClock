@@ -7,6 +7,7 @@ import { getLibrary } from "@/lib/library/source";
 import { draftFromRows } from "@/lib/properties/convert";
 import { fetchAllRows } from "@/lib/properties/load";
 import { createClient } from "@/lib/supabase/server";
+import { getAccount } from "../../account";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,7 +38,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
   const property = await getProperty(id);
   // Row Level Security returns nothing for someone else's property, so this is also the access check.
   if (!property) notFound();
-  const [components, library] = await Promise.all([
+  const [components, library, account] = await Promise.all([
     fetchAllRows((from, to) =>
       supabase
         .from("components")
@@ -48,6 +49,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
         .range(from, to),
     ),
     getLibrary(),
+    getAccount(),
   ]);
 
   return (
@@ -60,6 +62,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
         library={library}
         // Keeps its own state after a save; a new mount only for another property.
         key={property.id}
+        userId={account.id}
         propertyId={property.id}
         initialName={property.name}
         initialUpdatedAt={property.updated_at}
