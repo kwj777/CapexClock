@@ -31,6 +31,10 @@ export default function ReserveCalculator() {
   const unitsErrorId = `${baseId}-units-error`;
   // Fields the owner has left at least once ("<row id>:cost"); a row is only checked field by field after that.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  // The field being typed in, same keys. A row keeps room for its message while
+  // the owner is in a field it's about, so the message appearing when they click
+  // away never moves the button they're clicking.
+  const [editing, setEditing] = useState<string | null>(null);
   // Field to focus after the next render (after removing a row).
   const focusNext = useRef<string | null>(null);
 
@@ -41,8 +45,10 @@ export default function ReserveCalculator() {
   });
 
   const update = (id: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  const touch = (id: number, field: ExpenseField) =>
+  const touch = (id: number, field: ExpenseField) => {
     setTouched((t) => (t.has(`${id}:${field}`) ? t : new Set(t).add(`${id}:${field}`)));
+    setEditing(null);
+  };
 
   function remove(id: number) {
     const i = rows.findIndex((r) => r.id === id);
@@ -59,7 +65,6 @@ export default function ReserveCalculator() {
       shownFields(problems.get(r.id), new Set((["cost", "years"] as const).filter((f) => touched.has(`${r.id}:${f}`)))),
     ]),
   );
-  const anyFlagged = [...flagged.values()].some((fields) => fields.length > 0);
   const result = inputs.expenses.length && problems.size === 0 && !inputs.balanceProblem
     ? sinkingFund({ expenses: inputs.expenses, currentBalance: inputs.balance, units: inputs.units })
     : null;
@@ -73,7 +78,9 @@ export default function ReserveCalculator() {
           // Row names keep each field's label unique, starting with the visible label.
           const rowName = r.name.trim() || `expense ${i + 1}`;
           const errorId = `${baseId}-${r.id}-error`;
+          const problem = problems.get(r.id);
           const fields = flagged.get(r.id) ?? [];
+          const roomForMessage = fields.length > 0 || (problem?.fields.some((f) => editing === `${r.id}:${f}`) ?? false);
           const flag = (field: ExpenseField) =>
             fields.includes(field) ? { "aria-invalid": true, "aria-describedby": errorId } : {};
           return (
@@ -99,6 +106,7 @@ export default function ReserveCalculator() {
                   aria-label={`Cost, ${rowName}`}
                   {...flag("cost")}
                   onChange={(e) => update(r.id, { cost: e.target.value })}
+                  onFocus={() => setEditing(`${r.id}:cost`)}
                   onBlur={() => touch(r.id, "cost")}
                 />
               </label>
@@ -111,6 +119,7 @@ export default function ReserveCalculator() {
                   aria-label={`Years until due, ${rowName}`}
                   {...flag("years")}
                   onChange={(e) => update(r.id, { years: e.target.value })}
+                  onFocus={() => setEditing(`${r.id}:years`)}
                   onBlur={() => touch(r.id, "years")}
                 />
               </label>
@@ -123,9 +132,12 @@ export default function ReserveCalculator() {
               >
                 ✕
               </button>
-              {fields.length > 0 && (
-                <p id={errorId} className="col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400">
-                  {problems.get(r.id)?.message}
+              {roomForMessage && (
+                <p
+                  id={errorId}
+                  className={`col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400 ${fields.length > 0 ? "" : "invisible"}`}
+                >
+                  {problem?.message}
                 </p>
               )}
             </div>
@@ -204,7 +216,7 @@ export default function ReserveCalculator() {
               {result.shortfallNow > 0 && " Your balance doesn't cover what's due now, so that gap needs to be funded separately."}
             </p>
           </>
-        ) : anyFlagged || inputs.balanceProblem ? (
+        ) : inputs.balanceProblem ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">Fix the highlighted fields to see your monthly amount.</p>
         ) : problems.size > 0 ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">Finish each expense&apos;s cost and years until due to see your monthly amount.</p>
