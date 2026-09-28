@@ -3,10 +3,19 @@
 import { useState } from "react";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
-import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import type { ExportDetails } from "@/lib/export/rows";
+import type { Forecast, ForecastComponent, UnitLabel } from "@/lib/forecast";
 import PayQuestion from "./PayQuestion";
 
 type Format = "csv" | "pdf";
+
+/** A calculator form row, as far as the exports need it. */
+export interface ExportFormRow {
+  id: string;
+  name: string;
+  category: string;
+  unitLabel: UnitLabel;
+}
 
 function download(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -28,11 +37,14 @@ export default function ExportButtons({
   unitCount,
   forecast,
   components,
+  rows,
 }: {
   name: string;
   unitCount: number;
   forecast: Forecast;
   components: ForecastComponent[];
+  /** Every form row, so exports show units and name the rows left out. */
+  rows: ExportFormRow[];
 }) {
   const [busy, setBusy] = useState<Format | null>(null);
   const [exported, setExported] = useState<Format | null>(null);
@@ -41,10 +53,17 @@ export default function ExportButtons({
   async function exportAs(format: Format) {
     setBusy(format);
     setFailed(false);
+    const included = new Set(components.map((c) => c.id));
+    const details: ExportDetails = {
+      unitLabels: new Map(rows.map((r) => [r.id, r.unitLabel])),
+      leftOut: rows
+        .filter((r) => !included.has(r.id))
+        .map((r) => ({ name: r.name.trim() || "Unnamed component", category: r.category })),
+    };
     try {
       if (format === "csv") {
         // The byte-order mark makes Excel read the file as UTF-8.
-        const csv = "﻿" + forecastCsv(forecast, components);
+        const csv = "﻿" + forecastCsv(forecast, components, details);
         download(new Blob([csv], { type: "text/csv;charset=utf-8" }), exportFileName(name, "csv", forecast.startYear));
       } else {
         // The PDF library is large, so it's only loaded when asked for.
@@ -54,7 +73,14 @@ export default function ExportButtons({
         ]);
         const generatedOn = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
         const blob = await pdf(
-          <ForecastPdf name={name} unitCount={unitCount} forecast={forecast} components={components} generatedOn={generatedOn} />,
+          <ForecastPdf
+            name={name}
+            unitCount={unitCount}
+            forecast={forecast}
+            components={components}
+            details={details}
+            generatedOn={generatedOn}
+          />,
         ).toBlob();
         download(blob, exportFileName(name, "pdf", forecast.startYear));
       }

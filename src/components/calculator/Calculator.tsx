@@ -348,6 +348,7 @@ export function CalculatorView({
             unitCount={unitCount}
             forecast={forecast}
             components={components}
+            rows={draft.rows}
           />
         </section>
       )}

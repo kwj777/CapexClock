@@ -1,4 +1,5 @@
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
 
 // Spreadsheet apps run cells starting with these as formulas; prefix them so a
 // component named "=HYPERLINK(...)" stays plain text.
@@ -20,31 +21,40 @@ function row(values: (string | number)[]): string {
   return values.map(cell).join(",");
 }
 
-/** One row per replacement in the forecast window, in year order. */
-export function forecastCsv(forecast: Forecast, components: ForecastComponent[]): string {
-  const byId = new Map(components.map((c) => [c.id, c]));
+/** Plain digits with at least 2 decimals: 16801.2 -> "16801.20", 0.125 -> "0.125". */
+function amount(value: number, maxDecimals: number): string {
+  // toFixed also drops float noise such as 956.9999999999999.
+  return value.toFixed(maxDecimals).replace(/(\.\d\d\d*?)0+$/, "$1");
+}
+
+/**
+ * One row per replacement in the forecast window, in year order, then one row
+ * for each component left out because its details aren't complete.
+ */
+export function forecastCsv(
+  forecast: Forecast,
+  components: ForecastComponent[],
+  details: ExportDetails = {},
+): string {
   const lines = [
-    row(["Year", "Component", "Category", "Quantity", "Cost each", "Total cost", "Note"]),
+    row(["Year", "Component", "Category", "Quantity", "Unit", "Cost each", "Total cost", "Note"]),
   ];
-  for (const year of forecast.years) {
-    for (const r of year.replacements) {
-      const c = byId.get(r.componentId);
-      const notes = [
-        r.overdue ? "Overdue" : "",
-        c?.installYearIsEstimate ? "Install year estimated" : "",
-      ].filter(Boolean);
-      lines.push(
-        row([
-          r.year,
-          r.name,
-          r.category,
-          c?.quantity ?? "",
-          c?.replacementCostEach ?? "",
-          r.cost,
-          notes.join("; "),
-        ]),
-      );
-    }
+  for (const r of exportRows(forecast, components, details.unitLabels)) {
+    lines.push(
+      row([
+        r.year,
+        r.name,
+        r.category,
+        r.quantity ?? "",
+        r.quantity === null ? "" : r.unit,
+        r.costEach === null ? "" : amount(r.costEach, 6),
+        amount(r.total, 2),
+        r.notes.join("; "),
+      ]),
+    );
+  }
+  for (const l of details.leftOut ?? []) {
+    lines.push(row(["", l.name, l.category, "", "", "", "", LEFT_OUT_NOTE]));
   }
   // CRLF is what spreadsheet apps expect from CSV.
   return lines.join("\r\n") + "\r\n";
