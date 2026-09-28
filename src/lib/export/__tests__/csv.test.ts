@@ -25,8 +25,42 @@ describe("forecast CSV", () => {
     expect(lines.find((l) => l.startsWith("2028"))).toBe(`2028,"'=HYPERLINK(""x"")",Other,1,10,10,`);
   });
 
+  it("stops formulas that start after a separator inside a name", () => {
+    const names = ["x;=1+1;", "Roof\t+SUM(1)", "Deck|@A1", "Gutters, -2+3", "Boiler; =1+1", "Porch\n=1+1"];
+    const list: ForecastComponent[] = names.map((name, i) => ({
+      id: `n${i}`, category: "Other", name, quantity: 1, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 1000,
+    }));
+    const out = forecastCsv(computeForecast({ startYear: 2026, unitCount: 1, components: list }), list).trimEnd().split("\r\n");
+    expect(out[1]).toBe(`2026,"x;'=1+1;",Other,1,1000,1000,Overdue`);
+    // Split the file the way an app set to each of these separators would, ignoring quotes.
+    for (const separator of [",", ";", "\t", "|", "\n"]) {
+      const cells = out.join("\n").split(separator).map((c) => c.replace(/^[\s"]+/, ""));
+      expect(cells.filter((c) => /^[=+\-@]/.test(c))).toEqual([]);
+    }
+  });
+});
+
+describe("export file names", () => {
   it("names files after the property", () => {
     expect(exportFileName("14 Maple Ct.", "pdf", 2026)).toBe("14-maple-ct-forecast-2026.pdf");
     expect(exportFileName("", "csv", 2026)).toBe("capexclock-forecast-2026.csv");
+    expect(exportFileName("🔥 #1", "csv", 2026)).toBe("1-forecast-2026.csv");
+  });
+
+  it("keeps accented and non-Latin names readable", () => {
+    expect(exportFileName("Résidence Élysée", "pdf", 2026)).toBe("residence-elysee-forecast-2026.pdf");
+    expect(exportFileName("Łódź Apartments", "pdf", 2026)).toBe("lodz-apartments-forecast-2026.pdf");
+    expect(exportFileName("Nguyễn Duplex", "pdf", 2026)).toBe("nguyen-duplex-forecast-2026.pdf");
+    expect(exportFileName("Café 12", "csv", 2026)).toBe("cafe-12-forecast-2026.csv");
+    expect(exportFileName("Straße Ørsted", "csv", 2026)).toBe("strasse-orsted-forecast-2026.csv");
+    expect(exportFileName('Łódź Résidence – 東京 #2 "Main"', "pdf", 2026)).toBe(
+      "lodz-residence-東京-2-main-forecast-2026.pdf",
+    );
+    expect(exportFileName("Дом на Мойке", "pdf", 2026)).toBe("дом-на-мойке-forecast-2026.pdf");
+  });
+
+  it("keeps long names to a sensible length", () => {
+    const name = exportFileName("Maple ".repeat(40), "pdf", 2026);
+    expect(name).toBe(`${"maple-".repeat(10).slice(0, -1)}-forecast-2026.pdf`);
   });
 });
