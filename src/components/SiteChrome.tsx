@@ -33,8 +33,9 @@ export function SiteHeader() {
           <Link href="/#signup" className={`${navLink} hidden lg:inline`}>
             Early access
           </Link>
+          {/* No prefetch: /app runs the auth proxy, which public pages shouldn't trigger. */}
           {supabaseEnv() && (
-            <Link href="/app" className={navLink}>
+            <Link href="/app" prefetch={false} className={navLink}>
               Sign in
             </Link>
           )}
