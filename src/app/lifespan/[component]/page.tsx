@@ -7,10 +7,10 @@ import { defaultLife, UNIT_LABEL_TEXT, type LibraryComponent } from "@/lib/libra
 import { notesFor } from "@/lib/library/content";
 import {
   capitalize,
-  categoryAsModifier,
   lifeDrivers,
   lifespanDescription,
   lifespanTitle,
+  relatedHeading,
   subjectFor,
 } from "@/lib/library/phrasing";
 import { getLibrary } from "@/lib/library/source";
@@ -171,7 +171,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
           {related.length > 0 && (
             <section className="mt-12">
               <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
-                {sameCategory.length > 0 ? `Other ${categoryAsModifier(item.category)} lifespans` : "More component lifespans"}
+                {sameCategory.length > 0 ? relatedHeading(item.category) : "More component lifespans"}
               </h2>
               <ul className="mt-3 space-y-1.5">
                 {related.map((c) => (
