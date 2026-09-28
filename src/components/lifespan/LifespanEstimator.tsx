@@ -88,7 +88,7 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
         </label>
         <label className="block">
           <span className={label}>Replacement cost {item.unitLabel === "per_sq_ft" ? "per sq ft" : "each"}</span>
-          <input className={input} inputMode="decimal" placeholder="Your cost" value={cost} onChange={(e) => setCost(e.target.value)} />
+          <input className={input} inputMode="decimal" placeholder="Quote or estimate" value={cost} onChange={(e) => setCost(e.target.value)} />
         </label>
       </div>
 
