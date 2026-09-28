@@ -1,7 +1,7 @@
 import { exampleDraft } from "@/components/calculator/draft";
-import type { ComponentRow } from "@/lib/supabase/database.types";
+import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { toSaveInput } from "../convert";
-import { matchesSaved, saveFailure, withSavedIds } from "../save";
+import { matchesSaved, saveFailure, versionFromReadBack, withSavedIds } from "../save";
 
 describe("telling save failures apart", () => {
   it("spots an ended session", () => {
@@ -79,5 +79,52 @@ describe("after a save", () => {
     expect(matchesSaved(input, { ...property, name: "Other tab" }, rows)).toBe(false);
     expect(matchesSaved(input, property, rows.slice(1))).toBe(false);
     expect(matchesSaved(input, property, [{ ...rows[0], replacement_cost_each: 1 }, rows[1]])).toBe(false);
+  });
+});
+
+describe("checking the version when the last save couldn't read it back", () => {
+  const propertyId = "a0000000-0000-4000-8000-000000000001";
+  const draft = exampleDraft();
+  draft.rows = draft.rows.slice(0, 2);
+  const lastSaved = toSaveInput("Maple Court", draft, 2026, propertyId);
+  const components: ComponentRow[] = lastSaved.components.map((c, i) => ({
+    ...c,
+    id: `c0000000-0000-4000-8000-00000000000${i}`,
+    property_id: propertyId,
+    condition: null,
+    notes: null,
+    created_at: "",
+    updated_at: "",
+  }));
+  const property: PropertyRow = {
+    id: propertyId,
+    user_id: "u0000000-0000-4000-8000-000000000001",
+    name: "Maple Court",
+    city: null,
+    state: null,
+    unit_count: 12,
+    year_built: 1998,
+    created_at: "",
+    updated_at: "2026-09-28T10:00:00.123456+00:00",
+  };
+
+  it("uses the database's version when it holds what was saved", () => {
+    expect(versionFromReadBack(lastSaved, { property, components })).toEqual({
+      updatedAt: "2026-09-28T10:00:00.123456+00:00",
+    });
+  });
+
+  it("refuses when another tab or device saved since", () => {
+    expect(versionFromReadBack(lastSaved, { property: { ...property, name: "Other tab" }, components })).toEqual({
+      failure: "conflict",
+    });
+    expect(versionFromReadBack(lastSaved, { property, components: components.slice(1) })).toEqual({
+      failure: "conflict",
+    });
+  });
+
+  it("refuses when the property is gone or can't be read", () => {
+    expect(versionFromReadBack(lastSaved, { property: null, components: [] })).toEqual({ failure: "deleted" });
+    expect(versionFromReadBack(lastSaved, null)).toEqual({ failure: "network" });
   });
 });

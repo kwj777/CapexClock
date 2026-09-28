@@ -31,8 +31,13 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
   const supabase = await createClient();
   // A failed or partial read throws to error.tsx. Editing from a partial list would
   // delete the missing components on the next save.
-  const [property, components, library] = await Promise.all([
-    getProperty(id),
+  // The property (with its version) is read before its components. If a save lands
+  // in between, the older version goes with the newer components, so the editor's
+  // next save is refused instead of overwriting that save.
+  const property = await getProperty(id);
+  // Row Level Security returns nothing for someone else's property, so this is also the access check.
+  if (!property) notFound();
+  const [components, library] = await Promise.all([
     fetchAllRows((from, to) =>
       supabase
         .from("components")
@@ -44,8 +49,6 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
     ),
     getLibrary(),
   ]);
-  // Row Level Security returns nothing for someone else's property, so this is also the access check.
-  if (!property) notFound();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-6 sm:px-6">

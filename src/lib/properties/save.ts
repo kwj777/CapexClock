@@ -82,3 +82,25 @@ export function matchesSaved(
     );
   });
 }
+
+/** A property and its components as read back from the database; `property` is null when it's gone. */
+export interface ReadBack {
+  property: PropertyRow | null;
+  components: ComponentRow[];
+}
+
+/**
+ * When the last save couldn't read back its new version, the next save checks the
+ * database first. It gets the database's version only if the property still holds
+ * exactly what was last saved; otherwise it says why it can't go ahead. `back` is
+ * null when the read failed.
+ */
+export function versionFromReadBack(
+  lastSaved: Pick<SaveInput, "property" | "components">,
+  back: ReadBack | null,
+): { updatedAt: string } | { failure: "network" | "deleted" | "conflict" } {
+  if (!back) return { failure: "network" };
+  if (!back.property) return { failure: "deleted" };
+  if (!matchesSaved(lastSaved, back.property, back.components)) return { failure: "conflict" };
+  return { updatedAt: back.property.updated_at };
+}

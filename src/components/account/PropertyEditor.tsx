@@ -14,11 +14,12 @@ import {
   matchesSaved,
   SAVE_FAILURE_TEXT,
   saveFailure,
+  versionFromReadBack,
   withSavedIds,
+  type ReadBack,
   type SaveFailure,
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
-import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { clearUnsaved, keepUnsaved, loadUnsaved, unsavedKey } from "./unsaved";
 
 type SaveState =
@@ -47,23 +48,26 @@ export interface PropertyEditorProps {
   library: LibraryComponent[];
 }
 
-/** Reads a property back after saving it; null if that fails. */
-async function readBack(id: string): Promise<{ property: PropertyRow; components: ComponentRow[] } | null> {
+/** Reads a property and its components from the database; null if that fails. */
+async function readBack(id: string): Promise<ReadBack | null> {
   const supabase = createClient();
   try {
-    const [{ data: property, error }, components] = await Promise.all([
-      supabase.from("properties").select("*").eq("id", id).maybeSingle(),
-      fetchAllRows((from, to) =>
-        supabase
-          .from("components")
-          .select("*", { count: "exact" })
-          .eq("property_id", id)
-          .order("sort_order")
-          .order("id")
-          .range(from, to),
-      ),
-    ]);
-    return property && !error ? { property, components } : null;
+    // The property (with its version) first, then its components. If another save
+    // lands in between, the older version goes with the newer components, so the
+    // next save is refused instead of overwriting that save.
+    const { data: property, error } = await supabase.from("properties").select("*").eq("id", id).maybeSingle();
+    if (error) return null;
+    if (!property) return { property: null, components: [] };
+    const components = await fetchAllRows((from, to) =>
+      supabase
+        .from("components")
+        .select("*", { count: "exact" })
+        .eq("property_id", id)
+        .order("sort_order")
+        .order("id")
+        .range(from, to),
+    );
+    return { property, components };
   } catch {
     return null;
   }
@@ -184,8 +188,24 @@ export default function PropertyEditor({
     const sent = { name, draft };
     setSave({ kind: "saving", creating: !id });
 
+    let expected = id && !versionCheckMissing ? saved.updatedAt : null;
+    if (id && !versionCheckMissing && !expected) {
+      // The last save here couldn't read back the new version, so check it now
+      // rather than save without the check.
+      const checked = versionFromReadBack(
+        toSaveInput(saved.name, saved.draft, currentYear, id),
+        await readBack(id),
+      );
+      if ("failure" in checked) {
+        busy.current = false;
+        const out = checked.failure !== "conflict" && (await isSignedOut());
+        setSave({ kind: "failed", failure: out ? "signed_out" : checked.failure });
+        return;
+      }
+      expected = checked.updatedAt;
+    }
+
     const supabase = createClient();
-    const expected = id && !versionCheckMissing ? saved.updatedAt : null;
     const args = { p_property: input.property, p_components: input.components };
     let result = await supabase.rpc("save_property", expected ? { ...args, p_expected_updated_at: expected } : args);
     if (expected && result.error?.code === FUNCTION_NOT_FOUND) {
@@ -223,7 +243,8 @@ export default function PropertyEditor({
     // Anything edited while saving is kept, and stays unsaved.
     const back = await readBack(newId);
     busy.current = false;
-    if (!back) {
+    if (!back?.property) {
+      // Saved, but its new version is unknown. The next save checks it first.
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
     } else if (!matchesSaved(input, back.property, back.components)) {
       // Another tab or device saved right after this one.
