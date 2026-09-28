@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNext } from "@/lib/safe-next";
+import { supabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 // The magic link lands here with a one-time code, which becomes a session cookie.
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
+  // Accounts aren't set up on this deployment.
+  if (!supabaseEnv()) return NextResponse.redirect(new URL("/", origin));
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
