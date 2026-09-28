@@ -307,8 +307,9 @@ export default function PropertyEditor({
   }
 
   function reload() {
-    clearUnsaved(backupKey);
+    if (dirty && !window.confirm("Reload the latest version? The changes you made here will be lost.")) return;
     leaving.current = true;
+    clearUnsaved(backupKey);
     window.location.reload();
   }
 
@@ -388,7 +389,7 @@ export default function PropertyEditor({
           )}
           {failure === "conflict" && (
             <button type="button" onClick={reload} className={actionClass}>
-              Reload
+              {dirty ? "Reload and lose my changes" : "Reload"}
             </button>
           )}
           {failure === "deleted" && (
