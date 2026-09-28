@@ -1,4 +1,4 @@
-import { sinkingFund } from "../sinking-fund";
+import { MAX_YEARS_UNTIL_DUE, sinkingFund } from "../sinking-fund";
 
 describe("sinkingFund", () => {
   it("spreads a single expense evenly over the months until it's due", () => {
@@ -44,6 +44,26 @@ describe("sinkingFund", () => {
     });
     expect(r.shortfallNow).toBe(6000);
     expect(r.monthly).toBeCloseTo(1000);
+  });
+
+  it("finds the tightest point among far-apart due years", () => {
+    const r = sinkingFund({
+      expenses: [
+        { cost: 24000, yearsUntilDue: 2 },
+        { cost: 100000, yearsUntilDue: MAX_YEARS_UNTIL_DUE },
+      ],
+      currentBalance: 0,
+      units: 1,
+    });
+    expect(r.monthly).toBeCloseTo(1000);
+    expect(r.schedule).toHaveLength(MAX_YEARS_UNTIL_DUE);
+    expect(r.schedule.every((y) => y.endBalance >= -1e-6)).toBe(true);
+  });
+
+  it("refuses an expense more than 100 years out instead of building a huge schedule", () => {
+    expect(() =>
+      sinkingFund({ expenses: [{ cost: 60000, yearsUntilDue: 1e7 }], currentBalance: 0, units: 1 }),
+    ).toThrow(RangeError);
   });
 
   it("ignores blank, zero and negative rows and handles zero units", () => {

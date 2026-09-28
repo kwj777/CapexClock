@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { sinkingFund, type PlannedExpense } from "@/lib/reserve/sinking-fund";
+import { readReserveInputs } from "@/lib/reserve/inputs";
+import { sinkingFund } from "@/lib/reserve/sinking-fund";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -16,13 +17,6 @@ interface Row {
   years: string;
 }
 
-function num(value: string): number | null {
-  const cleaned = value.replace(/[$,\s]/g, "");
-  if (cleaned === "") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
 let nextId = 3;
 
 export default function ReserveCalculator() {
@@ -32,24 +26,15 @@ export default function ReserveCalculator() {
   ]);
   const [balance, setBalance] = useState("");
   const [units, setUnits] = useState("");
+  const balanceErrorId = useId();
+  const unitsErrorId = useId();
 
   const update = (id: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
-  const expenses: PlannedExpense[] = [];
-  const problems = new Set<number>();
-  for (const r of rows) {
-    const cost = num(r.cost);
-    const years = num(r.years);
-    if (cost === null && years === null) continue;
-    if (cost === null || cost < 0 || years === null || years < 0 || !Number.isInteger(years)) {
-      problems.add(r.id);
-      continue;
-    }
-    expenses.push({ cost, yearsUntilDue: years });
-  }
-  const unitCount = num(units);
-  const result = expenses.length && problems.size === 0
-    ? sinkingFund({ expenses, currentBalance: num(balance) ?? 0, units: unitCount !== null && unitCount > 0 ? unitCount : 0 })
+  const inputs = readReserveInputs(rows, balance, units);
+  const problems = inputs.rowProblems;
+  const result = inputs.expenses.length && problems.size === 0 && !inputs.balanceProblem
+    ? sinkingFund({ expenses: inputs.expenses, currentBalance: inputs.balance, units: inputs.units })
     : null;
 
   return (
@@ -81,9 +66,7 @@ export default function ReserveCalculator() {
               ✕
             </button>
             {problems.has(r.id) && (
-              <p className="col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400">
-                Enter a cost and a whole number of years (0 or more).
-              </p>
+              <p className="col-span-3 text-xs text-red-700 sm:col-span-4 dark:text-red-400">{problems.get(r.id)}</p>
             )}
           </div>
         ))}
@@ -99,12 +82,38 @@ export default function ReserveCalculator() {
       <div className="mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
         <label>
           <span className={label}>Reserve balance today</span>
-          <input className={input} inputMode="decimal" placeholder="$0" value={balance} onChange={(e) => setBalance(e.target.value)} />
+          <input
+            className={input}
+            inputMode="decimal"
+            placeholder="$0"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+            aria-invalid={inputs.balanceProblem !== null}
+            aria-describedby={inputs.balanceProblem ? balanceErrorId : undefined}
+          />
         </label>
         <label>
           <span className={label}>Units</span>
-          <input className={input} inputMode="numeric" placeholder="e.g. 12" value={units} onChange={(e) => setUnits(e.target.value)} />
+          <input
+            className={input}
+            inputMode="numeric"
+            placeholder="e.g. 12"
+            value={units}
+            onChange={(e) => setUnits(e.target.value)}
+            aria-invalid={inputs.unitsProblem !== null}
+            aria-describedby={inputs.unitsProblem ? unitsErrorId : undefined}
+          />
         </label>
+        {inputs.balanceProblem && (
+          <p id={balanceErrorId} className="col-span-2 text-xs text-red-700 dark:text-red-400">
+            {inputs.balanceProblem}
+          </p>
+        )}
+        {inputs.unitsProblem && (
+          <p id={unitsErrorId} className="col-span-2 text-xs text-red-700 dark:text-red-400">
+            {inputs.unitsProblem}
+          </p>
+        )}
       </div>
 
       <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800" aria-live="polite">
@@ -134,8 +143,8 @@ export default function ReserveCalculator() {
               {result.shortfallNow > 0 && " Your balance doesn't cover what's due now, so that gap needs to be funded separately."}
             </p>
           </>
-        ) : problems.size > 0 ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">Fix the highlighted row to see your monthly amount.</p>
+        ) : problems.size > 0 || inputs.balanceProblem ? (
+          <p className="text-sm text-slate-600 dark:text-slate-400">Fix the highlighted fields to see your monthly amount.</p>
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">Enter at least one cost and when it&apos;s due to see your monthly amount.</p>
         )}
