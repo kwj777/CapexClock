@@ -44,6 +44,7 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
   const byId = new Map(components.map((c) => [c.id, c]));
   const maxYear = Math.max(1, ...forecast.years.map((y) => y.total));
   const replacements = forecast.years.flatMap((y) => y.replacements);
+  const longTable = replacements.length > 12;
 
   return (
     <Document title={`${name} CapEx forecast`} author="CapexClock">
@@ -98,31 +99,33 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
           </>
         )}
 
-        <Text style={s.h2} break={replacements.length > 12}>
-          What&apos;s due when
-        </Text>
-        <View style={s.tr} fixed>
-          <Text style={[s.th, { width: cols.year }]}>Year</Text>
-          <Text style={[s.th, { width: cols.name }]}>Component</Text>
-          <Text style={[s.th, { width: cols.qty, textAlign: "right" }]}>Qty</Text>
-          <Text style={[s.th, { width: cols.each, textAlign: "right" }]}>Cost each</Text>
-          <Text style={[s.th, { width: cols.total, textAlign: "right" }]}>Total</Text>
-          <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Note</Text>
+        {/* The header row is fixed inside this view, so it repeats on each page
+            the table spans and nowhere else. A short table is kept on one page. */}
+        <View break={longTable} wrap={longTable}>
+          <Text style={s.h2}>What&apos;s due when</Text>
+          <View style={s.tr} fixed>
+            <Text style={[s.th, { width: cols.year }]}>Year</Text>
+            <Text style={[s.th, { width: cols.name }]}>Component</Text>
+            <Text style={[s.th, { width: cols.qty, textAlign: "right" }]}>Qty</Text>
+            <Text style={[s.th, { width: cols.each, textAlign: "right" }]}>Cost each</Text>
+            <Text style={[s.th, { width: cols.total, textAlign: "right" }]}>Total</Text>
+            <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Note</Text>
+          </View>
+          {replacements.map((r, i) => {
+            const c = byId.get(r.componentId);
+            return (
+              <View key={`${r.componentId}-${r.year}-${i}`} style={s.tr} wrap={false}>
+                <Text style={{ width: cols.year }}>{r.year}</Text>
+                <Text style={{ width: cols.name }}>{r.name}</Text>
+                <Text style={{ width: cols.qty, textAlign: "right" }}>{c ? c.quantity.toLocaleString("en-US") : ""}</Text>
+                <Text style={{ width: cols.each, textAlign: "right" }}>{c ? formatUnitPrice(c.replacementCostEach) : ""}</Text>
+                <Text style={{ width: cols.total, textAlign: "right" }}>{formatMoney(r.cost)}</Text>
+                <Text style={{ flex: 1, paddingLeft: 10, color: muted }}>{r.overdue ? "Overdue" : ""}</Text>
+              </View>
+            );
+          })}
+          {replacements.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
         </View>
-        {replacements.map((r, i) => {
-          const c = byId.get(r.componentId);
-          return (
-            <View key={`${r.componentId}-${r.year}-${i}`} style={s.tr} wrap={false}>
-              <Text style={{ width: cols.year }}>{r.year}</Text>
-              <Text style={{ width: cols.name }}>{r.name}</Text>
-              <Text style={{ width: cols.qty, textAlign: "right" }}>{c ? c.quantity.toLocaleString("en-US") : ""}</Text>
-              <Text style={{ width: cols.each, textAlign: "right" }}>{c ? formatUnitPrice(c.replacementCostEach) : ""}</Text>
-              <Text style={{ width: cols.total, textAlign: "right" }}>{formatMoney(r.cost)}</Text>
-              <Text style={{ flex: 1, paddingLeft: 10, color: muted }}>{r.overdue ? "Overdue" : ""}</Text>
-            </View>
-          );
-        })}
-        {replacements.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
 
         <View style={s.footer} fixed>
           <Text>capexclock.com</Text>
