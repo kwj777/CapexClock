@@ -10,6 +10,8 @@ export function posthogHost(value: string | undefined): string {
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = posthogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
 
+const LAST_VISIT_KEY = "capexclock:last-visit:v1";
+
 let client: Promise<PostHog | null> | null = null;
 
 // Loads PostHog lazily so it never blocks first paint. No-op without a key.
@@ -29,6 +31,7 @@ export function initAnalytics(): Promise<PostHog | null> {
         disable_session_recording: true,
         before_send: withoutPageTitle,
       });
+      recordVisit(posthog, () => window.localStorage, new Date());
       return posthog;
     })
     .catch(() => null);
@@ -44,4 +47,36 @@ export async function track(event: string, properties?: Record<string, string>) 
 export function withoutPageTitle(event: CaptureResult | null): CaptureResult | null {
   if (event) delete event.properties.title;
   return event;
+}
+
+/** Local calendar date as YYYY-MM-DD. */
+export function localDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Whole days since the last visit, or null when this isn't a return visit. */
+export function daysSinceLastVisit(lastVisit: string | null, today: string): number | null {
+  if (!lastVisit || !/^\d{4}-\d{2}-\d{2}$/.test(lastVisit)) return null;
+  const days = Math.round((Date.parse(today) - Date.parse(lastVisit)) / 86_400_000);
+  return days >= 1 ? days : null;
+}
+
+/** Sends return_visit at most once a day, and only for a browser that has been here before. */
+export function recordVisit(
+  posthog: Pick<PostHog, "capture">,
+  storage: () => Pick<Storage, "getItem" | "setItem">,
+  now: Date,
+): void {
+  try {
+    const store = storage();
+    const today = localDay(now);
+    const last = store.getItem(LAST_VISIT_KEY);
+    if (last === today) return;
+    store.setItem(LAST_VISIT_KEY, today);
+    const days = daysSinceLastVisit(last, today);
+    if (days !== null) posthog.capture("return_visit", { days_since_last_visit: days });
+  } catch {
+    // Storage blocked: return visits can't be told apart, so none are sent.
+  }
 }
