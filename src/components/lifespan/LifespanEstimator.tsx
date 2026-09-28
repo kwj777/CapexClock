@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { formatMoney } from "@/components/calculator/format";
+import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { loadDraft, rowFromLibrary, saveDraft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { computeForecast } from "@/lib/forecast";
@@ -114,7 +114,7 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
                 )}
                 {result.monthly > 0 && (
                   <>
-                    Set aside <strong className="text-slate-950 dark:text-white">{formatMoney(result.monthly)}/month</strong> to
+                    Set aside <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong> to
                     have the cash ready for the next replacement.
                   </>
                 )}

@@ -1,5 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { formatMoney, formatUnitPrice } from "@/components/calculator/format";
+import { formatMoney, formatReserve, formatUnitPrice } from "@/components/calculator/format";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons).
@@ -56,10 +56,10 @@ export default function ForecastPdf({ name, unitCount, forecast, components, gen
         </Text>
 
         <View style={s.stats}>
-          <Stat label="Monthly reserve" value={formatMoney(forecast.monthlyReserve)} />
+          <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} />
           <Stat
             label="Per unit, per month"
-            value={forecast.monthlyReservePerUnit === null ? "–" : formatMoney(forecast.monthlyReservePerUnit)}
+            value={forecast.monthlyReservePerUnit === null ? "–" : formatReserve(forecast.monthlyReservePerUnit)}
           />
           <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
           <Stat label="10-year total" value={formatMoney(forecast.total)} />

@@ -34,7 +34,7 @@ import {
   type DraftRow,
 } from "./draft";
 import ForecastChart from "./ForecastChart";
-import { formatMoney } from "./format";
+import { formatMoney, formatReserve } from "./format";
 
 const CUSTOM = "__custom__";
 
@@ -302,13 +302,13 @@ export function CalculatorView({
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Monthly reserve" value={formatMoney(forecast.monthlyReserve)} emphasis />
+            <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} emphasis />
             <Stat
               label="Per unit, per month"
               value={
                 forecast.monthlyReservePerUnit === null
                   ? "Add units"
-                  : formatMoney(forecast.monthlyReservePerUnit)
+                  : formatReserve(forecast.monthlyReservePerUnit)
               }
               emphasis
             />

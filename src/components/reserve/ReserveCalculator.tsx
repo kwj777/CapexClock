@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatMoney } from "@/components/calculator/format";
+import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { sinkingFund, type PlannedExpense } from "@/lib/reserve/sinking-fund";
 
 const input =
@@ -113,12 +113,12 @@ export default function ReserveCalculator() {
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div>
                 <dt className={label}>Save each month</dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{formatMoney(result.monthly)}</dd>
+                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{formatReserve(result.monthly)}</dd>
               </div>
               <div>
                 <dt className={label}>Per unit</dt>
                 <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">
-                  {result.perUnit === null ? "—" : formatMoney(result.perUnit)}
+                  {result.perUnit === null ? "—" : formatReserve(result.perUnit)}
                 </dd>
               </div>
               {result.shortfallNow > 0 && (
