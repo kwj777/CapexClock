@@ -1,8 +1,10 @@
 import { ImageResponse } from "next/og";
+import { OG_IMAGE } from "@/lib/metadata";
 
-export const alt = "CapexClock: Know when every system in your building runs out.";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+// Every page's share card points at this image through OG_IMAGE.
+export const alt = OG_IMAGE.alt;
+export const size = { width: OG_IMAGE.width, height: OG_IMAGE.height };
+export const contentType = OG_IMAGE.type;
 
 const BARS = [6, 15, 7, 42, 13, 6, 26, 2, 15, 23];
 

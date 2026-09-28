@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary } from "@/lib/library/source";
+import { pageMetadata } from "@/lib/metadata";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "How Long Do Building Components Last? Lifespan Chart | CapexClock",
+export const metadata: Metadata = pageMetadata({
+  title: "How Long Do Building Components Last? Lifespan Chart",
   description:
     "Typical useful life of roofs, HVAC, water heaters, appliances, flooring and more in rental buildings, with a free calculator for when yours are due.",
-  alternates: { canonical: "/lifespan" },
-};
+  path: "/lifespan",
+});
 
 export default async function LifespanIndex() {
   const library = await getLibrary();

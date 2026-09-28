@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ForecastMockup from "@/components/ForecastMockup";
 import SignupForm from "@/components/SignupForm";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { pageMetadata } from "@/lib/metadata";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/site";
 
+export const metadata: Metadata = pageMetadata({ title: SITE_TITLE, description: SITE_DESCRIPTION, path: "/" });
 
 const PROBLEMS = [
   {

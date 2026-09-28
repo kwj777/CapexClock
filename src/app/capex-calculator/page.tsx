@@ -3,18 +3,15 @@ import Link from "next/link";
 import CalculatorLoader from "@/components/calculator/CalculatorLoader";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary } from "@/lib/library/source";
+import { pageMetadata } from "@/lib/metadata";
 import { supabaseEnv } from "@/lib/supabase/env";
 
-const title = "Free CapEx Calculator for Rental Properties | CapexClock";
-const description =
-  "Enter your building's roof, HVAC, water heaters and other components with install years and costs. Get a 10-year replacement forecast and a monthly reserve per unit. Free, no signup.";
-
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: "/capex-calculator" },
-  openGraph: { title, description, url: "/capex-calculator" },
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Free CapEx Calculator for Rental Properties | CapexClock",
+  description:
+    "Enter your roof, HVAC, water heaters and more with install years and costs. Get a 10-year replacement forecast and a monthly reserve per unit. Free.",
+  path: "/capex-calculator",
+});
 
 const FAQ = [
   {
