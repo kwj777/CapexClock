@@ -83,6 +83,18 @@ export function matchesSaved(
   });
 }
 
+/**
+ * True when two versions of a property's edits would save exactly the same thing,
+ * row ids aside, and neither has anything left to fix. Kept edits that match what's
+ * already saved have nothing to bring back.
+ */
+export function sameSave(a: SaveInput, b: SaveInput): boolean {
+  if (Object.keys(a.problems).length > 0 || Object.keys(b.problems).length > 0) return false;
+  const content = (input: SaveInput) =>
+    JSON.stringify([input.property, input.components], (key, value: unknown) => (key === "id" ? undefined : value));
+  return content(a) === content(b);
+}
+
 /** A property and its components as read back from the database; `property` is null when it's gone. */
 export interface ReadBack {
   property: PropertyRow | null;

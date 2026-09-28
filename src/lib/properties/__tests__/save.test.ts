@@ -1,7 +1,7 @@
 import { exampleDraft } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { toSaveInput } from "../convert";
-import { matchesSaved, saveFailure, versionFromReadBack, withSavedIds } from "../save";
+import { matchesSaved, sameSave, saveFailure, versionFromReadBack, withSavedIds } from "../save";
 
 describe("telling save failures apart", () => {
   it("spots an ended session", () => {
@@ -126,5 +126,35 @@ describe("checking the version when the last save couldn't read it back", () => 
   it("refuses when the property is gone or can't be read", () => {
     expect(versionFromReadBack(lastSaved, { property: null, components: [] })).toEqual({ failure: "deleted" });
     expect(versionFromReadBack(lastSaved, null)).toEqual({ failure: "network" });
+  });
+});
+
+describe("telling whether two sets of edits save the same thing", () => {
+  const propertyId = "a0000000-0000-4000-8000-000000000001";
+  const draft = exampleDraft();
+  const input = (name: string, d = draft) => toSaveInput(name, d, 2026, propertyId);
+
+  it("ignores row ids and how numbers were typed", () => {
+    const retyped = {
+      ...draft,
+      rows: draft.rows.map((r, i) => ({ ...r, id: `c0000000-0000-4000-8000-00000000000${i}` })),
+    };
+    retyped.rows[0] = { ...retyped.rows[0], costEach: "$38,000" };
+    expect(sameSave(input("Maple Court"), input("Maple Court", retyped))).toBe(true);
+    expect(sameSave(input("Maple Court "), toSaveInput("Maple Court", draft, 2026))).toBe(true);
+  });
+
+  it("spots any real change", () => {
+    const cheaper = { ...draft, rows: [{ ...draft.rows[0], costEach: "37000" }, ...draft.rows.slice(1)] };
+    expect(sameSave(input("Maple Court"), input("Maple Court", cheaper))).toBe(false);
+    expect(sameSave(input("Maple Court"), input("Oak Court"))).toBe(false);
+    expect(sameSave(input("Maple Court"), input("Maple Court", { ...draft, rows: draft.rows.slice(1) }))).toBe(false);
+    expect(sameSave(input("Maple Court"), input("Maple Court", { ...draft, rows: [...draft.rows].reverse() }))).toBe(false);
+    expect(sameSave(input("Maple Court"), input("Maple Court", { ...draft, unitCount: "13" }))).toBe(false);
+  });
+
+  it("never calls edits with something to fix the same", () => {
+    const unfinished = { ...draft, rows: [...draft.rows, { ...draft.rows[0], id: "row-new", quantity: "" }] };
+    expect(sameSave(input("Maple Court", unfinished), input("Maple Court", unfinished))).toBe(false);
   });
 });
