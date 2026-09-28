@@ -1,6 +1,7 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
+import { DRAFT_STORAGE_KEY } from "./storage-key";
 
 // Form state keeps raw strings so inputs can be empty or mid-edit.
 export interface DraftRow {
@@ -32,7 +33,7 @@ export interface Draft {
 
 export const EMPTY_DRAFT: Draft = { unitCount: "", yearBuilt: "", rows: [] };
 
-const STORAGE_KEY = "capexclock:calculator:v1";
+const STORAGE_KEY = DRAFT_STORAGE_KEY;
 
 export function loadDraft(): Draft {
   try {
@@ -317,6 +318,66 @@ export const PROBLEM_TEXT: Record<RowProblem, string> = {
   missing_cost: "Add a replacement cost to include it.",
   invalid: "Check quantity (above 0), useful life (1–100 years) and cost (a plain number like 1400).",
 };
+
+/** A row's fields that a problem can point at. */
+export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach";
+
+type NumberField = "quantity" | "usefulLife" | "costEach";
+
+/** The number fields that stop a named, dated, costed row from being used. */
+function invalidFields(row: DraftRow): NumberField[] {
+  const bad: NumberField[] = [];
+  const quantity = parseNumber(row.quantity);
+  if (quantity === null || !Number.isFinite(quantity) || quantity <= 0) bad.push("quantity");
+  const life = parseNumber(row.usefulLife);
+  if (life === null || !Number.isInteger(life) || life < 1 || life > 100) bad.push("usefulLife");
+  const cost = parseNumber(row.costEach);
+  if (cost === null || !Number.isFinite(cost) || cost < 0) bad.push("costEach");
+  return bad;
+}
+
+/** The fields to mark for a row's problem, so the message can point at them. */
+export function problemFields(row: DraftRow, problem: RowProblem): RowField[] {
+  switch (problem) {
+    case "missing_name":
+      return ["name"];
+    case "missing_install_year":
+    case "bad_install_year":
+    case "bad_year_built":
+      return ["installYear"];
+    case "missing_cost":
+      return ["costEach"];
+    case "invalid":
+      return invalidFields(row);
+  }
+}
+
+/** What to tell the owner about a row's problem; for a bad number, says which one. */
+export function problemText(row: DraftRow, problem: RowProblem): string {
+  if (problem !== "invalid") return PROBLEM_TEXT[problem];
+  const text: Record<NumberField, string> = {
+    quantity:
+      row.unitLabel === "per_sq_ft"
+        ? "Square feet should be a number above 0, like 1200."
+        : "Quantity should be a number above 0, like 12.",
+    usefulLife: "Useful life should be a whole number of years from 1 to 100.",
+    costEach: "Cost should be a plain number, like 1400.",
+  };
+  const fields = invalidFields(row);
+  return fields.length > 0 ? fields.map((f) => text[f]).join(" ") : PROBLEM_TEXT.invalid;
+}
+
+/** Where focus goes when a row is removed: the next row, else the one before, else nowhere. */
+export function neighborRowId(rows: Pick<DraftRow, "id">[], id: string): string | null {
+  const i = rows.findIndex((r) => r.id === id);
+  if (i < 0) return null;
+  return rows[i + 1]?.id ?? rows[i - 1]?.id ?? null;
+}
+
+/** True when the draft holds anything the owner typed or loaded. */
+export function hasEntries(draft: Draft): boolean {
+  return draft.rows.length > 0 || draft.unitCount.trim() !== "" || draft.yearBuilt.trim() !== "";
+}
 
 /** A small 12-unit example so first-time visitors can see a forecast immediately. */
 export function exampleDraft(): Draft {

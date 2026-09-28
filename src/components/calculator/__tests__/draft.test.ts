@@ -4,8 +4,14 @@ import {
   costLabel,
   customRow,
   editRow,
+  EMPTY_DRAFT,
   exampleDraft,
+  hasEntries,
+  neighborRowId,
   parseUnitCount,
+  PROBLEM_TEXT,
+  problemFields,
+  problemText,
   rowFromLibrary,
   rowTotal,
   toComponents,
@@ -109,6 +115,77 @@ describe("calculator rows to forecast components", () => {
     const row = { ...rowFromLibrary(waterHeater, "4"), installYear: "2016", costEach: "1.4k" };
     const { problems } = toComponents({ unitCount: "4", yearBuilt: "", rows: [row] }, 2026);
     expect(Object.values(problems)).toEqual(["invalid"]);
+  });
+});
+
+describe("pointing a row's note at the field it's about", () => {
+  const dated = { ...rowFromLibrary(waterHeater, "4"), installYear: "2016", costEach: "900" };
+
+  it("names the one field that's missing or out of range", () => {
+    const cases: [DraftRow, string][] = [
+      [{ ...dated, name: " " }, "name"],
+      [{ ...dated, installYear: "" }, "installYear"],
+      [{ ...dated, installYear: "98" }, "installYear"],
+      [{ ...dated, costEach: "" }, "costEach"],
+    ];
+    for (const [row, field] of cases) {
+      const problem = toComponents({ unitCount: "4", yearBuilt: "", rows: [row] }, 2026).problems[row.id];
+      expect(problemFields(row, problem)).toEqual([field]);
+    }
+  });
+
+  it("sends a blank install year to the install year when year built is the trouble", () => {
+    const row = { ...dated, installYear: "" };
+    const problem = toComponents({ unitCount: "4", yearBuilt: "98", rows: [row] }, 2026).problems[row.id];
+    expect(problem).toBe("bad_year_built");
+    expect(problemFields(row, problem)).toEqual(["installYear"]);
+  });
+
+  it("says which number can't be used instead of listing all three", () => {
+    const badCost = { ...dated, costEach: "1.4k" };
+    expect(problemFields(badCost, "invalid")).toEqual(["costEach"]);
+    expect(problemText(badCost, "invalid")).toBe("Cost should be a plain number, like 1400.");
+
+    const badLifeAndQty = { ...dated, quantity: "twelve", usefulLife: "0" };
+    expect(problemFields(badLifeAndQty, "invalid")).toEqual(["quantity", "usefulLife"]);
+    expect(problemText(badLifeAndQty, "invalid")).toBe(
+      "Quantity should be a number above 0, like 12. Useful life should be a whole number of years from 1 to 100.",
+    );
+
+    const badSqFt = { ...rowFromLibrary(carpet, "4"), quantity: "-5", installYear: "2020", costEach: "4" };
+    expect(problemText(badSqFt, "invalid")).toBe("Square feet should be a number above 0, like 1200.");
+  });
+
+  it("keeps the fixed wording for the other problems", () => {
+    expect(problemText(dated, "missing_cost")).toBe(PROBLEM_TEXT.missing_cost);
+  });
+});
+
+describe("after removing a row", () => {
+  const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("moves to the next row, or the one before when it was last", () => {
+    expect(neighborRowId(rows, "a")).toBe("b");
+    expect(neighborRowId(rows, "b")).toBe("c");
+    expect(neighborRowId(rows, "c")).toBe("b");
+  });
+
+  it("has nowhere to go when it was the only row", () => {
+    expect(neighborRowId([{ id: "a" }], "a")).toBeNull();
+    expect(neighborRowId(rows, "missing")).toBeNull();
+  });
+});
+
+describe("what Clear and Load an example would replace", () => {
+  it("is nothing for an empty draft, so there's no undo to offer", () => {
+    expect(hasEntries(EMPTY_DRAFT)).toBe(false);
+    expect(hasEntries({ ...EMPTY_DRAFT, unitCount: " " })).toBe(false);
+  });
+
+  it("counts rows, a unit count or a year built", () => {
+    expect(hasEntries(exampleDraft())).toBe(true);
+    expect(hasEntries({ ...EMPTY_DRAFT, unitCount: "40" })).toBe(true);
+    expect(hasEntries({ ...EMPTY_DRAFT, yearBuilt: "1962" })).toBe(true);
   });
 });
 
