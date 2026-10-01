@@ -57,12 +57,13 @@ export const TYPICAL_COST_SOURCES: ReadonlyMap<string, readonly CostSource[]> = 
 /**
  * How each built-in typical cost was worked out from its source's figures, shown
  * under it as "Based on ...". Building-wide items are for the 12-unit building in
- * typical-costs.md. The parking seal coat is the source's own range, so it has none.
+ * typical-costs.md. Any figure the source doesn't give is marked "our estimate".
+ * The parking seal coat is the source's own range, so it has none.
  */
 const TYPICAL_COST_BASIS: ReadonlyMap<string, string> = new Map([
   ["asphalt-shingle-roof", "7,000 sq ft of roof × $4.50–$8, old shingles removed, ÷ 12 apartments"],
   ["flat-membrane-roof", "6,000 sq ft of roof × $6–$12, old roof removed, ÷ 12 apartments"],
-  ["gutters", "480 ft of gutters and downspouts × $5–$10, old ones removed, ÷ 12 apartments"],
+  ["gutters", "480 ft of gutters and downspouts × $5–$10, including $1 a foot to take the old ones down (our estimate), ÷ 12 apartments"],
   ["gas-furnace", "one small furnace for each apartment"],
   ["central-ac", "one 2-ton system for each apartment"],
   ["heat-pump", "one 2-ton system for each apartment, indoor unit included"],
@@ -81,9 +82,9 @@ const TYPICAL_COST_BASIS: ReadonlyMap<string, string> = new Map([
   ["vinyl-windows", "8 windows × $400–$900"],
   ["exterior-paint", "5,500 sq ft of wall × $2–$6, ÷ 12 apartments"],
   ["vinyl-siding", "5,500 sq ft of wall × $3.50–$7, old siding removed, ÷ 12 apartments"],
-  ["parking-lot-resurface", "an overlay, which costs less than the $2.50–$4.50 for new paving"],
+  ["parking-lot-resurface", "our estimate for an overlay, which costs less than the $2.50–$4.50 for new paving"],
   ["electrical-panel", "one 100 amp panel for each apartment"],
-  ["fire-alarm-panel", "$3,000–$10,000 for a new panel, installed and programmed, ÷ 12 apartments"],
+  ["fire-alarm-panel", "a $1,500–$8,000 panel, plus $1,500–$2,000 to install and program it (our estimate), ÷ 12 apartments"],
 ]);
 
 /**

@@ -30,7 +30,9 @@ describe("the quick estimate as the page is built", () => {
     expect(page).toContain("Based on one 300,000–600,000 BTU boiler at $13,000–$35,000, ÷ 12 apartments");
     expect(page).toContain("Based on 20 ft of stock cabinets × $100–$300 per ft");
     expect(page).toContain("Based on 30 sq ft × $15–$40, plus $50–$300 to remove the old top");
-    expect(page).toContain("Based on $3,000–$10,000 for a new panel, installed and programmed, ÷ 12 apartments");
+    expect(page).toContain(
+      "Based on a $1,500–$8,000 panel, plus $1,500–$2,000 to install and program it (our estimate), ÷ 12 apartments",
+    );
   });
 
   it("leaves out the working for a cost edited in the dashboard, since it no longer matches", () => {

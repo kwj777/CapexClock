@@ -13,7 +13,7 @@
 --              per apartment for a 12-unit, two-story building.
 --   sq_ft:     one square foot (carpet, vinyl plank and parking lots).
 -- Leave all three cells blank on a row to keep it out of the quick estimate and the hints.
--- Sources and assumptions are in typical-costs.md, which Kevin approved.
+-- Sources and assumptions are in typical-costs.md. Approve those numbers before running this.
 
 -- Adds the columns and, only on the run that adds them, fills in the built-in components. So
 -- running this again never puts back a cost edited or blanked in the dashboard. It's one block,

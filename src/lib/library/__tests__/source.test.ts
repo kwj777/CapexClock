@@ -259,6 +259,31 @@ describe("how each typical cost was worked out", () => {
     expect(checked).toBeGreaterThanOrEqual(8);
   });
 
+  it("adds up where it's a price plus the cost of fitting it", () => {
+    // "a $1,500–$8,000 panel, plus $1,500–$2,000 to install and program it (our estimate), ÷ 12 apartments"
+    // should give about $250–$850.
+    const pattern = /^(?:.*?([\d,]+) [^×$]*× )?[^$]*\$([\d,.]+)–\$([\d,.]+)[^$]*plus \$([\d,.]+)–\$([\d,.]+)(.*÷ 12 apartments)?/;
+    const n = (text: string | undefined) => Number((text ?? "1").replace(/,/g, ""));
+    let checked = 0;
+    for (const c of TYPICAL_COSTS) {
+      const match = pattern.exec(typicalCostBasis(c) ?? "");
+      if (!match) continue;
+      const share = match[6] ? 12 : 1;
+      expect((n(match[1]) * n(match[2]) + n(match[4])) / share / c.low).toBeCloseTo(1, 1);
+      expect((n(match[1]) * n(match[3]) + n(match[5])) / share / c.high).toBeCloseTo(1, 1);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(4);
+  });
+
+  it("says which figures are our own estimate rather than the source's", () => {
+    const basis = (slug: string) => typicalCostBasis(TYPICAL_COSTS.find((c) => c.slug === slug)!);
+    // The fire alarm source prices the panel only; fitting it is ours.
+    expect(basis("fire-alarm-panel")).toBe("a $1,500–$8,000 panel, plus $1,500–$2,000 to install and program it (our estimate), ÷ 12 apartments");
+    expect(basis("parking-lot-resurface")).toMatch(/^our estimate/);
+    expect(basis("gutters")).toContain("(our estimate)");
+  });
+
   it("isn't shown for a cost edited in the dashboard, which no longer matches the working", () => {
     expect(typicalCostBasis({ slug: "vinyl-windows", low: 4000, high: 8000, per: "apartment" })).toBeNull();
     expect(typicalCostBasis({ slug: "carpet", low: 3, high: 6, per: "apartment" })).toBeNull();
