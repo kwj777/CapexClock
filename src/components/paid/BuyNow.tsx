@@ -44,10 +44,13 @@ export default function BuyNow({ offer, link }: { offer: Offer; link: string }) 
         <a
           href={link}
           onClick={onClick}
+          // Starts with the visible words, so "click Buy now" works by voice, and
+          // says which offer, since a page can have two.
+          aria-label={`Buy now: ${name}`}
           aria-describedby={noteId}
           className="inline-block rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
         >
-          Buy now<span className="sr-only">: {name}</span>
+          Buy now
         </a>
         <p id={noteId} className="text-sm font-medium text-slate-900 dark:text-white">
           {priceNote}

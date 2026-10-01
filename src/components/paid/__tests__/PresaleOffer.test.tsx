@@ -16,14 +16,15 @@ describe("Buy now", () => {
   });
 
   it("names the offer for screen readers, starting with the visible words", () => {
-    expect(html).toMatch(/>Buy now<span class="sr-only">: Founding membership<\/span><\/a>/);
+    expect(html).toContain('aria-label="Buy now: Founding membership"');
+    expect(html).toMatch(/>Buy now<\/a>/);
   });
 
   it("has the price note right next to it, and points to it", () => {
     const noteId = html.match(/aria-describedby="([^"]+)"/)?.[1];
     expect(noteId).toBeTruthy();
     expect(html).toContain(`id="${noteId}"`);
-    expect(text(html)).toContain("Buy now: Founding membership$12 every month until you cancel. Cancel any time online.");
+    expect(text(html)).toContain("Buy now$12 every month until you cancel. Cancel any time online.");
   });
 
   it("says when a link is in Stripe's test mode", () => {
