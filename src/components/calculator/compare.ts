@@ -122,6 +122,9 @@ export function perUnitText(asPlanned: ComparisonFigures, replaceNow: Comparison
  * 2 years. An emergency percent also adds its extra to the waiting side, so the
  * second variant says so. Both are drawn in one spot (one shown), so typing a percent
  * never moves the list. Empty when nothing is paid this year either way.
+ * Awaiting Kevin: if the extra stops applying to items paid this year either way (see
+ * emergencyPercent in src/lib/forecast/compare.ts), "Only the emergency extra differs."
+ * is no longer true and that variant goes.
  */
 export function eitherWayVariants(
   items: Pick<AtRiskItem, "endOfLifeYear">[],

@@ -44,6 +44,12 @@ export interface CompareOptions {
    * percent. Added to each chosen item's next replacement on the asPlanned side
    * only. Later replacements are planned the same way on both sides, so they
    * don't get it. Missing or 0 means none.
+   *
+   * AWAITING KEVIN: the extra also goes on chosen items that are paid in the
+   * first year either way (past end of life or due this year), because waiting
+   * means running them until they break. The plan doesn't say either way, and
+   * Kevin has been asked. If he wants it only on items due in the next 2 years,
+   * skip those items in the extras loop below and update the "emergency" tests.
    */
   emergencyPercent?: number;
 }
@@ -78,6 +84,7 @@ export function compareReplaceNow(input: ForecastInput, options: CompareOptions 
   const share = Math.max(0, options.emergencyPercent ?? 0) / 100;
   const extras = new Map<number, number>();
   if (share > 0) {
+    // Awaiting Kevin (see emergencyPercent): this includes items paid this year either way.
     for (const id of chosen) {
       const c = byId.get(id);
       if (!c) continue;

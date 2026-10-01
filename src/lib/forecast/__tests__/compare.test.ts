@@ -145,6 +145,8 @@ describe("emergency replacements cost more", () => {
     expect(extra.asPlanned.monthlyReserve).toBeGreaterThan(plain.asPlanned.monthlyReserve);
   });
 
+  // Awaiting Kevin's answer on whether the extra belongs on items paid this year
+  // either way (see emergencyPercent in compare.ts). Change this test if he says no.
   it("makes waiting on an overdue item cost more this year", () => {
     const plain = compareReplaceNow(input([overdue]));
     const extra = compareReplaceNow(input([overdue]), { emergencyPercent: 10 });
