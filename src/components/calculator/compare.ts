@@ -116,14 +116,33 @@ export function perUnitText(asPlanned: ComparisonFigures, replaceNow: Comparison
   return shown === waiting ? `${shown} per unit, same if you wait` : `${shown} per unit, or ${waiting} if you wait`;
 }
 
-/** Said once the list holds items already past end of life or due this year. */
-export function eitherWayText(items: Pick<AtRiskItem, "endOfLifeYear">[], startYear: number): string {
+/**
+ * Said once the list holds items already past end of life or due this year: they're
+ * paid this year either way, so the difference comes from the items due in the next
+ * 2 years. An emergency percent also adds its extra to the waiting side, so the
+ * second variant says so. Both are drawn in one spot (one shown), so typing a percent
+ * never moves the list. Empty when nothing is paid this year either way.
+ */
+export function eitherWayVariants(
+  items: Pick<AtRiskItem, "endOfLifeYear">[],
+  startYear: number,
+  emergencyPercent: number,
+): { text: string; shown: boolean }[] {
   const inYearOne = items.filter((i) => i.endOfLifeYear <= startYear).length;
-  if (inYearOne === 0) return "";
+  if (inYearOne === 0) return [];
+  const extra = emergencyPercent > 0;
   if (inYearOne === items.length) {
-    return `Everything here is past end of life or due in ${startYear}, so it's paid in ${startYear} either way.`;
+    const either = `Everything here is past end of life or due in ${startYear}, so it's paid in ${startYear} either way.`;
+    return [
+      { text: either, shown: !extra },
+      { text: `${either} Only the emergency extra differs.`, shown: extra },
+    ];
   }
-  return `Items past end of life or due in ${startYear} are paid in ${startYear} either way.`;
+  const either = `Items past end of life or due in ${startYear} are paid in ${startYear} either way, so the difference comes from items due in the next 2 years`;
+  return [
+    { text: `${either}.`, shown: !extra },
+    { text: `${either} and the emergency extra.`, shown: extra },
+  ];
 }
 
 /** Under the emergency box once it has a percent in it. */

@@ -8,7 +8,7 @@ import {
   compareSummary,
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
-  eitherWayText,
+  eitherWayVariants,
   ifYouWait,
   itemDetail,
   leadVariants,
@@ -222,13 +222,29 @@ describe("the comparison's wording", () => {
   });
 
   it("explains that items past end of life or due this year are paid this year either way", () => {
-    expect(eitherWayText([{ endOfLifeYear: 2027 }, { endOfLifeYear: 2028 }], 2026)).toBe("");
-    expect(eitherWayText([{ endOfLifeYear: 2011 }, { endOfLifeYear: 2028 }], 2026)).toBe(
-      "Items past end of life or due in 2026 are paid in 2026 either way.",
-    );
-    expect(eitherWayText([{ endOfLifeYear: 2011 }, { endOfLifeYear: 2026 }], 2026)).toBe(
+    const mixed = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2028 }];
+    const allNow = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2026 }];
+    expect(eitherWayVariants([{ endOfLifeYear: 2027 }, { endOfLifeYear: 2028 }], 2026, 0)).toEqual([]);
+    expect(eitherWayVariants([{ endOfLifeYear: 2027 }], 2026, 20)).toEqual([]);
+    expect(shown(eitherWayVariants(mixed, 2026, 0))).toEqual([
+      "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years.",
+    ]);
+    expect(shown(eitherWayVariants(allNow, 2026, 0))).toEqual([
       "Everything here is past end of life or due in 2026, so it's paid in 2026 either way.",
-    );
+    ]);
+  });
+
+  it("adds the emergency extra to the explanation once there's a percent, in the same spot", () => {
+    const mixed = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2028 }];
+    expect(shown(eitherWayVariants(mixed, 2026, 20))).toEqual([
+      "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years and the emergency extra.",
+    ]);
+    expect(shown(eitherWayVariants([{ endOfLifeYear: 2011 }], 2026, 20))).toEqual([
+      "Everything here is past end of life or due in 2026, so it's paid in 2026 either way. Only the emergency extra differs.",
+    ]);
+    // Both drawn every time, so typing a percent never changes the height.
+    expect(eitherWayVariants(mixed, 2026, 0)).toHaveLength(2);
+    expect(eitherWayVariants(mixed, 2026, 20)).toHaveLength(2);
   });
 });
 

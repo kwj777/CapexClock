@@ -103,6 +103,8 @@ describe("the open panel", () => {
       expect.arrayContaining([
         "If you replace all 4 items below in 2026:",
         "The monthly amount is lower because these are paid now instead of saved for.",
+        // The refrigerator is past end of life, so it's paid in 2026 either way.
+        "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years.",
       ]),
     );
   });
@@ -147,6 +149,9 @@ describe("the open panel", () => {
     const twenty = render({ percentText: "20" });
     expect(twenty).toContain('aria-describedby="c-percent-note"');
     expect(twenty).toContain("$36,000 if you wait");
+    expect(shownLines(twenty)).toContain(
+      "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years and the emergency extra.",
+    );
 
     const bad = render({ percentText: "abc", showPercentError: true });
     expect(bad).toContain('aria-invalid="true"');

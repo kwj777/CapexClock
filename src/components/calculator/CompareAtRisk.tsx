@@ -18,7 +18,7 @@ import {
   EMERGENCY_HINT,
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
-  eitherWayText,
+  eitherWayVariants,
   ifYouWait,
   itemDetail,
   leadVariants,
@@ -265,7 +265,7 @@ export function ComparisonPanel({
   const total = totalChange(asPlanned.total, replaceNow.total);
   const monthly = formatReserve(replaceNow.monthlyReserve);
   const perUnit = perUnitText(asPlanned, replaceNow);
-  const eitherWay = eitherWayText(items, startYear);
+  const eitherWay = eitherWayVariants(items, startYear, percent);
   const sure = items.filter((i) => !i.installYearIsEstimate);
   const toCheck = items.filter((i) => i.installYearIsEstimate);
   const shownHint = showPercentError ? errorId : percent > 0 ? noteId : hintId;
@@ -326,7 +326,9 @@ export function ComparisonPanel({
           variants={reserveVariants(asPlanned.monthlyReserve, replaceNow.monthlyReserve)}
           className="mt-3 text-sm text-slate-700 dark:text-slate-300"
         />
-        {eitherWay && <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{eitherWay}</p>}
+        {eitherWay.length > 0 && (
+          <OneOf variants={eitherWay} className="mt-2 text-sm text-slate-500 dark:text-slate-400" />
+        )}
       </div>
 
       <div>
