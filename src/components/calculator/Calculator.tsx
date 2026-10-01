@@ -185,11 +185,11 @@ export function CalculatorView({
   // What Load an example or Clear replaced, offered back until the next edit.
   const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // Element to focus once the next render is on screen (after removing a row, say).
+  const focusNext = useRef<string | null>(null);
   // The replace-now comparison's panel, ticks and Undo. Kept here because the
   // comparison goes away whenever nothing is at risk, and this lasts the page view.
   const [compare, setCompare] = useState<CompareState>(NEW_COMPARE_STATE);
-  // Element to focus once the next render is on screen (after removing a row, say).
-  const focusNext = useRef<string | null>(null);
 
   const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
   // Condition and the guess flag for the lists under the forecast.
