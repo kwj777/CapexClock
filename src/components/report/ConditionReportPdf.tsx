@@ -12,6 +12,7 @@ import {
   statusText,
   type ReportRow,
 } from "@/lib/report/condition-report";
+import { CONTACT_EMAIL } from "@/lib/site";
 
 // A condition report as a PDF. Only the sample is made with it for now
 // (scripts/sample-report.tsx, which registers the font first): paid reports
@@ -302,7 +303,7 @@ export default function ConditionReportPdf({
           Anything to do with safety, such as gas, electrical, structure or water damage, needs a licensed professional.
           This report never says a system is safe.
         </Text>
-        <Text style={s.para}>Questions: support@capexclock.com · capexclock.com</Text>
+        <Text style={s.para}>Questions: {CONTACT_EMAIL} · capexclock.com</Text>
         {footer}
       </Page>
     </Document>
