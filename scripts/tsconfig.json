@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "incremental": false,
+    "plugins": []
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "require": ["./register-alias.ts"]
+  }
+}
