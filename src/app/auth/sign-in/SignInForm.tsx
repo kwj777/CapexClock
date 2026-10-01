@@ -1,9 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import Script from "next/script";
+import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CONTACT_EMAIL } from "@/lib/site";
+import {
+  CAPTCHA_FAILED_TEXT,
+  CAPTCHA_WAIT_TEXT,
+  captchaReducer,
+  initialCaptcha,
+  sendErrorMessage,
+  sendPlan,
+  TURNSTILE_SCRIPT_URL,
+  turnstileSiteKey,
+  widgetSize,
+  type SendError,
+} from "@/lib/turnstile";
+
+// Baked in at build time. Unset means no CAPTCHA, and the form works as before.
+const SITE_KEY = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+
+// If the script hasn't loaded by then, say so instead of waiting forever.
+const SCRIPT_TIMEOUT_MS = 20_000;
 
 type Status =
   | { kind: "idle" }
@@ -11,12 +29,71 @@ type Status =
   | { kind: "sent"; email: string }
   | { kind: "error"; message: string; detail: string };
 
-type SendError = { status?: number; code?: string; message: string };
-
 export default function SignInForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const sentRef = useRef<HTMLDivElement>(null);
+  const [captcha, dispatch] = useReducer(captchaReducer, SITE_KEY, initialCaptcha);
+  const [scriptReady, setScriptReady] = useState(false);
+  // In state, not a ref, so the widget is drawn whenever the box appears.
+  const [captchaBox, setCaptchaBox] = useState<HTMLDivElement | null>(null);
+  const widgetId = useRef<string | null>(null);
+  // Sign-in was pressed before the check finished.
+  const [waitShown, setWaitShown] = useState(false);
+
+  useEffect(() => {
+    if (!SITE_KEY || scriptReady) return;
+    const timer = window.setTimeout(() => dispatch({ type: "failed" }), SCRIPT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [scriptReady]);
+
+  // Draws the widget once the script is ready and the form is on the page, and
+  // removes it when the form goes (after the link is sent).
+  useEffect(() => {
+    if (!SITE_KEY || !scriptReady || !captchaBox) return;
+    const turnstile = window.turnstile;
+    if (!turnstile) {
+      dispatch({ type: "failed" });
+      return;
+    }
+    dispatch({ type: "cleared" });
+    let id: string | null = null;
+    try {
+      id =
+        turnstile.render(captchaBox, {
+          sitekey: SITE_KEY,
+          action: "sign-in",
+          theme: "auto",
+          size: widgetSize(captchaBox.clientWidth),
+          callback: (token) => {
+            dispatch({ type: "token", token });
+            setWaitShown(false);
+          },
+          "expired-callback": () => dispatch({ type: "cleared" }),
+          "timeout-callback": () => dispatch({ type: "cleared" }),
+          "error-callback": () => {
+            dispatch({ type: "failed" });
+            // Handled: Turnstile keeps retrying on its own.
+            return true;
+          },
+        }) ?? null;
+    } catch {
+      dispatch({ type: "failed" });
+      return;
+    }
+    widgetId.current = id;
+    return () => {
+      widgetId.current = null;
+      if (id) turnstile.remove(id);
+    };
+  }, [scriptReady, captchaBox]);
+
+  /** Tokens are single-use, so the widget starts over after every attempt. */
+  function resetCaptcha() {
+    if (!SITE_KEY) return;
+    dispatch({ type: "cleared" });
+    if (widgetId.current) window.turnstile?.reset(widgetId.current);
+  }
 
   // The form goes away once the link is sent, so move focus to the message
   // instead of letting it drop to the top of the page.
@@ -26,6 +103,13 @@ export default function SignInForm({ next }: { next: string }) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (status.kind === "sending") return;
+    const plan = sendPlan(captcha);
+    if (!plan.send) {
+      setWaitShown(true);
+      return;
+    }
+    setWaitShown(false);
     setStatus({ kind: "sending" });
     const callback = new URL("/auth/callback", window.location.origin);
     callback.searchParams.set("next", next);
@@ -33,22 +117,24 @@ export default function SignInForm({ next }: { next: string }) {
     try {
       ({ error } = await createClient().auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: callback.toString(), shouldCreateUser: true },
+        options: {
+          emailRedirectTo: callback.toString(),
+          shouldCreateUser: true,
+          ...(plan.token ? { captchaToken: plan.token } : {}),
+        },
       }));
     } catch (thrown) {
       // A setup or network failure that Supabase threw instead of returning.
       error = { message: thrown instanceof Error ? thrown.message : String(thrown) };
     }
+    resetCaptcha();
     if (error) {
       console.error("Sign-in link failed", error.status, error.code, error.message);
       setStatus({
         kind: "error",
         // Supabase's own reason, so a setup problem (email sender, URL settings) can be diagnosed.
         detail: [error.status, error.code, error.message].filter(Boolean).join(" · "),
-        message:
-          error.status === 429
-            ? "Too many sign-in emails just now. Please wait a minute and try again."
-            : `We couldn't send the link. Check the address, or email ${CONTACT_EMAIL}.`,
+        message: sendErrorMessage(error),
       });
       return;
     }
@@ -57,6 +143,15 @@ export default function SignInForm({ next }: { next: string }) {
 
   return (
     <>
+      {/* Loaded on this page only, and only when CAPTCHA is on. */}
+      {SITE_KEY && (
+        <Script
+          src={TURNSTILE_SCRIPT_URL}
+          strategy="afterInteractive"
+          onReady={() => setScriptReady(true)}
+          onError={() => dispatch({ type: "failed" })}
+        />
+      )}
       {/* Always in the page, so screen readers announce the message when it appears. */}
       <div role="status">
         {status.kind === "sent" && (
@@ -86,6 +181,22 @@ export default function SignInForm({ next }: { next: string }) {
               placeholder="you@example.com"
             />
           </label>
+          {SITE_KEY && (
+            <div>
+              {/* Holds the widget's height while it loads, so the button doesn't jump. */}
+              <div ref={setCaptchaBox} className="min-h-[65px]" />
+              {captcha.kind === "failed" && (
+                <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">
+                  {CAPTCHA_FAILED_TEXT}
+                </p>
+              )}
+              {waitShown && captcha.kind !== "failed" && (
+                <p role="alert" className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+                  {CAPTCHA_WAIT_TEXT}
+                </p>
+              )}
+            </div>
+          )}
           <button
             type="submit"
             disabled={status.kind === "sending"}
