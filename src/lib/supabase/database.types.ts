@@ -4,6 +4,7 @@
 export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
 export type ReplacementScenario = "run_to_failure" | "replace_now";
 export type ComponentCondition = "good" | "fair" | "poor";
+export type TypicalCostPer = "apartment" | "sq_ft";
 
 export type PropertyRow = {
   id: string;
@@ -46,6 +47,10 @@ export type ComponentLibraryRow = {
   default_unit_label: UnitLabel;
   description: string | null;
   sort_order: number;
+  /** 0005: typical installed cost range, in today's dollars. All three are null or all are set. */
+  typical_cost_low: number | null;
+  typical_cost_high: number | null;
+  typical_cost_per: TypicalCostPer | null;
 };
 
 /** One component as sent to save_property. `id` only for rows already saved. */

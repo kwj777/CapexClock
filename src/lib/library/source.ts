@@ -1,6 +1,12 @@
 import type { UnitLabel } from "@/lib/forecast";
 import { supabaseEnv } from "@/lib/supabase/env";
-import { COMPONENT_LIBRARY, type LibraryComponent } from "./components";
+import {
+  COMPONENT_LIBRARY,
+  TYPICAL_COSTS,
+  type LibraryComponent,
+  type TypicalCost,
+  type TypicalCostPer,
+} from "./components";
 
 const UNIT_LABELS: readonly UnitLabel[] = ["per_unit", "per_building", "per_sq_ft"];
 
@@ -14,6 +20,12 @@ const HAS_WORD = /[\p{L}\p{N}]/u;
 
 function isUnitLabel(value: string): value is UnitLabel {
   return (UNIT_LABELS as readonly string[]).includes(value);
+}
+
+const TYPICAL_COST_PERS: readonly TypicalCostPer[] = ["apartment", "sq_ft"];
+
+function isTypicalCostPer(value: unknown): value is TypicalCostPer {
+  return typeof value === "string" && (TYPICAL_COST_PERS as readonly string[]).includes(value);
 }
 
 /** The component, or why the row can't be used. */
@@ -75,5 +87,73 @@ export async function getLibrary(): Promise<LibraryComponent[]> {
     return items.length > 0 ? items : COMPONENT_LIBRARY;
   } catch {
     return COMPONENT_LIBRARY;
+  }
+}
+
+/**
+ * The row's typical cost, null when it has none (all three cells blank), or why
+ * it can't be used. Same rule as the database check in 0005_typical_costs.sql.
+ */
+function toTypicalCost(r: Record<string, unknown>, slug: string): TypicalCost | null | string {
+  const low = r.typical_cost_low;
+  const high = r.typical_cost_high;
+  const per = r.typical_cost_per;
+  if (low === null && high === null && per === null) return null;
+  if (
+    typeof low !== "number" ||
+    typeof high !== "number" ||
+    !Number.isFinite(low) ||
+    !Number.isFinite(high) ||
+    low < 0 ||
+    low > high ||
+    high >= 1e9
+  ) {
+    return "the typical cost must run from low to high, from 0 to under 1 billion";
+  }
+  if (!isTypicalCostPer(per)) return "typical_cost_per must be apartment or sq_ft";
+  return { slug, low, high, per };
+}
+
+/**
+ * Validates typical costs from the REST API. Rows without one are left out, and
+ * malformed ones are skipped with the reason passed to onSkip. A row with a bad
+ * slug is left out quietly, since the library skips it already and says why.
+ */
+export function parseTypicalCostRows(data: unknown, onSkip?: (reason: string) => void): TypicalCost[] {
+  if (!Array.isArray(data)) return [];
+  const costs: TypicalCost[] = [];
+  for (const raw of data) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const r = raw as Record<string, unknown>;
+    if (typeof r.slug !== "string" || !SLUG_PATTERN.test(r.slug)) continue;
+    const result = toTypicalCost(r, r.slug);
+    if (typeof result === "string") {
+      onSkip?.(`Skipped the typical cost of component_library row ${JSON.stringify(r.slug)}: ${result}.`);
+      continue;
+    }
+    if (result) costs.push(result);
+  }
+  return costs;
+}
+
+/**
+ * Typical costs for the quick estimate and the calculator's hints, refreshed
+ * hourly. A separate request from getLibrary, with its own fallback to the copy
+ * in components.ts: before update 0005 runs the columns don't exist and this
+ * request fails, which must never cost the lifespans edited in the dashboard.
+ */
+export async function getTypicalCosts(): Promise<TypicalCost[]> {
+  const env = supabaseEnv();
+  if (!env) return TYPICAL_COSTS;
+  try {
+    const res = await fetch(
+      `${env.url}/rest/v1/component_library?select=slug,typical_cost_low,typical_cost_high,typical_cost_per&order=sort_order`,
+      { headers: { apikey: env.key }, next: { revalidate: 3600 } },
+    );
+    if (!res.ok) return TYPICAL_COSTS;
+    const costs = parseTypicalCostRows(await res.json(), (reason) => console.warn(reason));
+    return costs.length > 0 ? costs : TYPICAL_COSTS;
+  } catch {
+    return TYPICAL_COSTS;
   }
 }
