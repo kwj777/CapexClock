@@ -14,8 +14,9 @@ export const EMERGENCY_PERCENT_TEXT = `Enter a percent from 0 to ${MAX_EMERGENCY
 export function parseEmergencyPercent(text: string): { percent: number; error: boolean } {
   const cleaned = text.replace(/\s/g, "").replace(/%$/, "");
   if (cleaned === "") return { percent: 0, error: false };
-  const value = Number(cleaned);
-  if (!Number.isFinite(value) || value < 0 || value > MAX_EMERGENCY_PERCENT) return { percent: 0, error: true };
+  // Plain decimals only, so "1e2" or "0x10" isn't read as a number nobody typed.
+  const value = /^(\d+\.?\d*|\.\d+)$/.test(cleaned) ? Number(cleaned) : NaN;
+  if (!Number.isFinite(value) || value > MAX_EMERGENCY_PERCENT) return { percent: 0, error: true };
   return { percent: value, error: false };
 }
 

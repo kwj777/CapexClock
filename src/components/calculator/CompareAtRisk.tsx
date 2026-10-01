@@ -3,7 +3,13 @@
 import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { track } from "@/lib/analytics";
 import { guessedYear } from "@/lib/export/rows";
-import { compareReplaceNow, replacementCost, type AtRiskItem, type ForecastComponent } from "@/lib/forecast";
+import {
+  compareReplaceNow,
+  replacementCost,
+  type AtRiskItem,
+  type ForecastComponent,
+  type ReplaceNowComparison,
+} from "@/lib/forecast";
 import {
   applyLabel,
   appliedText,
@@ -27,6 +33,11 @@ import { formatMoney, formatReserve } from "./format";
 
 const inputClass =
   "block rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+
+/** A repeat of the same words wouldn't be read again, so vary it invisibly. */
+function sayAgain(current: string, message: string): string {
+  return current === message ? `${message}\u00a0` : message;
+}
 
 /** Draft as it was before Apply, offered back until anything else changes it (like Clear). */
 interface Applied {
@@ -93,15 +104,14 @@ export default function CompareAtRisk({
     applied.after.yearBuilt === draft.yearBuilt;
 
   function say(message: string) {
-    // A repeat of the same words wouldn't be read again, so vary it invisibly.
-    setSpoken((current) => (current === message ? `${message} ` : message));
+    setSpoken((current) => sayAgain(current, message));
   }
 
   useEffect(() => {
     if (!speak) return;
     const timer = window.setTimeout(() => {
       setSpeak(false);
-      setSpoken((current) => (current === summary ? `${summary} ` : summary));
+      setSpoken((current) => sayAgain(current, summary));
     }, 1000);
     return () => window.clearTimeout(timer);
   }, [speak, summary]);
@@ -240,7 +250,7 @@ function ComparisonPanel({
   baseId: string;
   applyId: string;
   startYear: number;
-  comparison: ReturnType<typeof compareReplaceNow>;
+  comparison: ReplaceNowComparison;
   byId: ReadonlyMap<string, ForecastComponent>;
   rows: ReadonlyMap<string, DraftRow>;
   unticked: ReadonlySet<string>;
@@ -270,6 +280,7 @@ function ComparisonPanel({
 
   const choice = (item: AtRiskItem) => {
     const component = byId.get(item.componentId);
+    if (!component) return null;
     const row = rows.get(item.componentId);
     return (
       <li key={item.componentId}>
@@ -283,14 +294,12 @@ function ComparisonPanel({
           <span className="min-w-0 flex-1">
             <span className="text-slate-900 dark:text-white">{item.name}</span>
             <span className="block text-xs text-slate-500 dark:text-slate-400">
-              {itemDetail(item, component?.installYear ?? item.endOfLifeYear, row !== undefined && guessedYear(row))}
+              {itemDetail(item, component.installYear, row !== undefined && guessedYear(row))}
             </span>
           </span>
-          {component && (
-            <span className="shrink-0 tabular-nums text-slate-900 dark:text-white">
-              {formatMoney(replacementCost(component))}
-            </span>
-          )}
+          <span className="shrink-0 tabular-nums text-slate-900 dark:text-white">
+            {formatMoney(replacementCost(component))}
+          </span>
         </label>
       </li>
     );
@@ -299,9 +308,16 @@ function ComparisonPanel({
   return (
     <div className="space-y-5">
       <div>
-        <OneOf variants={leadVariants(chosen.length, items.length, startYear)} className="text-sm text-slate-700 dark:text-slate-300" />
+        <OneOf
+          variants={leadVariants(chosen.length, items.length, startYear)}
+          className="text-sm text-slate-700 dark:text-slate-300"
+        />
         <dl className="mt-3 space-y-3">
-          <Figure label={`Cash needed in ${startYear}`} value={cash} detail={ifYouWait(cash, formatMoney(asPlanned.neededNow))} />
+          <Figure
+            label={`Cash needed in ${startYear}`}
+            value={cash}
+            detail={ifYouWait(cash, formatMoney(asPlanned.neededNow))}
+          />
           <Figure label="10-year total" value={total.change} detail={total.detail} />
           <Figure
             label="Monthly reserve"
@@ -337,21 +353,25 @@ function ComparisonPanel({
           <span id={percentSuffixId}>% more</span>
         </div>
         {/* The hint, the note and the error share one spot sized for the longest, so
-            typing never moves what's below. */}
-        <div className="mt-1.5 grid text-xs">
-          <p id={hintId} className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${shownHint === hintId ? "" : "invisible"}`}>
-            {EMERGENCY_HINT}
-          </p>
-          <p id={noteId} className={`col-start-1 row-start-1 text-slate-600 dark:text-slate-300 ${shownHint === noteId ? "" : "invisible"}`}>
-            {emergencyNote(percent || 25)}
-          </p>
-          <p
-            id={errorId}
-            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${shownHint === errorId ? "" : "invisible"}`}
-          >
-            {EMERGENCY_PERCENT_TEXT}
-          </p>
-        </div>
+            typing never moves what's below. Until there's a percent, the note is sized with 25. */}
+        <OneOf
+          className="mt-1.5 text-xs"
+          variants={[
+            { id: hintId, text: EMERGENCY_HINT, shown: shownHint === hintId, className: "text-slate-500 dark:text-slate-400" },
+            {
+              id: noteId,
+              text: emergencyNote(percent || 25),
+              shown: shownHint === noteId,
+              className: "text-slate-600 dark:text-slate-300",
+            },
+            {
+              id: errorId,
+              text: EMERGENCY_PERCENT_TEXT,
+              shown: shownHint === errorId,
+              className: "text-amber-800 dark:text-amber-300",
+            },
+          ]}
+        />
       </div>
 
       {sure.length > 0 && (
@@ -408,12 +428,19 @@ function Figure({ label, value, detail, extra }: { label: string; value: string;
   );
 }
 
+interface Variant {
+  text: string;
+  shown: boolean;
+  id?: string;
+  className?: string;
+}
+
 /** Draws every variant in one spot, sized for the longest, and shows only the one that applies. */
-function OneOf({ variants, className }: { variants: { text: string; shown: boolean }[]; className: string }) {
+function OneOf({ variants, className }: { variants: Variant[]; className: string }) {
   return (
     <div className={`grid ${className}`}>
       {variants.map((v, i) => (
-        <p key={i} className={`col-start-1 row-start-1 ${v.shown ? "" : "invisible"}`}>
+        <p key={i} id={v.id} className={`col-start-1 row-start-1 ${v.className ?? ""} ${v.shown ? "" : "invisible"}`}>
           {v.text}
         </p>
       ))}

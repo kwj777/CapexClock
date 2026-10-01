@@ -36,10 +36,11 @@ describe("the emergency box", () => {
     expect(parseEmergencyPercent(" 12.5 % ")).toEqual({ percent: 12.5, error: false });
     expect(parseEmergencyPercent("0")).toEqual({ percent: 0, error: false });
     expect(parseEmergencyPercent("500")).toEqual({ percent: 500, error: false });
+    expect(parseEmergencyPercent(".5")).toEqual({ percent: 0.5, error: false });
   });
 
   it("flags anything else instead of guessing, and the comparison leaves it out", () => {
-    for (const text of ["-5", "abc", "501", "$20", "20%%", "1e400"]) {
+    for (const text of ["-5", "abc", "501", "$20", "20%%", "1e2", "0x10", "1,000", "."]) {
       expect(parseEmergencyPercent(text)).toEqual({ percent: 0, error: true });
     }
     expect(EMERGENCY_PERCENT_TEXT).toBe("Enter a percent from 0 to 500, like 25.");
