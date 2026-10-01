@@ -141,6 +141,8 @@ export function parseTypicalCostRows(data: unknown, onSkip?: (reason: string) =>
  * hourly. A separate request from getLibrary, with its own fallback to the copy
  * in components.ts: before update 0005 runs the columns don't exist and this
  * request fails, which must never cost the lifespans edited in the dashboard.
+ * The fallback is also used when the library has no rows (as getLibrary does),
+ * but not when every row's cost has been blanked: that takes them all out.
  */
 export async function getTypicalCosts(): Promise<TypicalCost[]> {
   const env = supabaseEnv();
@@ -151,8 +153,9 @@ export async function getTypicalCosts(): Promise<TypicalCost[]> {
       { headers: { apikey: env.key }, next: { revalidate: 3600 } },
     );
     if (!res.ok) return TYPICAL_COSTS;
-    const costs = parseTypicalCostRows(await res.json(), (reason) => console.warn(reason));
-    return costs.length > 0 ? costs : TYPICAL_COSTS;
+    const data: unknown = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return TYPICAL_COSTS;
+    return parseTypicalCostRows(data, (reason) => console.warn(reason));
   } catch {
     return TYPICAL_COSTS;
   }

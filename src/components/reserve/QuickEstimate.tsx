@@ -109,6 +109,22 @@ export default function QuickEstimate({
     });
   }
 
+  if (systems.length === 0) {
+    // No library item has a typical cost: they've all been taken out in the dashboard.
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Quick estimate</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          The quick estimate isn&apos;t available right now.{" "}
+          <Link href="/capex-calculator" className={link}>
+            The full CapEx calculator
+          </Link>{" "}
+          works from your own costs and dates.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
       <p className="sr-only" aria-live="polite" aria-atomic="true">

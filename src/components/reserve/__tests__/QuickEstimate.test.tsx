@@ -41,6 +41,13 @@ describe("the quick estimate as the page is built", () => {
     expect(page).toContain("Based on 7,000 sq ft of roof");
   });
 
+  it("says plainly when there are no typical costs to estimate from", () => {
+    const page = text(renderToStaticMarkup(<QuickEstimate library={COMPONENT_LIBRARY} typicalCosts={[]} />));
+    expect(page).toContain("The quick estimate isn't available right now.");
+    expect(page).toContain("The full CapEx calculator");
+    expect(page).not.toContain("Rental units");
+  });
+
   it("starts with the usual systems ticked", () => {
     const checked = [...html.matchAll(/<input type="checkbox"[^>]*?( checked="")?\/><span>([^<]+)<\/span>/g)];
     expect(checked).toHaveLength(COMPONENT_LIBRARY.length);

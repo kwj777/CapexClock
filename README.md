@@ -134,9 +134,11 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   (`typical_cost_low`, `typical_cost_high`, and `typical_cost_per`: `apartment` or `sq_ft`) and
   fills in the 25 built-in components. The quick estimate on /reserve-calculator uses them, and
   the calculator shows them as grey hints under a per-apartment or per-sq-ft cost field; they're
-  never used in a forecast or saved to a property. It's safe to run again (it never overwrites a
-  cost edited in the dashboard), and until it runs the site uses the same numbers from
-  `src/lib/library/components.ts`. Leave all three cells blank on a row to leave it out.
+  never used in a forecast or saved to a property. It fills in costs only on the run that adds the
+  columns, so running it again changes no costs and never puts back one edited or blanked in the
+  dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
+  Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
+  says it isn't available and no hints show.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its

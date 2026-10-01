@@ -170,14 +170,18 @@ describe("loading typical costs and lifespans", () => {
   const dbLibrary = [row("elevator", { name: "Elevator", category: "Other" })];
 
   // Answers like PostgREST: asking for a column that doesn't exist yet is a 400.
-  function fakeSupabase(costColumns: "missing" | "present" | "down") {
+  function fakeSupabase(costColumns: "missing" | "present" | "blank" | "no rows" | "down") {
     global.fetch = jest.fn(async (input: string | URL | Request) => {
       if (costColumns === "down") throw new TypeError("fetch failed");
       const url = String(input);
       if (url.includes("typical_cost")) {
-        return costColumns === "missing"
-          ? Response.json({ code: "42703", message: "column component_library.typical_cost_low does not exist" }, { status: 400 })
-          : Response.json([cost("elevator", 30000, 60000, "apartment")]);
+        if (costColumns === "missing") {
+          return Response.json({ code: "42703", message: "column component_library.typical_cost_low does not exist" }, { status: 400 });
+        }
+        if (costColumns === "no rows") return Response.json([]);
+        return Response.json([
+          costColumns === "blank" ? cost("elevator", null, null, null) : cost("elevator", 30000, 60000, "apartment"),
+        ]);
       }
       return Response.json(dbLibrary);
     }) as typeof fetch;
@@ -201,6 +205,16 @@ describe("loading typical costs and lifespans", () => {
   it("uses the dashboard's costs once update 0005 has run", async () => {
     fakeSupabase("present");
     expect(await getTypicalCosts()).toEqual([{ slug: "elevator", low: 30000, high: 60000, per: "apartment" }]);
+  });
+
+  it("leaves every cost out when they've all been blanked in the dashboard", async () => {
+    fakeSupabase("blank");
+    expect(await getTypicalCosts()).toEqual([]);
+  });
+
+  it("falls back to the built-in costs when the library has no rows, as the lifespans do", async () => {
+    fakeSupabase("no rows");
+    expect(await getTypicalCosts()).toEqual(TYPICAL_COSTS);
   });
 
   it("falls back to the built-in costs when Supabase can't be reached or isn't set up", async () => {
