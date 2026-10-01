@@ -92,6 +92,37 @@ current method, biggest worry). From there you can:
 - Get notified: **Project configuration → Notifications → Emails and webhooks → Form submission
   notifications → Add notification → Email notification**.
 
+## Replace-now comparison
+
+Under **At risk**, in the calculator and the property editor, "What if we replace everything at
+risk now?" compares the forecast as it stands with replacing the ticked at-risk items this year.
+It shows the cash needed this year, the change in the 10-year total and the monthly reserve.
+Items whose install year is a guess are listed apart. Nothing changes until the owner clicks
+**Apply**, and Apply can be undone.
+
+PostHog events, with counts only: `compare_viewed` (`items`: how many items the panel lists;
+once per page view, the first time it opens) and `compare_applied` (`items`: how many items
+Apply turned on).
+
+**Dashboard tile.** Add it to the `CapexClock Monday numbers` dashboard the same way as the
+other tiles (that dashboard's steps come with Phase 3, step 1):
+
+| Tile | Series (counted as) | Breakdown | Dates |
+| --- | --- | --- | --- |
+| Comparison | `forecast_generated`, `compare_viewed`, `compare_applied` (Unique users), with the two compare events filtered to Path name = `/capex-calculator` | none | From the day this change went live |
+
+To filter a series, click the filter icon on it, choose **Path name**, then **equals**, and
+type `/capex-calculator`. The filter matters because the comparison also runs in the property
+editor, while `forecast_generated` is only sent from the public calculator. The plan's goal is
+met when `compare_viewed` is at least a tenth of `forecast_generated`.
+
+**Awaiting Kevin's answer:** the optional "Emergency replacements cost __% more" box adds the
+percent to the next replacement of every ticked item on the "if you wait" side, including items
+that are past end of life or due this year, which are paid this year either way. With 20% on
+the example property, the cash needed this year "if you wait" goes from $30,000 to $36,000. If
+the percent should only apply to items due in the next 2 years, tell Claude; it's a small
+change. The box is empty by default, so nothing changes until an owner types a percent.
+
 ## Accounts (Supabase)
 
 Accounts use Supabase magic-link sign-in. All data is protected by Row Level Security: each
