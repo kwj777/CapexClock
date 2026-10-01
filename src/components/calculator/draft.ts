@@ -1,6 +1,7 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
+import type { ComponentCondition } from "@/lib/supabase/database.types";
 
 // Form state keeps raw strings so inputs can be empty or mid-edit.
 export interface DraftRow {
@@ -20,7 +21,22 @@ export interface DraftRow {
    * Not saved to the database; loading a property works it out again.
    */
   followsUnitCount?: boolean;
+  // Drafts saved before these three existed don't have them; missing means not set.
+  /** The owner's rating of the component; null or missing when not set. */
+  condition?: ComponentCondition | null;
+  /** Anything the owner wants to remember about it, up to MAX_NOTES_LENGTH characters. */
+  notes?: string;
+  /** The owner ticked "guess" next to the install year. */
+  installYearIsGuess?: boolean;
 }
+
+/** The condition choices, in the order the picker shows them. */
+export const CONDITIONS: readonly ComponentCondition[] = ["good", "fair", "poor"];
+
+export const CONDITION_TEXT: Record<ComponentCondition, string> = { good: "Good", fair: "Fair", poor: "Poor" };
+
+/** Longest notes the database keeps, in characters. */
+export const MAX_NOTES_LENGTH = 2000;
 
 export interface Draft {
   unitCount: string;
@@ -65,13 +81,17 @@ function isDraft(value: unknown): value is Draft {
   );
 }
 
-/** Fills in flags that drafts saved before they existed don't have. */
+/**
+ * Fills in flags that drafts saved before they existed don't have, and drops any
+ * condition, notes or guess flag the calculator can't use.
+ */
 export function upgradeDraft(draft: Draft, currentYear: number): Draft {
+  const rows = draft.rows.map(cleanDetails);
   return {
     ...draft,
     // An older draft that already shows a forecast has already been counted.
-    forecastTracked: draft.forecastTracked ?? toComponents(draft, currentYear).components.length > 0,
-    rows: draft.rows.map((r) =>
+    forecastTracked: draft.forecastTracked ?? toComponents({ ...draft, rows }, currentYear).components.length > 0,
+    rows: rows.map((r) =>
       r.followsUnitCount === undefined
         ? { ...r, followsUnitCount: quantityMatchesUnits(r, draft.unitCount) || blankPerUnit(r) }
         : r,
@@ -87,6 +107,29 @@ function blankPerUnit(row: Pick<DraftRow, "unitLabel" | "quantity">): boolean {
 /** A per-unit row whose quantity is the unit count is taken to follow it (used for loaded rows). */
 export function quantityMatchesUnits(row: Pick<DraftRow, "unitLabel" | "quantity">, unitCount: string): boolean {
   return row.unitLabel === "per_unit" && row.quantity === unitCount;
+}
+
+/**
+ * Drops a stored condition, notes or guess flag that isn't one the calculator could
+ * have written, so a damaged copy in this browser can't break the page or a save.
+ * A row with nothing to drop comes back as it was.
+ */
+export function cleanDetails(row: DraftRow): DraftRow {
+  const { condition, notes, installYearIsGuess } = row as {
+    condition?: unknown;
+    notes?: unknown;
+    installYearIsGuess?: unknown;
+  };
+  const badCondition =
+    condition !== undefined && condition !== null && !CONDITIONS.some((c) => c === condition);
+  const badNotes = notes !== undefined && typeof notes !== "string";
+  const badGuess = installYearIsGuess !== undefined && typeof installYearIsGuess !== "boolean";
+  if (!badCondition && !badNotes && !badGuess) return row;
+  const clean = { ...row };
+  if (badCondition) delete clean.condition;
+  if (badNotes) delete clean.notes;
+  if (badGuess) delete clean.installYearIsGuess;
+  return clean;
 }
 
 let idCounter = 0;
@@ -228,6 +271,20 @@ export function costLabel(row: Pick<DraftRow, "unitLabel" | "quantity" | "follow
   return row.quantity.trim() === "1" ? "Cost for the building" : "Cost each";
 }
 
+/** How many more characters the notes can take, once that's 200 or fewer; null before then. */
+export function notesLeftText(notes: string): string | null {
+  const left = Math.max(0, MAX_NOTES_LENGTH - notes.length);
+  if (left > 200) return null;
+  return `${left.toLocaleString("en-US")} character${left === 1 ? "" : "s"} left`;
+}
+
+/** What a row's hidden condition and notes hold, e.g. "Fair, notes"; empty when nothing. */
+export function detailsSummary(row: Pick<DraftRow, "condition" | "notes">): string {
+  return [row.condition ? CONDITION_TEXT[row.condition] : "", (row.notes ?? "").trim() ? "notes" : ""]
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
 function parseNumber(value: string): number | null {
   const cleaned = value.replace(/[$,\s]/g, "");
@@ -325,7 +382,8 @@ export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
       name: row.name.trim(),
       quantity: parseNumber(row.quantity) ?? NaN,
       installYear,
-      installYearIsEstimate: explicitYear === null,
+      // Year built standing in for a blank year, or a year the owner says is a guess.
+      installYearIsEstimate: explicitYear === null || row.installYearIsGuess === true,
       usefulLifeYears: parseNumber(row.usefulLife) ?? NaN,
       replacementCostEach: cost,
       scenario: row.scenario,
@@ -350,7 +408,7 @@ export const PROBLEM_TEXT: Record<RowProblem, string> = {
 };
 
 /** A row's fields that a problem can point at. */
-export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach";
+export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach" | "notes";
 
 type NumberField = "quantity" | "usefulLife" | "costEach";
 

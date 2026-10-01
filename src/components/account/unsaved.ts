@@ -1,4 +1,4 @@
-import type { Draft } from "@/components/calculator/draft";
+import { cleanDetails, type Draft } from "@/components/calculator/draft";
 import { toSaveInput } from "@/lib/properties/convert";
 import { sameSave } from "@/lib/properties/save";
 
@@ -68,7 +68,13 @@ export function parseUnsaved(raw: string | null, now: number): UnsavedEdits | nu
     ) {
       return null;
     }
-    return { name, draft, baseUpdatedAt, ...(calculator === undefined ? {} : { calculator }), keptAt };
+    return {
+      name,
+      draft: { ...draft, rows: draft.rows.map(cleanDetails) },
+      baseUpdatedAt,
+      ...(calculator === undefined ? {} : { calculator }),
+      keptAt,
+    };
   } catch {
     return null;
   }

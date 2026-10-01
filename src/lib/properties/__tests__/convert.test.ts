@@ -118,7 +118,42 @@ describe("saving an editor draft", () => {
     expect(saveProblemFields("life")).toEqual(["usefulLife"]);
     expect(saveProblemFields("install_year")).toEqual(["installYear"]);
     expect(saveProblemFields("cost")).toEqual(["costEach"]);
+    expect(saveProblemFields("notes_length")).toEqual(["notes"]);
     expect(saveProblemFields("unit_count")).toEqual([]);
+  });
+});
+
+describe("saving condition, notes and a guessed install year", () => {
+  it("sends all three, so clearing one clears it in the database", () => {
+    const draft = exampleDraft();
+    const [a, b] = draft.rows;
+    draft.rows = [
+      { ...a, condition: "poor", notes: "  Leaks at the chimney.\nQuote: $9,000  ", installYearIsGuess: true },
+      { ...b, condition: null, notes: "   ", installYearIsGuess: false },
+    ];
+    const [first, second] = toSaveInput("x", draft, 2026).components;
+    expect(first).toMatchObject({ condition: "poor", notes: "Leaks at the chimney.\nQuote: $9,000", install_year_is_estimate: true });
+    expect(second).toMatchObject({ condition: null, notes: null, install_year_is_estimate: false });
+  });
+
+  it("sends nothing set for rows from before they existed", () => {
+    const draft = exampleDraft();
+    expect(toSaveInput("x", draft, 2026).components[0]).toMatchObject({
+      condition: null,
+      notes: null,
+      install_year_is_estimate: false,
+    });
+  });
+
+  it("counts notes the way the database does, so an emoji is one character", () => {
+    const draft = exampleDraft();
+    const [a, b, c] = draft.rows;
+    draft.rows = [
+      { ...a, notes: "🙂".repeat(2000) },
+      { ...b, notes: "x".repeat(2001) },
+      { ...c, notes: ` ${"x".repeat(2000)} ` },
+    ];
+    expect(toSaveInput("x", draft, 2026).problems).toEqual({ [b.id]: "notes_length" });
   });
 });
 
@@ -145,10 +180,51 @@ describe("loading a saved property", () => {
     // Once the owner types a quantity it stays put.
     const edited = { ...typed, rows: typed.rows.map((r, i) => (i === 0 ? editRow(r, { quantity: "10" }, typed.unitCount) : r)) };
     expect(withUnitCount(edited, "16").rows[0].quantity).toBe("10");
-    // What's saved is unchanged: no new fields reach the database.
-    expect(Object.keys(toSaveInput("x", typed, 2026, property.id).components[0]).sort()).toEqual(
-      ["category", "id", "install_year", "library_slug", "name", "quantity", "replacement_cost_each", "scenario", "sort_order", "unit_label", "useful_life_years"],
-    );
+    // The follow flag is worked out again on load, so it never reaches the database.
+    expect(Object.keys(toSaveInput("x", typed, 2026, property.id).components[0]).sort()).toEqual([
+      "category",
+      "condition",
+      "id",
+      "install_year",
+      "install_year_is_estimate",
+      "library_slug",
+      "name",
+      "notes",
+      "quantity",
+      "replacement_cost_each",
+      "scenario",
+      "sort_order",
+      "unit_label",
+      "useful_life_years",
+    ]);
+  });
+
+  it("brings back condition, notes and the guess flag", () => {
+    const rows = [
+      component({ condition: "fair", notes: "New thermostat 2022", install_year_is_estimate: true }),
+      component({ id: "b1d7c1e2-0000-4000-8000-000000000006", sort_order: 1 }),
+    ];
+    const [noted, plain] = draftFromRows(property, rows).rows;
+    expect(noted).toMatchObject({ condition: "fair", notes: "New thermostat 2022", installYearIsGuess: true });
+    expect(plain).toMatchObject({ condition: null, notes: "", installYearIsGuess: false });
+    const back = toSaveInput(property.name, draftFromRows(property, rows), 2026, property.id).components;
+    expect(back[0]).toMatchObject({ condition: "fair", notes: "New thermostat 2022", install_year_is_estimate: true });
+  });
+
+  it("loads rows from a database without update 0004 as not a guess", () => {
+    const before0004 = component({});
+    expect(before0004).not.toHaveProperty("install_year_is_estimate");
+    expect(draftFromRows(property, [before0004])).toMatchObject({ rows: [{ installYearIsGuess: false }] });
+    expect(forecastForProperty(property, [before0004], 2026).forecast.atRisk[0].installYearIsEstimate).toBe(false);
+  });
+
+  it("marks a guessed install year as an estimate in the forecast", () => {
+    const rows = [
+      component({ install_year: 2015, install_year_is_estimate: true }),
+      component({ id: "b1d7c1e2-0000-4000-8000-000000000007", install_year: 2015 }),
+    ];
+    const { forecast } = forecastForProperty(property, rows, 2026);
+    expect(forecast.atRisk.map((r) => r.installYearIsEstimate)).toEqual([true, false]);
   });
 
   it("forecasts saved rows, using year built for blank install years and skipping blank costs", () => {
