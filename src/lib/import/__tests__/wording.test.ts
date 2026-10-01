@@ -125,6 +125,7 @@ describe("import wording", () => {
       usesSheetYear: false,
       missingItemColumn: false,
       noQuantityColumn: false,
+      quantityFromTotals: false,
       doubtfulQuantity: null,
       withoutCost: 0,
       counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
@@ -136,6 +137,9 @@ describe("import wording", () => {
     expect(previewHints({ ...base, noQuantityColumn: true, withoutCost: 1 })).toEqual([
       "There's no quantity column, so each row counts as one, and identical rows are added up.",
       "1 row has no cost yet. Add costs after importing to include it in the forecast.",
+    ]);
+    expect(previewHints({ ...base, noQuantityColumn: true, quantityFromTotals: true })).toEqual([
+      "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.",
     ]);
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",

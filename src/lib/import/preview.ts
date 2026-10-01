@@ -103,6 +103,8 @@ export interface Preview {
   missingItemColumn: boolean;
   /** No quantity column, so each row counts as one. */
   noQuantityColumn: boolean;
+  /** With no quantity column, a total and a cost each give each row's quantity. */
+  quantityFromTotals: boolean;
   /** The quantity comes from a column whose heading only might mean one ("#", "No.", "Units"). */
   doubtfulQuantity: { column: number; heading: string } | null;
   /** Rows without a cost, which the forecast leaves out until one is added. */
@@ -745,6 +747,7 @@ export function buildPreview(
     usesSheetYear,
     missingItemColumn: layout === "rows" && !used.has("item"),
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
+    quantityFromTotals: layout === "rows" && !used.has("quantity") && used.has("total") && used.has("cost"),
     doubtfulQuantity: doubtful === null ? null : { column: doubtful, heading: heads[doubtful] },
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
     counts: {

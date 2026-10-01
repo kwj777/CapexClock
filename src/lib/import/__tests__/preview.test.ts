@@ -420,6 +420,8 @@ describe("a total that disagrees with the quantity and cost each", () => {
     expect(heater.row).toMatchObject({ quantity: "12", costEach: "1400" });
     expect(heater.changes).toContain("Worked out the quantity, 12, from the $16,800 total at $1,400 each");
     expect(heater.status).toBe("changed");
+    expect(p.quantityFromTotals).toBe(true);
+    expect(preview(["Item,Qty,Cost,Total", "Fridge,12,1100,13200"].join("\n")).quantityFromTotals).toBe(false);
   });
 
   it("asks when the sheet's quantity doesn't fit, and takes a fix", () => {

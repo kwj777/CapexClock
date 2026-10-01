@@ -120,7 +120,11 @@ export function previewHints(preview: Preview): string[] {
   const hints: string[] = [];
   if (preview.missingItemColumn) hints.push("Choose which column has the item names.");
   if (preview.noQuantityColumn && !preview.missingItemColumn) {
-    hints.push("There's no quantity column, so each row counts as one, and identical rows are added up.");
+    hints.push(
+      preview.quantityFromTotals
+        ? "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up."
+        : "There's no quantity column, so each row counts as one, and identical rows are added up.",
+    );
   }
   if (preview.doubtfulQuantity) {
     const { column, heading } = preview.doubtfulQuantity;
