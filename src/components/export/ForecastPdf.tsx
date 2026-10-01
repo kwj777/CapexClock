@@ -357,28 +357,32 @@ function DueTable({
 /** Each component's condition and the owner's notes, as the owner entered them. */
 function ConditionNotes({ items, printable }: { items: ConditionNote[]; printable: (text: string) => string }) {
   return (
-    <View style={s.table}>
-      {/* Carried to the next page with the header row and the first item, never left alone. */}
-      <Text style={s.h2} minPresenceAhead={40}>
+    <>
+      {/* Outside the rows' view, so minPresenceAhead can carry it to the next page with
+          the header row and the first item. */}
+      <Text style={s.h2} minPresenceAhead={50}>
         Condition and notes
       </Text>
-      <View style={s.tr} fixed>
-        <Text style={[s.th, { width: cols.name }]}>Component</Text>
-        <Text style={[s.th, { width: cols.condition }]}>Condition</Text>
-        <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Notes</Text>
-      </View>
-      {items.map((item, i) => (
-        <View
-          key={`${item.name}-${i}`}
-          style={s.tr}
-          wrap={item.name.length > MAX_NAME_KEPT_TOGETHER || item.notes.length > MAX_NOTES_KEPT_TOGETHER}
-        >
-          <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
-          <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>
-          <Text style={{ flex: 1, paddingLeft: 10 }}>{printable(item.notes)}</Text>
+      <View style={s.table}>
+        {/* Fixed inside the view, so it repeats on each page the list runs onto. */}
+        <View style={s.tr} fixed>
+          <Text style={[s.th, { width: cols.name }]}>Component</Text>
+          <Text style={[s.th, { width: cols.condition }]}>Condition</Text>
+          <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Notes</Text>
         </View>
-      ))}
-    </View>
+        {items.map((item, i) => (
+          <View
+            key={`${item.name}-${i}`}
+            style={s.tr}
+            wrap={item.name.length > MAX_NAME_KEPT_TOGETHER || item.notes.length > MAX_NOTES_KEPT_TOGETHER}
+          >
+            <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
+            <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>
+            <Text style={{ flex: 1, paddingLeft: 10 }}>{printable(item.notes)}</Text>
+          </View>
+        ))}
+      </View>
+    </>
   );
 }
 
