@@ -702,7 +702,16 @@ function ComponentRow({
           />
           <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
+        {/* More comes last, so the fields it shows are next in the tab order. */}
         <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:justify-end">
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${label}`}
+            className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            Remove
+          </button>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
@@ -716,14 +725,6 @@ function ComponentRow({
             )}
             {/* After the visible words, so the name starts with them and "click More" works by voice. */}
             <span className="sr-only">, condition and notes for {label}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`Remove ${label}`}
-            className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-          >
-            Remove
           </button>
         </div>
       </div>
