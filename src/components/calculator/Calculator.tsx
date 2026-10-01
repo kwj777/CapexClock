@@ -647,13 +647,14 @@ function ComponentRow({
               onChange={(e) => onChange({ installYear: e.target.value })}
             />
           </label>
-          <label className="mt-1 flex w-fit items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+          {/* 24px tall with the padding, so it's an easy target right under the year. */}
+          <label className="mt-0.5 flex w-fit items-center gap-1.5 py-1 text-xs text-slate-600 dark:text-slate-400">
             <input
               type="checkbox"
               checked={row.installYearIsGuess === true}
               aria-label={`Guess, install year of ${label}`}
               onChange={(e) => onChange({ installYearIsGuess: e.target.checked })}
-              className="h-3.5 w-3.5 accent-amber-500"
+              className="h-4 w-4 accent-amber-500"
             />
             Guess
           </label>

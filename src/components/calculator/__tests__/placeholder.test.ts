@@ -7,9 +7,9 @@ const saved = (draft: Draft) => JSON.stringify(draft);
 
 // Heights of the rendered calculator, measured in Chromium (px).
 const MEASURED = {
-  390: { oneRow: 1084, twoRows: 1525, oneRowWithForecast: 2343, example: 5111 },
-  640: { oneRow: 850, twoRows: 1173, oneRowWithForecast: 1839, example: 4013 },
-  1280: { oneRow: 661, twoRows: 830, oneRowWithForecast: 1320, example: 2580 },
+  390: { oneRow: 1090, twoRows: 1537, oneRowWithForecast: 2349, example: 5147 },
+  640: { oneRow: 856, twoRows: 1185, oneRowWithForecast: 1845, example: 4049 },
+  1280: { oneRow: 667, twoRows: 842, oneRowWithForecast: 1326, example: 2604 },
 };
 
 describe("the calculator's loading placeholder", () => {
