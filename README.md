@@ -5,7 +5,8 @@ Free CapEx forecaster for small rental property owners. Live at capexclock.com.
 ## Phase 1: early-access landing page
 
 - Next.js (App Router), TypeScript strict, Tailwind v4
-- Not a static site any more: `/`, `/privacy` and `/reserve-calculator` are fully static, the
+- Not a static site any more: `/`, `/pricing`, `/terms`, `/privacy`, `/thanks/*` and
+  `/reserve-calculator` are fully static, the
   pages built from the lifespan library (`/capex-calculator`, `/lifespan`, `/lifespan/<slug>` and
   the sitemap) are rebuilt at most once an hour (ISR), `/app` and `/auth` render on each request,
   and `src/proxy.ts` checks the session on `/app` only
@@ -37,9 +38,18 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 | `NEXT_PUBLIC_TEST_BUTTONS` | No | `off` hides the three paid-idea test buttons. Unset = shown. See [Paid-idea test buttons](#paid-idea-test-buttons). |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile **site** key for the sign-in check. Unset = no check. The secret key goes in Supabase, never here. See [Sign-in CAPTCHA](#sign-in-captcha-cloudflare-turnstile). |
+| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Unset = the reminders panel keeps its email form and /pricing says "Not on sale yet". See [Pre-orders](#pre-orders-stripe-payment-links). |
+| `NEXT_PUBLIC_STRIPE_LINK_REPORT` | No | Stripe Payment Link for the $29 condition report (`https://buy.stripe.com/…`). Unset = the report panel keeps its email form. |
+| `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal login link (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and pages say to email support@ to cancel. |
 
 Set them in Netlify under **Project configuration → Environment variables**, then redeploy
 (they're baked in at build time).
+
+The three Stripe settings only accept `https://` links on Stripe's own addresses: Payment Links
+on `buy.stripe.com` and the portal on `billing.stripe.com`. Anything else (a typo, an `http://`
+link, a link pasted in the wrong box) is ignored as if it were blank, so the site falls back to
+the email form instead of sending buyers somewhere wrong. `npm run dev` prints a warning when
+that happens. There are no Stripe keys anywhere in the site.
 
 ### Netlify forms (early access and paid interest)
 
@@ -168,6 +178,10 @@ They show in the public calculator (`where` = `calculator`) and the property edi
 (`where` = `property`). To hide them all, set `NEXT_PUBLIC_TEST_BUTTONS` to `off` in Netlify and
 redeploy. Delete the setting (or set it to `on`) and redeploy to bring them back.
 
+Once a Stripe link is set (see [Pre-orders](#pre-orders-stripe-payment-links)), the reminders
+and report panels show **Buy now** in place of the email form. The photo idea always keeps its
+email form. Hiding the buttons hides those Buy now buttons too, but /pricing keeps selling.
+
 PostHog events, all with `{idea, where}` and never the email or unit count:
 `paid_idea_seen` (once per page view per idea, once the button is actually on screen),
 `paid_idea_clicked` (once per page view per idea) and `paid_idea_signup`.
@@ -176,6 +190,118 @@ The pay question after an export keeps its wording. A Yes or Maybe now asks "Whi
 use first?" and sends `pay_question_first_pick` with `pick` (`reminders`, `report`, `photo` or
 `other`). Every pay-question event now has `version` = `2`; events from before this change have
 no `version` but the same question and the same once-per-browser rule.
+
+## Pre-orders (Stripe Payment Links)
+
+Two paid ideas can be bought before they're built, and you fill each order by hand: the
+**founding membership** ($12 every month until cancelled: reminder emails, a yearly budget
+summary and a yearly condition report) and the **condition report** ($29 once, made within 2
+business days). The site has no payment code: Buy now is a plain link to a Stripe Payment Link,
+and Stripe takes the card, sends receipts and runs the cancel page.
+
+Until the links are set, nothing changes for visitors: the panels keep their email forms and
+/pricing says "Not on sale yet". The pages that go with this are always live:
+
+- `/pricing`: Free ("Free today, with no limits during early access") next to the two offers,
+  a short FAQ and the [sample report](public/sample-condition-report.pdf). In the sitemap and
+  the header.
+- `/terms`: what each offer includes, renewal and cancelling, the 30-day refund, the report's
+  label, who may rely on a report, the liability cap and the founding promise.
+- `/thanks/membership` and `/thanks/report`: where Stripe sends buyers after paying. Hidden from
+  search and not in the sitemap. They say what happens next and how to email a sheet or export,
+  and the membership page links to the cancel page.
+- The footer gets Pricing, Terms and, once `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is set, **Manage or
+  cancel membership**. /privacy says Stripe processes payments and we never see card numbers.
+
+**Before you paste the live links, read [/terms](https://capexclock.com/terms),
+[/privacy](https://capexclock.com/privacy) (the Payments section) and the
+[sample report](https://capexclock.com/sample-condition-report.pdf).** Tell Claude anything you
+want changed. Ask your accountant about sales tax first, and optionally have a lawyer review
+/terms (an hour, about $200–500) and say whether to sell as yourself or through an LLC.
+
+### Set up Stripe (once, about an hour)
+
+Do everything in **test mode** first (the **Test mode** switch in the Stripe dashboard, or a
+**Sandbox** if your dashboard offers that instead). Nothing real is charged there.
+
+1. **Open the account.** Sign up at stripe.com and fill in what Stripe asks for: your business
+   (or you as an individual), your details and the bank account for payouts.
+2. **Public details.** **Settings → Business → Public details**: support email
+   `support@capexclock.com`, website `https://capexclock.com`, terms of service
+   `https://capexclock.com/terms`, privacy policy `https://capexclock.com/privacy`. Set the
+   statement descriptor to `CAPEXCLOCK` so card statements say who charged them.
+3. **Receipts.** **Settings → Customer emails** (under Business): turn on emails for
+   **Successful payments** and **Refunds**.
+4. **Customer portal** (where members cancel). **Settings → Billing → Customer portal**:
+   - Turn on **Cancel subscriptions**, set to cancel **at the end of the billing period** (that's
+     what /terms promises), and turn on updating payment methods and invoice history. Leave
+     switching plans off.
+   - Save, then turn on the **Login link** and copy it (it starts
+     `https://billing.stripe.com/p/login/`).
+5. **The membership link.** **Payment Links → New** (or **+ Create payment link**):
+   - Add a new product: name `CapexClock founding membership`, price **$12.00 USD**,
+     **Recurring**, **Monthly**. Description: `Reminder emails before replacements come due, a
+     yearly budget summary and a yearly condition report. Sent by hand while we build it.`
+   - **Options**: turn on **Limit the number of payments** and set it to **20**. Turn on
+     **Require customers to accept your terms of service**. Turn off promotion codes. Turn on
+     **Add custom text**, and in the text shown near the pay button (Stripe may call it the
+     submit button) paste exactly: `$12 every month until you cancel. Cancel any time online.`
+   - **After payment**: **Don't show confirmation page → Redirect customers to your website**:
+     `https://capexclock.com/thanks/membership`
+   - **Create link** and copy it (it starts `https://buy.stripe.com/`).
+6. **The report link.** The same way: product `CapexClock condition report`, price **$29.00
+   USD**, **One time**. Limit to **20** payments, require the terms, custom text near the pay
+   button: `$29 once. Made by hand within 2 business days of getting your details.` Redirect to
+   `https://capexclock.com/thanks/report`. Copy the link.
+7. **Paste the three links into Netlify.** **Project configuration → Environment variables →
+   Add a variable**, same value for every deploy context:
+   - `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP`: the membership link
+   - `NEXT_PUBLIC_STRIPE_LINK_REPORT`: the report link
+   - `NEXT_PUBLIC_STRIPE_PORTAL_LINK`: the portal login link
+
+   Then **Deploys → Trigger deploy → Deploy project**.
+8. **Buy once of each with Stripe's test card.** On the live site, open /pricing: both offers
+   show **Buy now** with "Stripe test mode: no real payment is taken." under them. Click Buy now,
+   pay with card `4242 4242 4242 4242`, any future date, any CVC and any ZIP, tick the terms box,
+   and check you land on the right thank-you page. Then open **Manage or cancel membership** at
+   the bottom of the page, sign in with the email you used, and cancel the test membership.
+   Stripe doesn't email receipts in test mode, so check **Payments** in the dashboard instead.
+   The panels in the calculator (**Email me before these are due** and **Condition report for
+   lenders and buyers**) show the same Buy now. Visitors see these test buttons too while you
+   test, but no one can be charged in test mode, so keep it short. Your test clicks reach
+   PostHog; the Monday tiles count from the day the live links go in.
+9. **Make the live ones.** Switch test mode off and repeat steps 3–6 in live mode (test-mode
+   products, links and portal settings don't carry over; a product page's **Copy to live mode**
+   saves retyping the product). Replace the three Netlify values with the live links and redeploy.
+   The "test mode" line under Buy now disappears. That's the start of the six-week check-in.
+
+To pause sales, delete the two `NEXT_PUBLIC_STRIPE_LINK_…` settings and redeploy: the panels go
+back to the email form and /pricing says "Not on sale yet". After 20 payments Stripe switches a
+link off by itself; Buy now then reaches Stripe's "no longer available" page, so delete that
+setting and redeploy when it happens.
+
+### Filling orders by hand
+
+Turn on Stripe's email to you for each successful payment (your Stripe **profile → Communication
+preferences**). Then for each order:
+
+1. Forward Stripe's email to the CapexClock thread. Claude drafts the reply; you check it and
+   send it from support@capexclock.com, to that one person only.
+2. **Membership:** the first email repeats "$12 every month until you cancel" and includes the
+   cancel link (your portal login link). Keep each member's components and due dates where you'll
+   see them, and send each reminder before the item comes due.
+3. **Report:** when the owner emails their sheet or export, forward it to the thread. Claude
+   drafts the report (the sample's layout, with the same label on the cover); you check it and
+   send it within 2 business days.
+4. **Refunds:** anyone who asks within 30 days of a payment gets it back in full: **Payments →
+   the payment → Refund**. For a member, also cancel the subscription (**Customers → the customer
+   → the subscription → Cancel**, immediately). If reminders aren't built after the check-in,
+   cancel every membership and refund every payment, as /terms promises.
+5. Delete files people emailed you 30 days after you deliver, as /privacy says.
+
+The sample report is made from the calculator's example building by a script. After changing the
+report's layout or the example (or in a new year, so its dates stay current), run
+`npm run sample-report` and commit `public/sample-condition-report.pdf`.
 
 ## Sign-in CAPTCHA (Cloudflare Turnstile)
 
@@ -212,7 +338,10 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 2. **Netlify:** **Forms → paid-interest** and **Forms → early-access**: how many new entries
    since last Monday.
 3. **Supabase:** the weekly query below.
-4. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
+4. **Stripe** (once the links are live): for each Payment Link, the payments since last Monday
+   and any refunds (**Payment Links → the link**, or **Payments**). For memberships, also the
+   number under **Billing → Subscriptions → Active**. Stripe is the real count of sales.
+5. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
 
 ### Build the PostHog dashboard (once, about 20 minutes)
 
@@ -226,7 +355,8 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
    - **Breakdown:** **+ Add breakdown → Event properties** and pick the property.
    - **Dates:** the date picker above the chart. "Since step 1" means **Custom → from** the day
      this change went live; "Since the review fix" means from the day PR #12's review fixes went
-     live (merged on September 28, 2026).
+     live (merged on September 28, 2026). "Since step 2" means from the day the Stripe links went
+     live.
    - **Chart:** the chart-type dropdown above the chart. Pick the one that shows one total per
      line (called **Total value** or **Bar chart (total value)**, depending on the version).
    - Name the insight (click the title), then **Save** (it lands on the dashboard).
@@ -239,6 +369,8 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Idea buttons | `paid_idea_seen`, `paid_idea_clicked`, `paid_idea_signup` (Total count) | `idea` | Since step 1 |
 | People who saw each idea | `paid_idea_seen` (Unique users) | `idea` | Since step 1 |
 | This week | `calculator_started`, `forecast_generated`, `pdf_exported`, `csv_exported`, `account_created`, `property_saved` (Total count) | none | Last 7 days |
+| Buy now | `presale_checkout_clicked`, `presale_completed` (Total count) | `offer` | Since step 2 |
+| Pricing page | `$pageview` (Unique users), with a filter on the series: **Current URL** contains `/pricing` | none | Since step 2 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
