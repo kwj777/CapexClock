@@ -133,7 +133,8 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
 - `0005_typical_costs.sql`: adds a typical cost range to each component in the library
   (`typical_cost_low`, `typical_cost_high`, and `typical_cost_per`: `apartment` or `sq_ft`) and
   fills in the 25 built-in components. The quick estimate on /reserve-calculator uses them, and
-  the calculator shows them as grey hints under a per-apartment or per-sq-ft cost field; they're
+  the calculator shows them as grey hints under a per-apartment or per-sq-ft cost field (only for
+  items the library counts per unit or per sq ft, never building-wide ones); they're
   never used in a forecast or saved to a property. It fills in costs only on the run that adds the
   columns, so running it again changes no costs and never puts back one edited or blanked in the
   dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.

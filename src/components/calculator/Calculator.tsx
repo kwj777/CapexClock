@@ -581,7 +581,7 @@ function ComponentRow({
   const label = row.name.trim() || "this component";
   const problemId = `${idPrefix}-problem`;
   const hintId = `${idPrefix}-cost-hint`;
-  const hint = costHint(row, typical);
+  const hint = costHint(row, lib, typical);
   // Marks the field the row's note is about and points it at the note.
   const flag = (field: RowField) =>
     problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};

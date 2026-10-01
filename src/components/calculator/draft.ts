@@ -244,18 +244,29 @@ export function costLabel(row: Pick<DraftRow, "unitLabel" | "quantity" | "follow
   return COST_LABELS[costBasis(row)];
 }
 
+/** What a cost means for a library item counted the library's way. */
+const LIBRARY_COST_BASIS: Record<UnitLabel, CostBasis> = {
+  per_unit: "apartment",
+  per_sq_ft: "sq_ft",
+  per_building: "building",
+};
+
 /**
- * Grey help text under a cost field, from the library's typical cost. Only while
- * the field and the typical cost mean the same thing, per apartment or per sq ft.
- * A cost each (the owner's own count: one window, not an apartment's eight) or
- * for the building can't be compared with them, so those get no hint. The hint
- * is never used in the math.
+ * Grey help text under a cost field, from the library item's typical cost. Only
+ * while the field and the typical cost mean the same thing, per apartment or per
+ * sq ft. A cost each (the owner's own count: one window, not an apartment's
+ * eight) or for the building can't be compared with them, so those get no hint.
+ * Neither does a building-wide item counted per apartment: its typical cost is a
+ * 12-unit building's boiler or roof shared out, and one in each apartment costs
+ * far more. The hint is never used in the math.
  */
 export function costHint(
   row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">,
+  lib: LibraryComponent | undefined,
   typical: TypicalCost | undefined,
 ): string | null {
-  if (!typical || costBasis(row) !== typical.per) return null;
+  if (!lib || !typical || LIBRARY_COST_BASIS[lib.unitLabel] !== typical.per) return null;
+  if (costBasis(row) !== typical.per) return null;
   return `Typical ${formatCostRange(typical.low, typical.high)}, use your quote`;
 }
 
