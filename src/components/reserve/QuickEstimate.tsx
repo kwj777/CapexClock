@@ -282,7 +282,7 @@ export default function QuickEstimate({
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-slate-400">
           <li>
             {SPREAD_REPLACEMENTS
-              ? `Each system you tick has been replaced on schedule since the building was built. No two last exactly the same time, so each one's replacements are spread across its typical lifespan, up to ${GIVE_OR_TAKE_YEARS} years early or late, rather than all landing in one year. Nothing is overdue.`
+              ? `Each system you tick has been replaced on schedule since the building was built. No two last exactly the same time, so each one's life is spread across its typical lifespan, and each replacement can land up to ${GIVE_OR_TAKE_YEARS} years early or late. Those add up over the years, so the older the building, the more evenly each system's next replacement is spread over the years ahead. Nothing is overdue.`
               : "Each system you tick has been replaced on schedule since the building was built, at the middle of its typical lifespan. So nothing is overdue."}
           </li>
           <li>

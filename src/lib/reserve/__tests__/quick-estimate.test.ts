@@ -1,12 +1,12 @@
-import { YEAR_BUILT_TEXT } from "@/components/calculator/draft";
+import { EARLIEST_YEAR_BUILT, YEAR_BUILT_TEXT } from "@/components/calculator/draft";
 import { computeForecast } from "@/lib/forecast";
 import { COMPONENT_LIBRARY, TYPICAL_COSTS, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
 import {
   FLOOR_SQ_FT_PER_APARTMENT,
   GIVE_OR_TAKE_YEARS,
   jobShares,
-  lastReplacedOnSchedule,
   MAX_QUICK_UNITS,
+  nextDueYears,
   PARKING_SQ_FT_PER_APARTMENT,
   QUICK_UNITS_PROBLEM,
   quickEstimate,
@@ -62,44 +62,81 @@ describe("which systems the quick estimate can price", () => {
 });
 
 describe("replaced on schedule since the building was built", () => {
-  it("finds the last replacement on the cycle", () => {
-    expect(lastReplacedOnSchedule(1998, 10, 2026)).toBe(2018);
-    expect(lastReplacedOnSchedule(1998, 22, 2026)).toBe(2020);
-    expect(lastReplacedOnSchedule(1998, 40, 2026)).toBe(1998);
+  const sum = (due: Map<number, number>) => [...due.values()].reduce((a, b) => a + b, 0);
+
+  it("finds the next replacement on the cycle, when it's exact", () => {
+    expect(nextDueYears(1998, 10, 2026, false)).toEqual(new Map([[2028, 1]]));
+    expect(nextDueYears(1998, 22, 2026, false)).toEqual(new Map([[2042, 1]]));
+    expect(nextDueYears(1998, 40, 2026, false)).toEqual(new Map([[2038, 1]]));
     // Due this year counts as replaced this year, so nothing is ever overdue.
-    expect(lastReplacedOnSchedule(2006, 10, 2026)).toBe(2026);
-    expect(lastReplacedOnSchedule(2026, 10, 2026)).toBe(2026);
-    // A schedule that starts after this year hasn't had a replacement yet.
-    expect(lastReplacedOnSchedule(2028, 10, 2026)).toBe(2028);
+    expect(nextDueYears(2006, 10, 2026, false)).toEqual(new Map([[2036, 1]]));
+    expect(nextDueYears(2026, 10, 2026, false)).toEqual(new Map([[2036, 1]]));
   });
 
-  it("never leaves anything overdue or due this year", () => {
-    for (let start = 1900; start <= 2030; start++) {
-      for (const life of [3, 10, 25, 40]) {
-        const last = lastReplacedOnSchedule(start, life, 2026);
-        expect(last + life).toBeGreaterThan(2026);
-        expect((last - start) % life).toBe(0);
+  it("spreads the first replacement up to 2 years either side of schedule", () => {
+    // Built 2018 with a 10-year life: a fifth each due 2026 to 2030. The 2026 fifth counts as
+    // replaced this year, so it's next due 2034 to 2038, a twenty-fifth each.
+    const due = nextDueYears(2018, 10, 2026, true);
+    expect([...due.keys()].sort()).toEqual([2027, 2028, 2029, 2030, 2034, 2035, 2036, 2037, 2038]);
+    for (const year of [2027, 2028, 2029, 2030]) expect(due.get(year)).toBeCloseTo(1 / 5);
+    for (const year of [2034, 2035, 2036, 2037, 2038]) expect(due.get(year)).toBeCloseTo(1 / 25);
+  });
+
+  it("lets each replacement's early or late years add up, so an old building's spreads evenly", () => {
+    // Over 20 replacements since 1800, no year is likelier than another: a tenth in each of the next
+    // 8 years, then less in each year after, as only the replacements that run late are left.
+    const due = nextDueYears(EARLIEST_YEAR_BUILT, 10, 2026, true);
+    for (let year = 2027; year <= 2034; year++) expect(due.get(year)).toBeCloseTo(0.1, 3);
+    expect([2035, 2036, 2037, 2038].map((year) => due.get(year))).toEqual([
+      expect.closeTo(0.08, 3),
+      expect.closeTo(0.06, 3),
+      expect.closeTo(0.04, 3),
+      expect.closeTo(0.02, 3),
+    ]);
+    // Neighbouring old buildings come out the same.
+    expect(nextDueYears(EARLIEST_YEAR_BUILT + 1, 10, 2026, true).get(2027)).toBeCloseTo(0.1, 3);
+  });
+
+  it("never leaves anything overdue or due this year, and always adds up to the whole system", () => {
+    for (const spread of [true, false]) {
+      for (let yearBuilt = EARLIEST_YEAR_BUILT; yearBuilt <= 2026; yearBuilt += 7) {
+        for (const life of [1, 2, 3, 10, 25, 40]) {
+          const due = nextDueYears(yearBuilt, life, 2026, spread);
+          expect(sum(due)).toBeCloseTo(1, 9);
+          for (const year of due.keys()) {
+            expect(year).toBeGreaterThan(2026);
+            expect(year).toBeLessThanOrEqual(2026 + life + GIVE_OR_TAKE_YEARS);
+          }
+        }
       }
     }
   });
 
-  it("spreads a system over every lifespan in its range, a year or two either side of schedule", () => {
+  it("never puts two replacements in the same year, even for a 1 or 2 year life", () => {
+    expect(nextDueYears(2020, 1, 2026, true)).toEqual(new Map([[2027, 1]]));
+    // A 2-year life lands a year early or late at most: 1 to 3 years after the last one.
+    const twoYears = nextDueYears(2026, 2, 2026, true);
+    expect([...twoYears.keys()].sort()).toEqual([2027, 2028, 2029]);
+    for (const chance of twoYears.values()) expect(chance).toBeCloseTo(1 / 3);
+  });
+
+  it("spreads a system over every lifespan in its range", () => {
     const furnace = item("furnace", 15, 20);
     const cycles = replacementCycles(furnace, 1990, 2026, true);
-    expect(cycles).toHaveLength(6 * (2 * GIVE_OR_TAKE_YEARS + 1));
     expect(new Set(cycles.map((c) => c.life))).toEqual(new Set([15, 16, 17, 18, 19, 20]));
-    expect(cycles.reduce((sum, c) => sum + c.share, 0)).toBeCloseTo(1);
-    // A 15-year life from 1990: replaced 2020, so due 2035. Started 2 years early: 2018, due 2033.
-    expect(cycles).toContainEqual({ life: 15, lastReplaced: 2020, share: 1 / 30 });
-    expect(cycles).toContainEqual({ life: 15, lastReplaced: 2018, share: 1 / 30 });
-    for (const c of cycles) expect(c.lastReplaced + c.life).toBeGreaterThan(2026);
+    expect(cycles.reduce((total, c) => total + c.share, 0)).toBeCloseTo(1);
+    // A 15-year life from 1990: replaced around 2005, then around 2020, so next due around 2035.
+    // Three replacements of up to 2 years either way: 19 of their 125 ways land exactly on 2035.
+    expect(cycles.filter((c) => c.life === 15).reduce((total, c) => total + c.share, 0)).toBeCloseTo(1 / 6);
+    expect(cycles.find((c) => c.life === 15 && c.due === 2035)?.share).toBeCloseTo((1 / 6) * (19 / 125));
+    for (const c of cycles) expect(c.due).toBeGreaterThan(2026);
   });
 
   it("keeps one schedule at the middle of the range when not spread", () => {
-    expect(replacementCycles(item("furnace", 15, 20), 1990, 2026, false)).toEqual([{ life: 18, lastReplaced: 2026, share: 1 }]);
+    expect(replacementCycles(item("furnace", 15, 20), 1990, 2026, false)).toEqual([{ life: 18, due: 2044, share: 1 }]);
   });
 
-  it("spreads replacements by default (Kevin's choice in typical-costs.md)", () => {
+  it("spreads replacements by default (recommended; Kevin picks in typical-costs.md)", () => {
     expect(SPREAD_REPLACEMENTS).toBe(true);
     expect(replacementCycles(item("furnace", 15, 20), 1990, 2026)).toEqual(replacementCycles(item("furnace", 15, 20), 1990, 2026, true));
   });
@@ -148,25 +185,45 @@ describe("the quick estimate", () => {
     expect(quickEstimate(tenYears, ticked("heater"), 12, 2018, 2026, false)!.perUnit.low).toBeCloseTo(600 / 24);
   });
 
+  /** The biggest change from one year built to the next, as a ratio of at least 1, from the earliest year allowed. */
+  function biggestStep(tickedSet: ReadonlySet<string>, spread: boolean): number {
+    let biggest = 1;
+    let previous: { low: number; high: number } | null = null;
+    for (let yearBuilt = EARLIEST_YEAR_BUILT; yearBuilt <= 2026; yearBuilt++) {
+      const { perUnit } = quickEstimate(systems, tickedSet, 12, yearBuilt, 2026, spread)!;
+      if (previous) {
+        for (const end of ["low", "high"] as const) {
+          const ratio = perUnit[end] / previous[end];
+          biggest = Math.max(biggest, ratio, 1 / ratio);
+        }
+      }
+      previous = perUnit;
+    }
+    return biggest;
+  }
+
   it("changes gradually from one year built to the next, with every system or the usual ones", () => {
     // Exactly on schedule, a 2002 building has windows, cabinets, gutters and paint all due next year,
-    // and comes out about 4 times a 2001 building. Spread, neighbouring years stay within 1.5 times.
+    // and comes out about 4 times a 2001 building. Spread, neighbouring years stay within 15%.
     const everything = new Set(systems.map((s) => s.item.slug));
-    for (const tickedSet of [TICKED_BY_DEFAULT, everything]) {
-      let previous: { low: number; high: number } | null = null;
-      for (let yearBuilt = 1900; yearBuilt <= 2026; yearBuilt++) {
-        const { perUnit } = quickEstimate(systems, tickedSet, 12, yearBuilt, 2026, true)!;
-        if (previous) {
-          for (const end of ["low", "high"] as const) {
-            const ratio = perUnit[end] / previous[end];
-            expect(Math.max(ratio, 1 / ratio)).toBeLessThan(1.5);
-          }
-        }
-        previous = perUnit;
-      }
-    }
+    expect(biggestStep(TICKED_BY_DEFAULT, true)).toBeLessThan(1.15);
+    expect(biggestStep(everything, true)).toBeLessThan(1.15);
     const exact = (yearBuilt: number) => quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026, false)!.perUnit.high;
     expect(exact(2002) / exact(2001)).toBeGreaterThan(4);
+  });
+
+  it("at most doubles from one year built to the next with a single system ticked", () => {
+    // A system on its own can double when its first replacement moves a year closer, since there's
+    // a year less to save for it. Older buildings change far less.
+    for (const s of systems) expect(biggestStep(new Set([s.item.slug]), true)).toBeLessThanOrEqual(2 + 1e-9);
+  });
+
+  it("stays within the range typical-costs.md gives for the usual systems", () => {
+    for (let yearBuilt = EARLIEST_YEAR_BUILT; yearBuilt <= 2026; yearBuilt++) {
+      const { perUnit } = quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026, true)!;
+      expect(roundEstimate(perUnit.low)).toBeGreaterThanOrEqual(125);
+      expect(roundEstimate(perUnit.high)).toBeLessThanOrEqual(395);
+    }
   });
 
   it("gives the same per-unit figure for any unit count, since costs are per apartment", () => {
@@ -178,7 +235,7 @@ describe("the quick estimate", () => {
 
   it("keeps low at or below high, and grows when more systems are ticked", () => {
     for (const spread of [true, false]) {
-      for (const yearBuilt of [1900, 1960, 1985, 1998, 2010, 2026]) {
+      for (const yearBuilt of [EARLIEST_YEAR_BUILT, 1900, 1960, 1985, 1998, 2010, 2026]) {
         const all = quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026, spread)!;
         expect(all.perUnit.low).toBeGreaterThan(0);
         expect(all.perUnit.low).toBeLessThanOrEqual(all.perUnit.high);
