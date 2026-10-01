@@ -1,4 +1,6 @@
+import { CONDITION_TEXT } from "@/components/calculator/draft";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import type { ComponentCondition } from "@/lib/supabase/database.types";
 import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
 
 // Spreadsheet apps run a cell starting with = + - or @ as a formula. Apps set
@@ -28,9 +30,14 @@ function amount(value: number, maxDecimals: number): string {
   return value.toFixed(maxDecimals).replace(/(\.\d\d\d*?)0+$/, "$1");
 }
 
+function condition(value: ComponentCondition | null | undefined): string {
+  return value ? CONDITION_TEXT[value] : "";
+}
+
 /**
  * One row per replacement in the forecast window, in year order, then one row
- * for each component left out because its details aren't complete.
+ * for each component left out because its details aren't complete. Each row
+ * carries its component's condition and the owner's notes.
  */
 export function forecastCsv(
   forecast: Forecast,
@@ -38,9 +45,20 @@ export function forecastCsv(
   details: ExportDetails = {},
 ): string {
   const lines = [
-    row(["Year", "Component", "Category", "Quantity", "Unit", "Cost each", "Total cost", "Note"]),
+    row([
+      "Year",
+      "Component",
+      "Category",
+      "Quantity",
+      "Unit",
+      "Cost each",
+      "Total cost",
+      "Forecast note",
+      "Condition",
+      "Notes",
+    ]),
   ];
-  for (const r of exportRows(forecast, components, details.unitLabels)) {
+  for (const r of exportRows(forecast, components, details.unitLabels, details.rowDetails)) {
     lines.push(
       row([
         r.year,
@@ -51,11 +69,13 @@ export function forecastCsv(
         r.costEach === null ? "" : amount(r.costEach, 6),
         amount(r.total, 2),
         r.notes.join("; "),
+        condition(r.condition),
+        r.ownerNotes,
       ]),
     );
   }
   for (const l of details.leftOut ?? []) {
-    lines.push(row(["", l.name, l.category, "", "", "", "", LEFT_OUT_NOTE]));
+    lines.push(row(["", l.name, l.category, "", "", "", "", LEFT_OUT_NOTE, condition(l.condition), l.notes ?? ""]));
   }
   // CRLF is what spreadsheet apps expect from CSV.
   return lines.join("\r\n") + "\r\n";

@@ -18,19 +18,19 @@ describe("forecast CSV", () => {
   const lines = forecastCsv(forecast, components).trimEnd().split("\r\n");
 
   it("has a header and one row per replacement, in year order", () => {
-    expect(lines[0]).toBe("Year,Component,Category,Quantity,Unit,Cost each,Total cost,Note");
+    expect(lines[0]).toBe("Year,Component,Category,Quantity,Unit,Cost each,Total cost,Forecast note,Condition,Notes");
     expect(lines.slice(1).map((l) => l.split(",")[0])).toEqual(["2026", "2028", "2030"]);
   });
 
   it("marks overdue and estimated rows", () => {
-    expect(lines[1]).toBe("2026,Water heaters,Plumbing,12,each,1400.00,16800.00,Overdue");
+    expect(lines[1]).toBe("2026,Water heaters,Plumbing,12,each,1400.00,16800.00,Overdue,,");
     expect(lines.find((l) => l.startsWith("2030"))).toBe(
-      '2030,"Roof, ""main""",Roofing,1,each,38000.00,38000.00,Install year estimated',
+      '2030,"Roof, ""main""",Roofing,1,each,38000.00,38000.00,Install year estimated,,',
     );
   });
 
   it("stops spreadsheet formulas in names", () => {
-    expect(lines.find((l) => l.startsWith("2028"))).toBe(`2028,"'=HYPERLINK(""x"")",Other,1,each,10.00,10.00,`);
+    expect(lines.find((l) => l.startsWith("2028"))).toBe(`2028,"'=HYPERLINK(""x"")",Other,1,each,10.00,10.00,,,`);
   });
 
   it("stops formulas that start after a separator inside a name", () => {
@@ -50,8 +50,8 @@ describe("forecast CSV", () => {
     const out = csvLines(
       names.map((name, i) => ({ id: `n${i}`, category: "Other", name, quantity: 1, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 1000 })),
     );
-    expect(out[1]).toBe(`2026,"x;'=1+1;",Other,1,each,1000.00,1000.00,Overdue`);
-    expect(out[7]).toBe(`2026,"x;""'=1+1;",Other,1,each,1000.00,1000.00,Overdue`);
+    expect(out[1]).toBe(`2026,"x;'=1+1;",Other,1,each,1000.00,1000.00,Overdue,,`);
+    expect(out[7]).toBe(`2026,"x;""'=1+1;",Other,1,each,1000.00,1000.00,Overdue,,`);
     // Split the file the way an app set to each of these separators would, ignoring quotes.
     for (const separator of [",", ";", "\t", "|", "\n"]) {
       const cells = out.join("\n").split(separator).map((c) => c.replace(/^[\s"]+/, ""));
@@ -66,10 +66,10 @@ describe("forecast CSV", () => {
       { id: "c", category: "Flooring", name: "LVP", quantity: 3, installYear: 2010, usefulLifeYears: 10, replacementCostEach: 4.1 },
       { id: "d", category: "Site", name: "Striping", quantity: 8000, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 0.125 },
     ]);
-    expect(out).toContain("2026,Seal coat,Site,3300,each,0.29,957.00,Overdue");
-    expect(out).toContain("2030,Range,Appliances,12,each,1400.10,16801.20,");
-    expect(out).toContain("2026,LVP,Flooring,3,each,4.10,12.30,Overdue");
-    expect(out).toContain("2026,Striping,Site,8000,each,0.125,1000.00,Overdue");
+    expect(out).toContain("2026,Seal coat,Site,3300,each,0.29,957.00,Overdue,,");
+    expect(out).toContain("2030,Range,Appliances,12,each,1400.10,16801.20,,,");
+    expect(out).toContain("2026,LVP,Flooring,3,each,4.10,12.30,Overdue,,");
+    expect(out).toContain("2026,Striping,Site,8000,each,0.125,1000.00,Overdue,,");
     expect(out.join("\n")).not.toMatch(/\d\.\d{7,}/);
   });
 
@@ -81,13 +81,32 @@ describe("forecast CSV", () => {
       ],
       { unitLabels: new Map([["carpet", "per_sq_ft"], ["wh", "per_unit"]]) },
     );
-    expect(out).toContain("2028,Carpet,Flooring,9600,sq ft,4.00,38400.00,");
-    expect(out).toContain("2028,Water heaters,Plumbing,12,each,1400.00,16800.00,");
+    expect(out).toContain("2028,Carpet,Flooring,9600,sq ft,4.00,38400.00,,,");
+    expect(out).toContain("2028,Water heaters,Plumbing,12,each,1400.00,16800.00,,,");
+  });
+
+  it("adds each component's condition and notes, and names guessed install years", () => {
+    const list: ForecastComponent[] = [
+      { id: "wh", category: "Plumbing", name: "Water heaters", quantity: 12, installYear: 2018, installYearIsEstimate: true, usefulLifeYears: 10, replacementCostEach: 1400 },
+      { id: "roof", category: "Roofing", name: "Roof", quantity: 1, installYear: 2010, usefulLifeYears: 20, replacementCostEach: 38000 },
+    ];
+    const out = csvLines(list, {
+      rowDetails: new Map([
+        ["wh", { condition: "poor", notes: "Two leaking, see photos", installYearIsGuess: true }],
+        ["roof", { condition: "good", notes: "Patched 2021,\nnorth side", installYearIsGuess: false }],
+      ]),
+      leftOut: [{ name: "Boiler", category: "HVAC", condition: "fair", notes: "=1+1" }],
+    });
+    expect(out).toContain("2028,Water heaters,Plumbing,12,each,1400.00,16800.00,Install year is a guess,Poor,\"Two leaking, see photos\"");
+    // A line break inside notes stays inside the quoted cell (rows end with CRLF).
+    expect(out).toContain('2030,Roof,Roofing,1,each,38000.00,38000.00,,Good,"Patched 2021,\nnorth side"');
+    // Notes are guarded against formulas like any other text.
+    expect(out.at(-1)).toBe(",Boiler,HVAC,,,,,Not included yet: details missing,Fair,'=1+1");
   });
 
   it("lists components left out of the forecast", () => {
     const out = csvLines(components.slice(0, 1), { leftOut: [{ name: "Boiler", category: "HVAC" }] });
-    expect(out.at(-1)).toBe(",Boiler,HVAC,,,,,Not included yet: details missing");
+    expect(out.at(-1)).toBe(",Boiler,HVAC,,,,,Not included yet: details missing,,");
   });
 });
 
