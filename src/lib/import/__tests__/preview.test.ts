@@ -382,6 +382,17 @@ describe("total rows", () => {
   });
 });
 
+describe("an unknown install year next to an age", () => {
+  it("uses the age, and falls back to the year built only when nothing else gives a year", () => {
+    const sheet = ["Item,Year installed,Age", "Fridge,unknown,8", "Range,unknown,", "Dishwasher,2019,3"].join("\n");
+    const p = preview(sheet, { sheetYear: 2024 });
+    expect(byName(p, "Refrigerator").row).toMatchObject({ installYear: "2016", installYearIsGuess: true });
+    expect(byName(p, "Range / oven").row).toMatchObject({ installYear: "", installYearIsGuess: false });
+    expect(byName(p, "Range / oven").changes).toContain('Read "unknown" as no install year, so it uses the year built, marked an estimate');
+    expect(byName(p, "Dishwasher").row).toMatchObject({ installYear: "2019", installYearIsGuess: false });
+  });
+});
+
 describe("identical rows", () => {
   it("merge into one row with a quantity, with the apartments in the notes", () => {
     const sheet = ["Apt,Item,Year,Cost,Condition,Notes", "1A,Water heater,2014,1400,Good,", "2B,Water heater,2014,1400,Good,Leaks", "3C,Water heater,2014,1400,Fair,"].join("\n");

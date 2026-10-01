@@ -259,8 +259,13 @@ function readTiming(
   const fix = fixed(ctx, key, "installYear");
   if (fix !== undefined) return { reading: readInstallYear(fix, ctx.currentYear), raw: fix };
   const text = (cell: Cell) => cellText(cell);
+  // "unknown" in the install year column gives way to an age or years left in the same row.
+  let unknown: { reading: Reading<number>; raw: string } | null = null;
   if (text(cells.installYear) !== "") {
-    return { reading: readInstallYear(cells.installYear, ctx.currentYear), raw: text(cells.installYear) };
+    const reading = readInstallYear(cells.installYear, ctx.currentYear);
+    const result = { reading, raw: text(cells.installYear) };
+    if (reading.value !== null || reading.problem) return result;
+    unknown = result;
   }
   const derived: [Cell, string, (year: number) => Reading<number>][] = [
     [cells.age, `age ${text(cells.age)}`, (y) => readAge(cells.age, y, ctx.currentYear)],
@@ -272,9 +277,12 @@ function readTiming(
     if (sheetYear === null) {
       return { reading: { value: null, problem: "Fix the year this sheet was last updated, above." }, raw };
     }
-    return { reading: read(sheetYear), raw };
+    const reading = read(sheetYear);
+    // Another "unknown" here: the install year's note says what happens.
+    if (unknown && reading.value === null && !reading.problem) continue;
+    return { reading, raw };
   }
-  return { reading: { value: null }, raw: "" };
+  return unknown ?? { reading: { value: null }, raw: "" };
 }
 
 /** Records from one row of a one-row-per-item sheet. */
