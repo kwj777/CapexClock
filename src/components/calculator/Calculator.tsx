@@ -15,6 +15,7 @@ import {
 import ExportButtons from "@/components/export/ExportButtons";
 import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
+import type { ImportedRow } from "@/lib/import/preview";
 import { moneyColumn } from "@/lib/export/format";
 import { guessedYear, installYearNote } from "@/lib/export/rows";
 import {
@@ -45,6 +46,7 @@ import {
   rowTotal,
   saveDraft,
   toComponents,
+  withImportedRows,
   withUnitCount,
   YEAR_BUILT_TEXT,
   type Draft,
@@ -59,6 +61,12 @@ import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 const ForecastChart = dynamic(() => import("./ForecastChart"), {
   ssr: false,
   loading: () => <div className="h-72 w-full sm:h-80" />,
+});
+
+// The importer (and the CSV reader it loads) only once the owner opens it.
+const ImportPanel = dynamic(() => import("@/components/import/ImportPanel"), {
+  ssr: false,
+  loading: () => <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">Loading the importer…</p>,
 });
 
 const CUSTOM = "__custom__";
@@ -177,12 +185,15 @@ export function CalculatorView({
   const unitsId = `${baseId}-units`;
   const addId = `${baseId}-add`;
   const undoId = `${baseId}-undo`;
+  const importButtonId = `${baseId}-import`;
+  const importPanelId = `${baseId}-import-panel`;
   const rowIdPrefix = (rowId: string) => `${baseId}-${rowId}`;
   const [editingYearBuilt, setEditingYearBuilt] = useState(false);
   const [picked, setPicked] = useState("");
   // What Load an example or Clear replaced, offered back until the next edit.
   const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
   const focusNext = useRef<string | null>(null);
 
@@ -245,6 +256,22 @@ export function CalculatorView({
     focusNext.current = item ? addId : `${rowIdPrefix(row.id)}-name`;
     announce(item ? `Added ${item.name}.` : "Added a custom component. Give it a name.");
     markStarted("add_component");
+  }
+
+  /** Rows from a spreadsheet go after the ones already there. */
+  function addImported(rows: ImportedRow[]) {
+    const next = withImportedRows(draft, rows);
+    setDraft(next);
+    setImporting(false);
+    const first = next.rows[draft.rows.length];
+    focusNext.current = first ? `${rowIdPrefix(first.id)}-name` : importButtonId;
+    announce(`Added ${rows.length} ${rows.length === 1 ? "row" : "rows"} from your spreadsheet.`);
+    markStarted("import");
+  }
+
+  function closeImport() {
+    setImporting(false);
+    focusNext.current = importButtonId;
   }
 
   /** Load an example and Clear replace everything, so they offer an undo. */
@@ -434,6 +461,25 @@ export function CalculatorView({
             </button>
           </div>
         </div>
+        <button
+          id={importButtonId}
+          type="button"
+          aria-expanded={importing}
+          aria-controls={importing ? importPanelId : undefined}
+          onClick={() => (importing ? closeImport() : setImporting(true))}
+          className="mt-3 text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+        >
+          Import from a spreadsheet
+        </button>
+        {importing && (
+          <ImportPanel
+            id={importPanelId}
+            library={library}
+            draftRows={draft.rows}
+            onAdd={addImported}
+            onClose={closeImport}
+          />
+        )}
 
         {draft.rows.length === 0 ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
