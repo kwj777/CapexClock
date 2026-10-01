@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // src/lib/supabase, src/components/SignupForm.tsx) whenever those change.
-const UPDATED = "September 28, 2026";
+const UPDATED = "October 1, 2026";
 
 const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
 
@@ -39,7 +39,8 @@ export default function PrivacyPage() {
           <Section title="The free calculators">
             <p>
               The CapEx calculator keeps your work in your browser&apos;s local storage, so it&apos;s still there when you
-              come back. It isn&apos;t sent to us. PDF and CSV exports are made in your browser too. We also remember in
+              come back. It isn&apos;t sent to us. PDF and CSV exports are made in your browser too, and so is reading a
+              spreadsheet you import: the file or pasted rows never leave your browser. We also remember in
               your browser whether you&apos;ve answered our one-question survey, so we don&apos;t ask twice. Clearing your
               browser data removes all of this.
             </p>
