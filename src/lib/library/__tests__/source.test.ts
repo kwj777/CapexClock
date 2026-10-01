@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "../components";
 import { getLibrary, getTypicalCosts, parseLibraryRows, parseTypicalCostRows, SLUG_PATTERN } from "../source";
-import { TYPICAL_COST_SOURCES } from "../typical-cost-sources";
+import { TYPICAL_COST_SOURCES, typicalCostBasis } from "../typical-cost-sources";
 
 const row = (slug: unknown, extra: Record<string, unknown> = {}) => ({
   slug,
@@ -219,5 +219,35 @@ describe("where the typical costs come from", () => {
       for (const s of sources ?? []) expect(s.url).toMatch(/^https:\/\//);
     }
     expect([...TYPICAL_COST_SOURCES.keys()]).toEqual(TYPICAL_COSTS.map((c) => c.slug));
+  });
+});
+
+describe("how each typical cost was worked out", () => {
+  it("explains every built-in cost that isn't straight from its source", () => {
+    const without = TYPICAL_COSTS.filter((c) => typicalCostBasis(c) === null).map((c) => c.slug);
+    expect(without).toEqual(["parking-lot-seal-coat"]);
+    expect(typicalCostBasis(TYPICAL_COSTS.find((c) => c.slug === "vinyl-windows")!)).toBe("8 windows × $400–$900");
+  });
+
+  it("multiplies out to the cost it explains, give or take rounding", () => {
+    // "7,000 sq ft of roof × $4.50–$8, ..., ÷ 12 apartments" should give about $2,600–$4,700.
+    const pattern = /^(?:an? |one )?([\d,]+)[^×]*× \$([\d.]+)–\$([\d.]+)(?!.*plus)(.*÷ 12 apartments)?/;
+    let checked = 0;
+    for (const c of TYPICAL_COSTS) {
+      const match = pattern.exec(typicalCostBasis(c) ?? "");
+      if (!match) continue;
+      const count = Number(match[1].replace(/,/g, ""));
+      const share = match[4] ? 12 : 1;
+      expect((count * Number(match[2])) / share / c.low).toBeCloseTo(1, 1);
+      expect((count * Number(match[3])) / share / c.high).toBeCloseTo(1, 1);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(8);
+  });
+
+  it("isn't shown for a cost edited in the dashboard, which no longer matches the working", () => {
+    expect(typicalCostBasis({ slug: "vinyl-windows", low: 4000, high: 8000, per: "apartment" })).toBeNull();
+    expect(typicalCostBasis({ slug: "carpet", low: 3, high: 6, per: "apartment" })).toBeNull();
+    expect(typicalCostBasis({ slug: "elevator", low: 30000, high: 60000, per: "apartment" })).toBeNull();
   });
 });

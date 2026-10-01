@@ -1,3 +1,5 @@
+import { TYPICAL_COSTS, type TypicalCost } from "./components";
+
 /** A cost guide a typical cost was worked out from. */
 export interface CostSource {
   name: string;
@@ -51,6 +53,48 @@ export const TYPICAL_COST_SOURCES: ReadonlyMap<string, readonly CostSource[]> = 
   ["electrical-panel", [{ name: "NerdWallet", url: "https://www.nerdwallet.com/home-ownership/home-improvement/learn/cost-to-replace-electrical-panel" }]],
   ["fire-alarm-panel", [{ name: "2M Technology", url: "https://www.2mtechnology.net/fire-alarm-installation-cost/" }]],
 ]);
+
+/**
+ * How each built-in typical cost was worked out from its source's figures, shown
+ * under it as "Based on ...". Building-wide items are for the 12-unit building in
+ * typical-costs.md. The parking seal coat is the source's own range, so it has none.
+ */
+const TYPICAL_COST_BASIS: ReadonlyMap<string, string> = new Map([
+  ["asphalt-shingle-roof", "7,000 sq ft of roof × $4.50–$8, old shingles removed, ÷ 12 apartments"],
+  ["flat-membrane-roof", "6,000 sq ft of roof × $6–$12, old roof removed, ÷ 12 apartments"],
+  ["gutters", "480 ft of gutters and downspouts × $5–$10, old ones removed, ÷ 12 apartments"],
+  ["gas-furnace", "one small furnace for each apartment"],
+  ["central-ac", "one 2-ton system for each apartment"],
+  ["heat-pump", "one 2-ton system for each apartment, indoor unit included"],
+  ["boiler", "one 300,000–600,000 BTU boiler at $13,000–$35,000, ÷ 12 apartments"],
+  ["tank-water-heater", "one 40-gallon heater for each apartment"],
+  ["tankless-water-heater", "one for each apartment"],
+  ["refrigerator", "a basic 18 cu ft top-freezer at $500–$1,000, plus $200–$300 to install"],
+  ["range-oven", "a basic freestanding range at $500–$1,000, plus $100–$300 to install"],
+  ["dishwasher", "a basic dishwasher, installed"],
+  ["washer-dryer", "a basic top-load washer and dryer, installed"],
+  ["carpet", "rental-grade carpet and pad, old carpet removed"],
+  ["luxury-vinyl-plank", "floating plank, plus $1–$2 per sq ft to remove the old floor"],
+  ["interior-paint", "a 900 sq ft apartment × $2–$4, one standard color"],
+  ["kitchen-cabinets", "20 ft of stock cabinets × $100–$300 per ft"],
+  ["laminate-countertops", "30 sq ft × $15–$40, plus $50–$300 to remove the old top"],
+  ["vinyl-windows", "8 windows × $400–$900"],
+  ["exterior-paint", "5,500 sq ft of wall × $2–$6, ÷ 12 apartments"],
+  ["vinyl-siding", "5,500 sq ft of wall × $3.50–$7, old siding removed, ÷ 12 apartments"],
+  ["parking-lot-resurface", "an overlay, which costs less than the $2.50–$4.50 for new paving"],
+  ["electrical-panel", "one 100 amp panel for each apartment"],
+  ["fire-alarm-panel", "$3,000–$10,000 for a new panel, installed and programmed, ÷ 12 apartments"],
+]);
+
+/**
+ * How a typical cost was worked out, or null. Only while it's still the built-in
+ * cost: one edited in the dashboard no longer matches the working.
+ */
+export function typicalCostBasis(cost: TypicalCost): string | null {
+  const builtIn = TYPICAL_COSTS.find((c) => c.slug === cost.slug);
+  const unchanged = builtIn !== undefined && builtIn.low === cost.low && builtIn.high === cost.high && builtIn.per === cost.per;
+  return unchanged ? (TYPICAL_COST_BASIS.get(cost.slug) ?? null) : null;
+}
 
 /** Sources for the quick estimate's own assumptions (apartment size and parking). */
 export const ASSUMPTION_SOURCES = {
