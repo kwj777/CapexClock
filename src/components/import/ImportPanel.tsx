@@ -24,6 +24,7 @@ import {
   type PreviewRow,
 } from "@/lib/import/preview";
 import {
+  decodeText,
   FAIL_TEXT,
   fileKind,
   MAX_BYTES,
@@ -174,7 +175,8 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
     if (file.size > MAX_BYTES) return fail("too_big");
     let content: string;
     try {
-      content = await file.text();
+      // Excel on Windows saves CSV files in its own encoding, not UTF-8.
+      content = decodeText(new Uint8Array(await file.arrayBuffer()));
     } catch {
       return fail("unreadable");
     }

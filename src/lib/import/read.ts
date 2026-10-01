@@ -30,6 +30,21 @@ export function fileKind(name: string, type: string): "text" | "spreadsheet" | "
   return "other";
 }
 
+/**
+ * A file's text. UTF-8 when it is (with or without a byte order mark), UTF-16 when
+ * it starts with that mark (Excel's "Unicode Text"), and otherwise Windows-1252,
+ * which Excel on Windows uses for "CSV (Comma delimited)".
+ */
+export function decodeText(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+}
+
 /** Bytes the text takes as UTF-8, to hold pasted text to the same limit as files. */
 export function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;

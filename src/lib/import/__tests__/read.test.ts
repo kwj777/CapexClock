@@ -1,5 +1,5 @@
 import { openSheet, parseSheetYear, startingChoices } from "../open";
-import { byteLength, fileKind, MAX_BYTES, readText } from "../read";
+import { byteLength, decodeText, fileKind, MAX_BYTES, readText } from "../read";
 import { match, parse } from "../__fixtures__/sheets";
 
 describe("reading pasted rows and CSV files", () => {
@@ -40,6 +40,19 @@ describe("reading pasted rows and CSV files", () => {
   it("won't read a spreadsheet or binary file given a .csv name", () => {
     expect(readText("PK\u0003\u0004\u0014\u0000\u0006", parse, "file")).toBe("unreadable");
     expect(readText("abc\u0000def", parse, "file")).toBe("unreadable");
+  });
+
+  it("reads files saved as UTF-8, Windows CSV or Unicode text", () => {
+    const utf8 = new TextEncoder().encode("Item,Cost\nCaf\u00e9 fridge,$1,200\u2013$1,500");
+    expect(decodeText(utf8)).toBe("Item,Cost\nCaf\u00e9 fridge,$1,200\u2013$1,500");
+    expect(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, ...utf8]))).toBe("Item,Cost\nCaf\u00e9 fridge,$1,200\u2013$1,500");
+    // Excel on Windows: "CSV (Comma delimited)" is Windows-1252, where é is E9, the en dash 96 and ½ BD.
+    const windows = new Uint8Array([...new TextEncoder().encode("Owner's 1"), 0xbd, 0x2c, 0x43, 0x61, 0x66, 0xe9, 0x2c, 0x31, 0x96, 0x32, 0x92]);
+    expect(decodeText(windows)).toBe("Owner's 1\u00bd,Caf\u00e9,1\u20132\u2019");
+    // Excel's "Unicode Text" is UTF-16 with a byte order mark.
+    const utf16 = new Uint8Array([0xff, 0xfe, 0x49, 0x00, 0x74, 0x00, 0x09, 0x00, 0xe9, 0x00]);
+    expect(decodeText(utf16)).toBe("It\t\u00e9");
+    expect(decodeText(new Uint8Array([0xfe, 0xff, 0x00, 0x49, 0x00, 0x74]))).toBe("It");
   });
 
   it("stops at 5 MB and 100 columns", () => {
