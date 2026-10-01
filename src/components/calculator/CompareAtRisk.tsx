@@ -125,7 +125,7 @@ export default function CompareAtRisk({
   function toggle() {
     if (!open && !viewed.current && comparison.items.length > 0) {
       viewed.current = true;
-      void track("compare_viewed", { items: String(comparison.items.length) });
+      void track("compare_viewed", { items: comparison.items.length });
     }
     setOpen((o) => !o);
   }
@@ -146,7 +146,7 @@ export default function CompareAtRisk({
     const next = withReplaceNow(draft, new Set(comparison.chosen));
     setApplied({ before: draft, after: next, count });
     setDraft(next);
-    void track("compare_applied", { items: String(count) });
+    void track("compare_applied", { items: count });
     setSpeak(false);
     say(`${appliedText(count)} The forecast above is updated.`);
     // Apply goes with the items it moved, so move to Undo.
