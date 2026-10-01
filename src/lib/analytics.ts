@@ -1,4 +1,4 @@
-import type { CaptureResult, PostHog } from "posthog-js";
+import type { CaptureOptions, CaptureResult, PostHog } from "posthog-js";
 
 export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
@@ -41,9 +41,14 @@ export function initAnalytics(): Promise<PostHog | null> {
 /** Event properties: counts and labels only, never names, emails, addresses or anything typed. */
 export type EventProperties = Record<string, string | number | boolean>;
 
-export async function track(event: string, properties?: EventProperties) {
+/**
+ * Sends an event. `sendNow` skips PostHog's batch, for a click that leaves the
+ * page (Buy now): the request is sent at once and survives the page change.
+ */
+export async function track(event: string, properties?: EventProperties, { sendNow = false } = {}) {
   const posthog = await initAnalytics();
-  posthog?.capture(event, properties);
+  const options: CaptureOptions | undefined = sendNow ? { send_instantly: true } : undefined;
+  posthog?.capture(event, properties, options);
 }
 
 /** Page titles can name a property, so they never leave the browser. */
