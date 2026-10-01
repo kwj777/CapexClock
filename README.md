@@ -5,8 +5,8 @@ Free CapEx forecaster for small rental property owners. Live at capexclock.com.
 ## Phase 1: early-access landing page
 
 - Next.js (App Router), TypeScript strict, Tailwind v4
-- Not a static site any more: `/`, `/privacy` and `/reserve-calculator` are fully static, the
-  pages built from the lifespan library (`/capex-calculator`, `/lifespan`, `/lifespan/<slug>` and
+- Not a static site any more: `/` and `/privacy` are fully static, the pages built from the
+  component library (`/capex-calculator`, `/reserve-calculator`, `/lifespan`, `/lifespan/<slug>` and
   the sitemap) are rebuilt at most once an hour (ISR), `/app` and `/auth` render on each request,
   and `src/proxy.ts` checks the session on `/app` only
 - A `/lifespan/<slug>` that doesn't exist shows the 404 page, which is cached like the other
@@ -130,6 +130,13 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   instead of saving it and leaving it off the site. It's safe to run again. If it notes that
   some existing rows break a rule, fix them under **Table Editor → component_library**; until
   then the site skips them and logs why.
+- `0005_typical_costs.sql`: adds a typical cost range to each component in the library
+  (`typical_cost_low`, `typical_cost_high`, and `typical_cost_per`: `apartment` or `sq_ft`) and
+  fills in the 25 built-in components. The quick estimate on /reserve-calculator uses them, and
+  the calculator shows them as grey hints under a per-apartment or per-sq-ft cost field; they're
+  never used in a forecast or saved to a property. It's safe to run again (it never overwrites a
+  cost edited in the dashboard), and until it runs the site uses the same numbers from
+  `src/lib/library/components.ts`. Leave all three cells blank on a row to leave it out.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its

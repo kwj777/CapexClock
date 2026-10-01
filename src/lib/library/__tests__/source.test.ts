@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "../components";
 import { getLibrary, getTypicalCosts, parseLibraryRows, parseTypicalCostRows, SLUG_PATTERN } from "../source";
+import { TYPICAL_COST_SOURCES } from "../typical-cost-sources";
 
 const row = (slug: unknown, extra: Record<string, unknown> = {}) => ({
   slug,
@@ -207,5 +208,16 @@ describe("loading typical costs and lifespans", () => {
     expect(await getTypicalCosts()).toEqual(TYPICAL_COSTS);
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     expect(await getTypicalCosts()).toEqual(TYPICAL_COSTS);
+  });
+});
+
+describe("where the typical costs come from", () => {
+  it("names a source for every built-in typical cost, linked over https", () => {
+    for (const { slug } of TYPICAL_COSTS) {
+      const sources = TYPICAL_COST_SOURCES.get(slug);
+      expect(sources?.length).toBeGreaterThan(0);
+      for (const s of sources ?? []) expect(s.url).toMatch(/^https:\/\//);
+    }
+    expect([...TYPICAL_COST_SOURCES.keys()]).toEqual(TYPICAL_COSTS.map((c) => c.slug));
   });
 });

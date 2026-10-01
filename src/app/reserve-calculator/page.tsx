@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import QuickEstimate from "@/components/reserve/QuickEstimate";
 import ReserveCalculator from "@/components/reserve/ReserveCalculator";
+import ReserveTabs from "@/components/reserve/ReserveTabs";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = pageMetadata({
   title: "Reserve Calculator for Rental Properties | CapexClock",
   description:
-    "Enter upcoming replacements, when they're due and your current balance. Get the monthly amount to save so the cash is there on time. Free, no signup.",
+    "Estimate a monthly reserve per unit from your building's age and systems, or list known expenses and when they're due. Free, no signup.",
   path: "/reserve-calculator",
 });
 
 const FAQ = [
+  {
+    q: "How does the quick estimate work?",
+    a: "It takes each system you tick to have been replaced on schedule since the building was built, prices it at typical low and high installed costs, and works out the monthly amount the same way as the full calculator. Building-wide items like the roof are shared out per apartment for a 12-unit building. Typical costs are not quotes, so use your own numbers in the CapEx calculator to plan.",
+  },
   {
     q: "How is the monthly amount calculated?",
     a: "It's the smallest steady monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short.",
@@ -36,7 +43,8 @@ const faqJsonLd = {
   mainEntity: FAQ.map(({ q, a }) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
 };
 
-export default function ReserveCalculatorPage() {
+export default async function ReserveCalculatorPage() {
+  const [library, typicalCosts] = await Promise.all([getLibrary(), getTypicalCosts()]);
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
@@ -47,11 +55,16 @@ export default function ReserveCalculatorPage() {
             Reserve calculator for rental properties
           </h1>
           <p className="mt-3 text-lg text-pretty text-slate-600 dark:text-slate-300">
-            Already know what&apos;s coming up? List each expense and when it&apos;s due to see how much to set aside every
-            month. Free, no signup.
+            See how much to set aside every month. Start with a quick estimate from your building&apos;s age and
+            systems, or list the expenses you already know about. Free, no signup.
           </p>
           <div className="mt-8">
-            <ReserveCalculator />
+            <ReserveTabs
+              panels={{
+                quick: <QuickEstimate library={library} typicalCosts={typicalCosts} />,
+                expenses: <ReserveCalculator />,
+              }}
+            />
           </div>
           <section className="mt-16" aria-labelledby="faq-heading">
             <h2 id="faq-heading" className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
