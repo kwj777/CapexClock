@@ -31,6 +31,10 @@ const FAQ = [
     a: "Tick it for anything you plan to replace this year, even if it still works. Its cost is added to this year's costs and its replacement cycle starts again from this year. If you already replaced something, don't tick it. Enter the year you replaced it as the install year instead.",
   },
   {
+    q: "Should I replace everything at risk now?",
+    a: "Open \"What if we replace everything at risk now?\" under At risk to compare. It shows the cash you'd need this year, how the 10-year total changes and what happens to the monthly reserve. If waiting until something breaks costs more, such as rush fees, you can add that as a percentage. Items whose install year is a guess are listed apart so you can check them first. Nothing changes until you click Apply, and you can undo it.",
+  },
+  {
     q: "What happens to items that are already past their useful life?",
     a: "They're counted in this year's costs and flagged as overdue, then repeat on their normal cycle.",
   },
