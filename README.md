@@ -216,17 +216,40 @@ Until the links are set, nothing changes for visitors: the panels keep their ema
 - The footer gets Pricing, Terms and, once `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is set, **Manage or
   cancel membership**. /privacy says Stripe processes payments and we never see card numbers.
 
-**Before you paste the live links, read [/terms](https://capexclock.com/terms),
-[/privacy](https://capexclock.com/privacy) (the Payments section) and the
-[sample report](https://capexclock.com/sample-condition-report.pdf).** Tell Claude anything you
-want changed. Ask your accountant about sales tax first, and optionally have a lawyer review
-/terms (an hour, about $200–500) and say whether to sell as yourself or through an LLC.
+**Before you paste the live links, read every page a buyer sees:**
+
+- [/terms](https://capexclock.com/terms) and [/privacy](https://capexclock.com/privacy) (the
+  Payments section);
+- the [sample report](https://capexclock.com/sample-condition-report.pdf);
+- [/pricing](https://capexclock.com/pricing), including its questions and answers;
+- the two thank-you pages, [/thanks/membership](https://capexclock.com/thanks/membership) and
+  [/thanks/report](https://capexclock.com/thanks/report). Opening them yourself before the live
+  links go in is fine: the Monday tiles count from that day.
+
+They make promises you'll have to keep by hand:
+
+- each new member hears from support@capexclock.com within 2 business days;
+- each member gets an email before each replacement comes due, plus a yearly budget summary
+  and a yearly condition report;
+- each report goes out within 2 business days of getting the owner's details;
+- anyone who asks within 30 days of a payment gets it back in full;
+- if reminders aren't built, every founding membership is cancelled and every payment refunded;
+- files people email you are deleted 30 days after you deliver.
+
+Tell Claude anything you want changed. Ask your accountant about sales tax first, and optionally
+have a lawyer review /terms (an hour, about $200–500) and say whether to sell as yourself or
+through an LLC.
 
 ### Set up Stripe (once, about an hour)
 
 Do everything in **test mode** first (the **Test mode** switch in the Stripe dashboard, or a
 **Sandbox** if your dashboard offers that instead). Nothing real is charged there.
 
+0. **Check support@capexclock.com gets email.** From another email account, send a test email to
+   support@capexclock.com and check it reaches you. Buyers, refunds, Stripe receipts and the
+   sheets owners send all use this address. If it doesn't arrive, set up forwarding to your inbox
+   (ImprovMX works with any DNS; Cloudflare Email Routing works if your DNS is on Cloudflare;
+   both are free), or get a mailbox (Google Workspace is about $7–8 a month), and test again.
 1. **Open the account.** Sign up at stripe.com and fill in what Stripe asks for: your business
    (or you as an individual), your details and the bank account for payouts.
 2. **Public details.** **Settings → Business → Public details**: support email
@@ -261,7 +284,9 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
    - `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP`: the membership link
    - `NEXT_PUBLIC_STRIPE_LINK_REPORT`: the report link
    - `NEXT_PUBLIC_STRIPE_PORTAL_LINK`: the portal login link (from step 4, not the address of
-     the portal's settings page). The membership only goes on sale when this one is right.
+     the portal's settings page). The membership only goes on sale when this one is right, and
+     from the same mode as the membership link: both test-mode links (they have `test_` in
+     them) or both live.
 
    Then **Deploys → Trigger deploy → Deploy project**. Open the deploy's log and search for
    `[CapexClock]`: there should be no matches. A match names the setting that was ignored and why.
@@ -282,8 +307,11 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
    check:
    - both offers show **Buy now**, and the "test mode" line under them is gone;
    - **Manage or cancel membership** is at the bottom of the page, and opens Stripe's sign-in
-     page for your **live** portal (its address has no `test_` in it). If it's missing, the
-     membership isn't on sale either: fix `NEXT_PUBLIC_STRIPE_PORTAL_LINK` and redeploy.
+     page for your **live** portal (its address has no `test_` in it).
+
+   If the membership says "Not on sale yet", the `[CapexClock]` line in the deploy log says why:
+   usually `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is missing, or is still the test-mode link. Fix it
+   and redeploy.
 
    That's the start of the six-week check-in.
 
@@ -387,8 +415,14 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
-steps (Buy now, import, the comparison and the quick estimate) add their own tiles; each of
-those changes says what to add.
+steps (import, the comparison and the quick estimate) add their own tiles; each of those changes
+says what to add.
+
+On the **Buy now** tile, `presale_checkout_clicked` counts trips to Stripe: once per click that
+leaves for Stripe (a double click is one), and once per Buy now opened in a new tab. One click can
+count without a trip: in the property editor with unsaved changes, the browser asks "Leave site?"
+first, and the click counts even if the owner stays. `presale_completed` counts the thank-you
+pages, once per visit. Stripe is the real count of sales; these only rank the two offers.
 
 ### Weekly Supabase query
 
