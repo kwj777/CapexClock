@@ -178,6 +178,51 @@ export interface AppliedChange {
   count: number;
 }
 
+/**
+ * What the comparison remembers for the whole page view. The calculator keeps it,
+ * not the panel, because the panel goes away whenever nothing is at risk (an install
+ * year edited, say, or Clear) and comes back when something is again.
+ */
+export interface CompareState {
+  open: boolean;
+  /** What's typed in the emergency box. */
+  percentText: string;
+  /** Unticked rather than ticked, so an item that comes into the list starts ticked. */
+  unticked: ReadonlySet<string>;
+  applied: AppliedChange | null;
+  /** compare_viewed has gone out in this page view. */
+  viewed: boolean;
+}
+
+export const NEW_COMPARE_STATE: CompareState = {
+  open: false,
+  percentText: "",
+  unticked: new Set(),
+  applied: null,
+  viewed: false,
+};
+
+/**
+ * Opens or closes the panel, with the compare_viewed event to send, if any. It goes
+ * out once per page view, however often the panel opens or the at-risk list empties
+ * and fills again.
+ */
+export function togglePanel(
+  state: CompareState,
+  items: number,
+): { state: CompareState; event: { items: number } | null } {
+  const event = viewedEvent(!state.open, state.viewed, items);
+  return { state: { ...state, open: !state.open, viewed: state.viewed || event !== null }, event };
+}
+
+/** Ticks or unticks one item in the panel's list. */
+export function withTick(state: CompareState, id: string, ticked: boolean): CompareState {
+  const unticked = new Set(state.unticked);
+  if (ticked) unticked.delete(id);
+  else unticked.add(id);
+  return { ...state, unticked };
+}
+
 /** The draft after Apply or Undo, and what the panel says and focuses next. */
 export interface CompareAction {
   draft: Draft;
@@ -205,8 +250,8 @@ export function applyChosen(draft: Draft, chosen: readonly string[]): CompareAct
 }
 
 /**
- * Undo is offered while the form is exactly as Apply left it. Any other edit,
- * Clear or a reload ends it, like the calculator's own Undo.
+ * Undo is offered while the form is exactly as Apply left it, like the calculator's
+ * own Undo, so any other edit, Clear or a reload takes it away.
  */
 export function canUndoApply(applied: AppliedChange | null, draft: Draft): applied is AppliedChange {
   return (

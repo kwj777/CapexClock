@@ -26,11 +26,12 @@ import {
   perUnitText,
   reserveVariants,
   compareSummary,
+  togglePanel,
   totalChange,
   undoApplied,
-  viewedEvent,
-  type AppliedChange,
+  withTick,
   type CompareAction,
+  type CompareState,
 } from "./compare";
 import type { Draft, DraftRow } from "./draft";
 import { formatMoney, formatReserve } from "./format";
@@ -46,7 +47,9 @@ function sayAgain(current: string, message: string): string {
 /**
  * "What if we replace everything at risk now?" under the at-risk list. It compares
  * the forecast with a copy where the ticked at-risk rows are set to replace this
- * year. Nothing in the draft changes until Apply, which can be undone.
+ * year. Nothing in the draft changes until Apply, which can be undone. Whether it's
+ * open, the ticks, the emergency box and Undo live in `state`, which the calculator
+ * keeps for the page view, so they outlast this going away while nothing is at risk.
  */
 export default function CompareAtRisk({
   startYear,
@@ -55,6 +58,8 @@ export default function CompareAtRisk({
   rows,
   draft,
   setDraft,
+  state,
+  setState,
 }: {
   startYear: number;
   unitCount: number;
@@ -64,22 +69,19 @@ export default function CompareAtRisk({
   rows: ReadonlyMap<string, DraftRow>;
   draft: Draft;
   setDraft: Dispatch<SetStateAction<Draft>>;
+  state: CompareState;
+  setState: Dispatch<SetStateAction<CompareState>>;
 }) {
+  const { open, percentText, unticked, applied } = state;
   const baseId = useId();
   const toggleId = `${baseId}-toggle`;
   const panelId = `${baseId}-panel`;
   const undoId = `${baseId}-undo`;
   const applyId = `${baseId}-apply`;
-  const [open, setOpen] = useState(false);
-  const [percentText, setPercentText] = useState("");
   const [editingPercent, setEditingPercent] = useState(false);
-  // Unticked rather than ticked, so an item that comes into the list starts ticked.
-  const [unticked, setUnticked] = useState<ReadonlySet<string>>(() => new Set());
-  const [applied, setApplied] = useState<AppliedChange | null>(null);
   const [spoken, setSpoken] = useState("");
   // Set when ticking or the emergency box changes the figures; they're read out once that pauses.
   const [speak, setSpeak] = useState(false);
-  const viewed = useRef(false);
   const focusNext = useRef<string | null>(null);
 
   const { percent, error: percentError } = parseEmergencyPercent(percentText);
@@ -116,26 +118,18 @@ export default function CompareAtRisk({
   });
 
   function toggle() {
-    const event = viewedEvent(!open, viewed.current, comparison.items.length);
-    if (event) {
-      viewed.current = true;
-      void track("compare_viewed", event);
-    }
-    setOpen((o) => !o);
+    const next = togglePanel(state, comparison.items.length);
+    setState(next.state);
+    if (next.event) void track("compare_viewed", next.event);
   }
 
   function setTicked(id: string, ticked: boolean) {
-    setUnticked((current) => {
-      const next = new Set(current);
-      if (ticked) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setState((s) => withTick(s, id, ticked));
     setSpeak(true);
   }
 
   function run(action: CompareAction) {
-    setApplied(action.applied);
+    setState((s) => ({ ...s, applied: action.applied }));
     setDraft(action.draft);
     setSpeak(false);
     say(action.message);
@@ -196,7 +190,7 @@ export default function CompareAtRisk({
             percent={percent}
             showPercentError={percentError && !editingPercent}
             onPercentChange={(value) => {
-              setPercentText(value);
+              setState((s) => ({ ...s, percentText: value }));
               setSpeak(true);
             }}
             onPercentEditing={setEditingPercent}

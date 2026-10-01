@@ -53,7 +53,7 @@ import {
 } from "./draft";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
-import { riskText } from "./compare";
+import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
 import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
@@ -185,6 +185,9 @@ export function CalculatorView({
   // What Load an example or Clear replaced, offered back until the next edit.
   const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // The replace-now comparison's panel, ticks and Undo. Kept here because the
+  // comparison goes away whenever nothing is at risk, and this lasts the page view.
+  const [compare, setCompare] = useState<CompareState>(NEW_COMPARE_STATE);
   // Element to focus once the next render is on screen (after removing a row, say).
   const focusNext = useRef<string | null>(null);
 
@@ -547,6 +550,8 @@ export function CalculatorView({
                 rows={rowsById}
                 draft={draft}
                 setDraft={setDraft}
+                state={compare}
+                setState={setCompare}
               />
             </AtRisk>
             <DueTable forecast={forecast} rows={rowsById} />

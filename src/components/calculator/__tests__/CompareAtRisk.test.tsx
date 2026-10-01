@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareReplaceNow, type ForecastComponent } from "@/lib/forecast";
 import CompareAtRisk, { ComparisonPanel } from "../CompareAtRisk";
+import { NEW_COMPARE_STATE, type CompareState } from "../compare";
 import { exampleDraft, toComponents } from "../draft";
 
 // Clicks, focus and the live region are checked in the browser; what Apply and
@@ -9,16 +10,20 @@ import { exampleDraft, toComponents } from "../draft";
 describe("the replace-now comparison before it's opened", () => {
   const draft = exampleDraft();
   const { components } = toComponents(draft, 2026);
-  const html = renderToStaticMarkup(
-    <CompareAtRisk
-      startYear={2026}
-      unitCount={12}
-      components={components}
-      rows={new Map(draft.rows.map((r) => [r.id, r]))}
-      draft={draft}
-      setDraft={() => undefined}
-    />,
-  );
+  const renderWith = (state: CompareState) =>
+    renderToStaticMarkup(
+      <CompareAtRisk
+        startYear={2026}
+        unitCount={12}
+        components={components}
+        rows={new Map(draft.rows.map((r) => [r.id, r]))}
+        draft={draft}
+        setDraft={() => undefined}
+        state={state}
+        setState={() => undefined}
+      />,
+    );
+  const html = renderWith(NEW_COMPARE_STATE);
 
   it("is a closed button that controls the panel", () => {
     expect(html).toContain(">What if we replace everything at risk now?");
@@ -35,6 +40,16 @@ describe("the replace-now comparison before it's opened", () => {
 
   it("keeps a live region in the page, so later changes are read out", () => {
     expect(html).toContain('aria-live="polite"');
+  });
+
+  it("draws the state the calculator kept, so it comes back as it was after the list empties", () => {
+    const carpet = components.find((c) => c.name === "Carpet")!.id;
+    const kept = renderWith({ ...NEW_COMPARE_STATE, open: true, viewed: true, percentText: "20", unticked: new Set([carpet]) });
+    expect(kept).toContain('aria-expanded="true"');
+    expect(kept).toContain("Cash needed in 2026");
+    expect(kept).toContain('value="20"');
+    expect(kept.match(/<input type="checkbox"[^>]* checked=""/g)).toHaveLength(3);
+    expect(kept).toContain(">Apply to 3 items<");
   });
 });
 

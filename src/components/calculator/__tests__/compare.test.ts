@@ -12,6 +12,7 @@ import {
   ifYouWait,
   itemDetail,
   leadVariants,
+  NEW_COMPARE_STATE,
   parseEmergencyPercent,
   perUnitText,
   RESERVE_HIGHER_TEXT,
@@ -19,11 +20,13 @@ import {
   RESERVE_SAME_TEXT,
   reserveVariants,
   riskText,
+  togglePanel,
   totalChange,
   undoApplied,
   undoneText,
   viewedEvent,
   withReplaceNow,
+  withTick,
 } from "../compare";
 import { EMPTY_DRAFT, editRow, exampleDraft, rowFromLibrary, toComponents, type Draft } from "../draft";
 
@@ -130,6 +133,44 @@ describe("Apply and Undo in the panel", () => {
     expect(viewedEvent(false, true, 4)).toBeNull();
     expect(viewedEvent(true, true, 4)).toBeNull();
     expect(viewedEvent(true, false, 0)).toBeNull();
+  });
+
+  it("keeps compare_viewed to once per page view as the panel opens and closes", () => {
+    const first = togglePanel(NEW_COMPARE_STATE, 4);
+    expect(first.event).toEqual({ items: 4 });
+    expect(first.state).toMatchObject({ open: true, viewed: true });
+    const closed = togglePanel(first.state, 4);
+    expect(closed.event).toBeNull();
+    expect(closed.state).toMatchObject({ open: false, viewed: true });
+    // The calculator keeps this state while the at-risk list empties and fills
+    // again, so opening it once more, with other items, sends nothing.
+    const again = togglePanel(closed.state, 1);
+    expect(again.event).toBeNull();
+    expect(again.state.open).toBe(true);
+  });
+
+  it("sends compare_viewed on a later open if the first had nothing in it", () => {
+    const empty = togglePanel(NEW_COMPARE_STATE, 0);
+    expect(empty.event).toBeNull();
+    expect(empty.state.viewed).toBe(false);
+    const later = togglePanel(togglePanel(empty.state, 0).state, 2);
+    expect(later.event).toEqual({ items: 2 });
+  });
+
+  it("opens and closes without touching the ticks, the emergency box or Undo", () => {
+    const { applied } = applyChosen(draft, chosen)!;
+    const state = { ...NEW_COMPARE_STATE, percentText: "20", unticked: new Set(["a"]), applied };
+    const { state: next } = togglePanel(state, 4);
+    expect(next.percentText).toBe("20");
+    expect(next.unticked).toBe(state.unticked);
+    expect(next.applied).toBe(applied);
+  });
+
+  it("ticks and unticks one item at a time", () => {
+    const off = withTick(NEW_COMPARE_STATE, "a", false);
+    expect([...off.unticked]).toEqual(["a"]);
+    expect(NEW_COMPARE_STATE.unticked.size).toBe(0);
+    expect([...withTick(withTick(off, "b", false), "a", true).unticked]).toEqual(["b"]);
   });
 
   it("applies the chosen rows, says so and moves focus to Undo", () => {
