@@ -92,3 +92,35 @@ describe("the tell me first form", () => {
     expect(empty).toContain('name="email" value=""/>');
   });
 });
+
+describe("the Stripe links the panels get", () => {
+  it("are read from the Netlify settings, and only valid ones count", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const before = { ...env };
+    try {
+      env.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP = "https://buy.stripe.com/test_m";
+      env.NEXT_PUBLIC_STRIPE_LINK_REPORT = "https://example.com/r";
+      let html = "";
+      // A fresh copy of the modules (React included), so the settings are read again.
+      await jest.isolateModulesAsync(async () => {
+        const { renderToStaticMarkup: render } = await import("react-dom/server");
+        const { default: Provider, usePaidIdeas } = await import("../PaidIdeas");
+        function Links() {
+          return <>{JSON.stringify(usePaidIdeas().offerLinks)}</>;
+        }
+        html = render(
+          <Provider where="calculator">
+            <Links />
+          </Provider>,
+        );
+      });
+      expect(JSON.parse(html.replace(/&quot;/g, '"'))).toEqual({
+        membership: "https://buy.stripe.com/test_m",
+        report: null,
+      });
+    } finally {
+      for (const key of Object.keys(env)) if (!(key in before)) delete env[key];
+      Object.assign(env, before);
+    }
+  });
+});
