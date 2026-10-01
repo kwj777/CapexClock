@@ -181,19 +181,6 @@ export default function CompareAtRisk({
           />
         </svg>
       </button>
-      {canUndo && (
-        <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
-          {appliedText(applied.count)}{" "}
-          <button
-            id={undoId}
-            type="button"
-            onClick={undo}
-            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
-          >
-            Undo
-          </button>
-        </p>
-      )}
       <div id={panelId} hidden={!open} className="mt-4">
         {open && (
           <ComparisonPanel
@@ -217,6 +204,20 @@ export default function CompareAtRisk({
           />
         )}
       </div>
+      {/* Below the panel, so appearing after Apply doesn't push the panel or Apply down. */}
+      {canUndo && (
+        <p className="mt-4 text-sm text-slate-700 dark:text-slate-300">
+          {appliedText(applied.count)}{" "}
+          <button
+            id={undoId}
+            type="button"
+            onClick={undo}
+            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+          >
+            Undo
+          </button>
+        </p>
+      )}
     </div>
   );
 }
