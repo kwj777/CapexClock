@@ -228,6 +228,10 @@ describe("price and report wording (plan T5)", () => {
     );
   });
 
+  it("promises nothing about what we'll build", () => {
+    expect(everything).not.toMatch(/while we build|automatic version|we will build|we'll build/i);
+  });
+
   it("uses no em dashes", () => {
     expect(everything).not.toContain("—");
   });

@@ -160,7 +160,7 @@ export const OFFER_TEXT: Record<Offer, OfferText> = {
     priceNote: `${MEMBERSHIP_RENEWS_TEXT} Cancel any time online.`,
     includes:
       "An email from us before each replacement comes due, plus a yearly budget summary and a yearly condition report.",
-    delivery: "We send them by hand while we build the automatic version.",
+    delivery: "We send them by hand for now.",
     pitch:
       "Founding members get it now, done by hand: an email from us before each replacement comes due, plus a yearly budget summary and a yearly condition report.",
   },

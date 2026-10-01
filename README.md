@@ -244,7 +244,7 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
 5. **The membership link.** **Payment Links → New** (or **+ Create payment link**):
    - Add a new product: name `CapexClock founding membership`, price **$12.00 USD**,
      **Recurring**, **Monthly**. Description: `Reminder emails before replacements come due, a
-     yearly budget summary and a yearly condition report. Sent by hand while we build it.`
+     yearly budget summary and a yearly condition report. Sent by hand for now.`
    - **Options**: turn on **Limit the number of payments** and set it to **20**. Turn on
      **Require customers to accept your terms of service**. Turn off promotion codes. Turn on
      **Add custom text**, and in the text shown near the pay button (Stripe may call it the
