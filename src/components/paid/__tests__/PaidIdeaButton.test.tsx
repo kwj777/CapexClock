@@ -17,8 +17,7 @@ describe("paid idea buttons", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("<span>Add from a photo of the label</span>");
     expect(html).toContain(">Idea</span>");
-    // Read as "Add from a photo of the label, Idea".
-    expect(html).toContain('<span class="sr-only">, </span>');
+    expect(html).toContain('aria-label="Add from a photo of the label, Idea"');
     expect(html).not.toContain("Not built yet");
   });
 

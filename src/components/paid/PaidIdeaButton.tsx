@@ -88,10 +88,12 @@ export function PaidIdeaDisclosure({
       aria-expanded={open}
       aria-controls={open ? panelId : undefined}
       onClick={toggle}
+      // Spelled out so it reads "…, Idea" (the badge alone runs into the words). It starts
+      // with the visible words, so "click Email me…" still works by voice.
+      aria-label={`${PAID_IDEA_TEXT[idea].button}, Idea`}
       className={buttonClass[tone]}
     >
       <span>{PAID_IDEA_TEXT[idea].button}</span>
-      <span className="sr-only">, </span>
       <span className={badgeClass[tone]}>Idea</span>
     </button>
   );

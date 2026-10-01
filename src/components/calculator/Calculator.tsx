@@ -513,7 +513,7 @@ function CalculatorBody({
             Your {forecast.startYear}–{forecast.endYear} forecast
           </h2>
 
-          {/* The reminders panel opens below the cards, at full width. */}
+          {/* The reminders panel opens below the cards and what they mean, at full width. */}
           <PaidIdeaDisclosure idea="reminders" tone="dark">
             {(button, panel) => (
               <>
@@ -536,22 +536,22 @@ function CalculatorBody({
                   <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
                   <Stat label="10-year total" value={formatMoney(forecast.total)} />
                 </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  The monthly reserve is the smallest steady amount that has the cash ready for every
+                  replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
+                  {forecast.startYear} costs (overdue or due this year) are shown separately because
+                  there&apos;s no time to save for them.
+                </p>
+                {incomplete > 0 && (
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    {incomplete} component{incomplete === 1 ? " isn't" : "s aren't"} included yet. See the
+                    notes above.
+                  </p>
+                )}
                 {panel}
               </>
             )}
           </PaidIdeaDisclosure>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            The monthly reserve is the smallest steady amount that has the cash ready for every
-            replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
-            {forecast.startYear} costs (overdue or due this year) are shown separately because
-            there&apos;s no time to save for them.
-          </p>
-          {incomplete > 0 && (
-            <p className="text-sm text-amber-800 dark:text-amber-300">
-              {incomplete} component{incomplete === 1 ? " isn't" : "s aren't"} included yet. See the
-              notes above.
-            </p>
-          )}
 
           <div className={cardClass}>
             <h3 className="text-base font-semibold text-slate-950 dark:text-white">
