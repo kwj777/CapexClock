@@ -301,3 +301,10 @@ export function samples(grid: Grid, headerRow: number, column: number, count = 3
   }
   return found;
 }
+
+/** A dropdown's value back as a role; anything unknown is "ignore". */
+export function parseRole(value: string): ColumnRole {
+  if ((FIELDS as string[]).includes(value)) return value as FieldKind;
+  if (value.startsWith("component:") && value.length > "component:".length) return value as `component:${string}`;
+  return "ignore";
+}

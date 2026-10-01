@@ -8,6 +8,7 @@ import {
   headings,
   headingTiming,
   offersColumnLayout,
+  parseRole,
   samples,
 } from "../columns";
 import { match } from "../__fixtures__/sheets";
@@ -143,6 +144,13 @@ describe("guessing the layout and every column", () => {
 
   it("keeps a sheet with an item column one row per item, even with item headings", () => {
     expect(guessLayout(["Item", "Water heater", "Furnace"], match)).toBe("rows");
+  });
+
+  it("reads a dropdown's value back as a role", () => {
+    expect(parseRole("cost")).toBe("cost");
+    expect(parseRole("component:boiler")).toBe("component:boiler");
+    expect(parseRole("component:")).toBe("ignore");
+    expect(parseRole("whatever")).toBe("ignore");
   });
 
   it("reads a component column's role back to its item", () => {

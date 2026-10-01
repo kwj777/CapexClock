@@ -1,6 +1,7 @@
 import type { ImportedRow, Preview, PreviewRow } from "../preview";
 import {
   addLabel,
+  columnLetter,
   detailsText,
   duplicates,
   duplicateText,
@@ -138,5 +139,9 @@ describe("import wording", () => {
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",
     ]);
+  });
+
+  it("names columns the way spreadsheets do", () => {
+    expect([0, 1, 25, 26, 27, 51, 52, 701, 702].map(columnLetter)).toEqual(["A", "B", "Z", "AA", "AB", "AZ", "BA", "ZZ", "AAA"]);
   });
 });

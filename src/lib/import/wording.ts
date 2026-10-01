@@ -1,6 +1,6 @@
 import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { ImportedRow, Preview, PreviewRow, RowStatus, SkipReason, Skipped } from "./preview";
+import type { FixField, ImportedRow, Preview, PreviewRow, RowStatus, SkipReason, Skipped } from "./preview";
 import { listText, quote } from "./text";
 
 export const STATUS_TEXT: Record<RowStatus, string> = {
@@ -131,3 +131,24 @@ export function previewHints(preview: Preview): string[] {
   }
   return hints;
 }
+
+/** A spreadsheet's column letter: 0 is A, 25 is Z, 26 is AA. */
+export function columnLetter(index: number): string {
+  let n = index + 1;
+  let letters = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}
+
+/** The label of each field the preview lets the owner fix. */
+export const FIX_LABEL: Record<FixField, string> = {
+  name: "Item name",
+  quantity: "Quantity",
+  installYear: "Install year",
+  usefulLife: "Useful life (years)",
+  costEach: "Cost each",
+};
