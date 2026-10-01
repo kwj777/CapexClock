@@ -4,7 +4,6 @@ import { toSaveInput } from "../convert";
 import {
   compareSaved,
   lacksUpdate0004,
-  matchesSaved,
   sameSave,
   saveFailure,
   sendsDetails,
@@ -84,10 +83,10 @@ describe("after a save", () => {
       updated_at: "",
     }));
     const property = { name: "Maple Court", unit_count: 12, year_built: 1998 };
-    expect(matchesSaved(input, property, [...rows].reverse())).toBe(true);
-    expect(matchesSaved(input, { ...property, name: "Other tab" }, rows)).toBe(false);
-    expect(matchesSaved(input, property, rows.slice(1))).toBe(false);
-    expect(matchesSaved(input, property, [{ ...rows[0], replacement_cost_each: 1 }, rows[1]])).toBe(false);
+    expect(compareSaved(input, property, [...rows].reverse())).toBe("same");
+    expect(compareSaved(input, { ...property, name: "Other tab" }, rows)).toBe("different");
+    expect(compareSaved(input, property, rows.slice(1))).toBe("different");
+    expect(compareSaved(input, property, [{ ...rows[0], replacement_cost_each: 1 }, rows[1]])).toBe("different");
   });
 });
 
@@ -117,13 +116,11 @@ describe("telling whether condition and notes were saved", () => {
 
   it("finds everything saved after update 0004", () => {
     expect(compareSaved(input, property, after0004)).toBe("same");
-    expect(matchesSaved(input, property, after0004)).toBe(true);
     expect(lacksUpdate0004(after0004)).toBe(false);
   });
 
   it("spots condition and notes a database without update 0004 dropped", () => {
     expect(compareSaved(input, property, before0004)).toBe("without_details");
-    expect(matchesSaved(input, property, before0004)).toBe(false);
     expect(lacksUpdate0004(before0004)).toBe(true);
   });
 

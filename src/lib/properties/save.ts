@@ -102,15 +102,6 @@ export function compareSaved(
   return sameDetails ? "same" : "without_details";
 }
 
-/** True when the database holds exactly what was just saved. */
-export function matchesSaved(
-  sent: Pick<SaveInput, "property" | "components">,
-  property: Pick<PropertyRow, "name" | "unit_count" | "year_built">,
-  components: ComponentRow[],
-): boolean {
-  return compareSaved(sent, property, components) === "same";
-}
-
 /** True when a save sends any condition, notes or "guess" flag worth checking for afterwards. */
 export function sendsDetails(input: Pick<SaveInput, "components">): boolean {
   return input.components.some((c) => c.condition !== null || c.notes !== null || c.install_year_is_estimate);
