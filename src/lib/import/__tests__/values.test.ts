@@ -78,6 +78,36 @@ describe("install years", () => {
   it("asks about words it can't read", () => {
     expect(readInstallYear("soon", NOW).problem).toBe(`Couldn't read "soon" as a year.`);
   });
+
+  it.each([
+    ["1990s", 1990],
+    ["1990's", 1990],
+    ["the 90s", 1990],
+    ["'80s", 1980],
+    ["early 2000s", 2000],
+    ["mid-90s", 1994],
+    ["Mid 2000s", 2004],
+    ["late 1990s", 1997],
+    ["1990s?", 1990],
+  ])("reads the decade %p as %p, marked a guess", (text, year) => {
+    expect(readInstallYear(text, NOW)).toEqual({ value: year, guess: true, note: `Read "${text}" as ${year}, marked a guess` });
+  });
+
+  it.each(["pre-2000", "pre 2000", "before 2000", "Prior to 1995", "2000 or earlier", "<2000", "≤ 2000", "after 2010", "post-2010", "2010 or later", "2015+"])(
+    "asks about %p, which doesn't give one year",
+    (text) => {
+      expect(readInstallYear(text, NOW)).toEqual({
+        value: null,
+        problem: `"${text}" doesn't give one year. Type your best guess, with "approx" in front to mark it a guess.`,
+      });
+    },
+  );
+
+  it("still reads a year with a season or a word like since", () => {
+    expect(readInstallYear("mid 2014", NOW)).toEqual({ value: 2014 });
+    expect(readInstallYear("since 2015", NOW)).toEqual({ value: 2015, note: 'Read "since 2015" as 2015' });
+    expect(readInstallYear("1990s or 2000s", NOW).problem).toBe('"1990s or 2000s" has more than one year. Type the one to use.');
+  });
 });
 
 describe("ages", () => {
@@ -188,6 +218,16 @@ describe("replace-by years", () => {
       guess: true,
       note: 'Used the earlier year of "2028-2030". Replace by 2028 with a 25-year life: installed about 2003, marked a guess',
     });
+  });
+
+  it("reads before a year as the year before, and a decade as its start", () => {
+    expect(readReplaceBy("before 2030", NOW, 10, NOW)).toEqual({
+      value: 2019,
+      guess: true,
+      note: 'Read "before 2030" as 2029. Replace by 2029 with a 10-year life: installed about 2019, marked a guess',
+    });
+    expect(readReplaceBy("2030s", NOW, 10, NOW).value).toBe(2020);
+    expect(readReplaceBy("after 2030", NOW, 10, NOW).problem).toContain("doesn't give one year");
   });
 
   it("asks about two-digit years and missing lives", () => {

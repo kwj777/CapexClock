@@ -73,6 +73,14 @@ interface FoundYear {
   problem?: string;
 }
 
+// "1990s", "the '90s", "early 2000s", "mid-80s": a decade, read as a guess.
+const DECADE = /(?:\b(early|mid|late)[\s-]*)?(?:the\s+)?(?:\b((?:1[89]|2\d)\d0)|'?\b([3-9]0))'?s\b/i;
+// How far into a decade early, mid and late are, at the older end of each.
+const DECADE_PART: Record<string, number> = { early: 0, mid: 4, late: 7 };
+// "pre-2000", "before 2000", "2000 or earlier", "2015+": a limit, not a year.
+const LIMIT =
+  /^(?:(?:pre|before|prior to|older than|earlier than|post|after|newer than|later than)(?:\s|-|$)|[<>≤≥])|\bor\s+(?:earlier|before|older|prior|later|after|newer)\b|\d\s*\+$/i;
+
 function findYear(cell: Cell): FoundYear {
   if (isDate(cell)) return { year: cell.getFullYear(), guess: false, extraWords: false, unknown: false };
   if (typeof cell === "number" && Number.isInteger(cell) && cell >= 1000 && cell <= 2999) {
@@ -82,6 +90,23 @@ function findYear(cell: Cell): FoundYear {
   if (text === "") return { year: null, guess: false, extraWords: false, unknown: false };
   if (UNKNOWN.test(text)) return { year: null, guess: false, extraWords: false, unknown: true };
   const { rest, guess } = withoutGuessWords(text);
+  if (LIMIT.test(rest) && /\d/.test(rest)) {
+    return {
+      year: null,
+      guess,
+      extraWords: false,
+      unknown: false,
+      problem: `${quote(text)} doesn't give one year. Type your best guess, with "approx" in front to mark it a guess.`,
+    };
+  }
+  const decade = rest.match(DECADE);
+  if (decade) {
+    const start = decade[2] ? Number(decade[2]) : 1900 + Number(decade[3]);
+    const others = rest.replace(decade[0], " ");
+    if (!/\d/.test(others)) {
+      return { year: start + (DECADE_PART[decade[1]?.toLowerCase() ?? ""] ?? 0), guess: true, extraWords: false, unknown: false };
+    }
+  }
   const years = [...new Set([...rest.matchAll(/(?<!\d)(1[89]\d\d|2\d\d\d)(?!\d)/g)].map((m) => Number(m[1])))];
   if (years.length > 1) {
     return { year: null, guess, extraWords: false, unknown: false, problem: `${quote(text)} has more than one year. Type the one to use.` };
@@ -251,10 +276,15 @@ export function readReplaceBy(cell: Cell, sheetYear: number, life: number | null
   const text = cellText(cell);
   let due: number | null;
   let used = "";
+  const before = text.match(/^(?:before|prior to)\s+(1[89]\d\d|2\d\d\d)$/i);
   if (NOW.test(text)) {
     due = sheetYear;
   } else if (/^next year$/i.test(text)) {
     due = sheetYear + 1;
+  } else if (before) {
+    // Before 2030 is 2029 at the latest.
+    due = Number(before[1]) - 1;
+    used = `Read ${quote(text)} as ${due}. `;
   } else {
     const found = findYear(cell);
     const range = text.match(/^\s*(?:by\s+)?(1[89]\d\d|2\d\d\d)\s*(?:-|–|—|to|or)\s*(1[89]\d\d|2\d\d\d)\s*$/i);
