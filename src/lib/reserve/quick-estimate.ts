@@ -1,7 +1,6 @@
 import { badYearBuilt, YEAR_BUILT_TEXT } from "@/components/calculator/draft";
-import { computeForecast, type ForecastComponent } from "@/lib/forecast";
+import { computeForecast, validateComponent, type ForecastComponent } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
-import { UNITS_PROBLEM } from "./inputs";
 
 /**
  * The quick estimate: a per-unit monthly reserve range from a unit count, a year
@@ -77,9 +76,56 @@ export function quickSystems(library: LibraryComponent[], costs: TypicalCost[]):
   });
 }
 
-/** The year it was last replaced, if it's been replaced every `life` years since the building went up. */
-export function lastReplacedOnSchedule(yearBuilt: number, life: number, currentYear: number): number {
-  return yearBuilt + Math.floor((currentYear - yearBuilt) / life) * life;
+/**
+ * Kevin's choice in typical-costs.md. True: each system lasts anywhere in its
+ * lifespan range and is replaced up to GIVE_OR_TAKE_YEARS either side of
+ * schedule, so its cost is spread over the years it could come due. False: each
+ * lasts exactly the middle of its range, the plan's first method, which jumps up
+ * to 4 times between neighbouring build years when several systems come due
+ * together.
+ */
+export const SPREAD_REPLACEMENTS = true;
+/** How many years early or late a replacement may land, when replacements are spread. */
+export const GIVE_OR_TAKE_YEARS = 2;
+
+/**
+ * The year a system was last replaced, if it's replaced every `life` years from
+ * `start`: `start` itself until the first replacement is due. Due this year
+ * counts as replaced this year, so nothing is ever overdue.
+ */
+export function lastReplacedOnSchedule(start: number, life: number, currentYear: number): number {
+  return currentYear < start ? start : start + Math.floor((currentYear - start) / life) * life;
+}
+
+/** A share of a system on one replacement schedule. */
+export interface ReplacementCycle {
+  life: number;
+  /** When this share was last replaced, or put in. The next replacement is `life` years later. */
+  lastReplaced: number;
+  /** Its part of the system, out of 1. */
+  share: number;
+}
+
+/**
+ * The schedules a system is split across, in equal shares. Spread: every
+ * lifespan in its range, each starting from the year built or up to
+ * GIVE_OR_TAKE_YEARS either side of it (a share started 2 years early comes due
+ * 2 years early, and so on). Not spread: one schedule at the middle of its range.
+ */
+export function replacementCycles(
+  item: LibraryComponent,
+  yearBuilt: number,
+  currentYear: number,
+  spread: boolean = SPREAD_REPLACEMENTS,
+): ReplacementCycle[] {
+  const lives = spread
+    ? Array.from({ length: item.lifeHigh - item.lifeLow + 1 }, (_, i) => item.lifeLow + i)
+    : [defaultLife(item)];
+  const shifts = spread ? Array.from({ length: 2 * GIVE_OR_TAKE_YEARS + 1 }, (_, i) => i - GIVE_OR_TAKE_YEARS) : [0];
+  const share = 1 / (lives.length * shifts.length);
+  return lives.flatMap((life) =>
+    shifts.map((shift) => ({ life, lastReplaced: lastReplacedOnSchedule(yearBuilt + shift, life, currentYear), share })),
+  );
 }
 
 /** Each ticked system's share of its job: 1, or an equal split with the others ticked for the same job. */
@@ -103,8 +149,9 @@ export interface QuickEstimate {
  * The full calculator's reserve (the smallest level monthly deposit that pays
  * every replacement after this year on time, 30 years ahead) for the ticked
  * systems, at typical low and high costs. Each system is taken to have been
- * replaced on schedule since the building was built, at the middle of its
- * lifespan, so nothing is overdue. Null when nothing ticked can be priced.
+ * replaced on schedule since the building was built (see replacementCycles), so
+ * nothing is overdue. Null when nothing ticked can be priced, or the unit count
+ * is too big to work out.
  */
 export function quickEstimate(
   systems: QuickSystem[],
@@ -112,28 +159,34 @@ export function quickEstimate(
   units: number,
   yearBuilt: number,
   currentYear: number,
+  spread: boolean = SPREAD_REPLACEMENTS,
 ): QuickEstimate | null {
   const included = systems.filter((s) => ticked.has(s.item.slug));
-  if (included.length === 0 || !(units > 0)) return null;
+  if (included.length === 0) return null;
   const shares = jobShares(new Set(included.map((s) => s.item.slug)));
-  const monthly = (end: "low" | "high") =>
-    computeForecast({
-      startYear: currentYear,
-      unitCount: units,
-      components: included.map((s): ForecastComponent => {
-        const life = defaultLife(s.item);
-        return {
-          id: s.item.slug,
-          category: s.item.category,
-          name: s.item.name,
-          quantity: units * s.perApartment * (shares.get(s.item.slug) ?? 1),
-          installYear: lastReplacedOnSchedule(yearBuilt, life, currentYear),
-          usefulLifeYears: life,
-          replacementCostEach: s.cost[end],
-        };
+  const parts = included.flatMap((s) =>
+    replacementCycles(s.item, yearBuilt, currentYear, spread).map((cycle) => ({ system: s, cycle })),
+  );
+  const components = (end: "low" | "high") =>
+    parts.map(
+      ({ system: s, cycle }, i): ForecastComponent => ({
+        id: `${s.item.slug}-${i}`,
+        category: s.item.category,
+        name: s.item.name,
+        quantity: units * s.perApartment * (shares.get(s.item.slug) ?? 1) * cycle.share,
+        installYear: cycle.lastReplaced,
+        usefulLifeYears: cycle.life,
+        replacementCostEach: s.cost[end],
       }),
-    }).monthlyReserve;
-  return { perUnit: { low: monthly("low") / units, high: monthly("high") / units }, systems: included.length };
+    );
+  const low = components("low");
+  const high = components("high");
+  // No units, or so many that a quantity can't be worked out, gives no estimate rather than an error.
+  if ([...low, ...high].some((c) => validateComponent(c).length > 0)) return null;
+  const perUnit = (list: ForecastComponent[]) =>
+    computeForecast({ startYear: currentYear, unitCount: units, components: list }).monthlyReserve / units;
+  const estimate = { perUnit: { low: perUnit(low), high: perUnit(high) }, systems: included.length };
+  return Number.isFinite(estimate.perUnit.low) && Number.isFinite(estimate.perUnit.high) ? estimate : null;
 }
 
 /**
@@ -161,16 +214,21 @@ function num(value: string): number | null {
   return Number.isFinite(n) ? n : NaN;
 }
 
-/** Reads the unit count and year built, with the same rules and wording as the calculators. */
+/** The most units the quick estimate takes: far more than any building it's for, and few enough to multiply out. */
+export const MAX_QUICK_UNITS = 100_000;
+export const QUICK_UNITS_PROBLEM = "Enter units as a whole number from 1 to 100,000, like 12.";
+
+/** Reads the unit count and year built. The year follows the calculators' rule and wording. */
 export function readQuickInputs(units: string, yearBuilt: string, currentYear: number): QuickInputs {
   const unitsValue = num(units);
-  const unitsOk = unitsValue === null || (Number.isInteger(unitsValue) && unitsValue > 0);
+  const unitsOk =
+    unitsValue === null || (Number.isInteger(unitsValue) && unitsValue > 0 && unitsValue <= MAX_QUICK_UNITS);
   const yearValue = num(yearBuilt);
   const yearOk = !badYearBuilt(yearBuilt, currentYear);
   return {
     units: unitsOk ? unitsValue : null,
     yearBuilt: yearOk ? yearValue : null,
-    unitsProblem: unitsOk ? null : UNITS_PROBLEM,
+    unitsProblem: unitsOk ? null : QUICK_UNITS_PROBLEM,
     yearBuiltProblem: yearOk ? null : YEAR_BUILT_TEXT,
   };
 }

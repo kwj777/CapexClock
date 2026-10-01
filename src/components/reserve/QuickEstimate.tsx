@@ -9,10 +9,12 @@ import { ASSUMPTION_SOURCES, TYPICAL_COST_SOURCES, type CostSource } from "@/lib
 import {
   ESTIMATE_BUILDING_UNITS,
   FLOOR_SQ_FT_PER_APARTMENT,
+  GIVE_OR_TAKE_YEARS,
   PARKING_SQ_FT_PER_APARTMENT,
   quickEstimate,
   quickSystems,
   readQuickInputs,
+  SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
   type QuickSystem,
 } from "@/lib/reserve/quick-estimate";
@@ -53,10 +55,13 @@ export default function QuickEstimate({
 
   const inputs = readQuickInputs(units, yearBuilt, currentYear);
   const showYearProblem = inputs.yearBuiltProblem !== null && !editingYear;
-  const estimate =
-    inputs.units !== null && inputs.yearBuilt !== null
-      ? quickEstimate(systems, ticked, inputs.units, inputs.yearBuilt, currentYear)
-      : null;
+  const estimate = useMemo(
+    () =>
+      inputs.units !== null && inputs.yearBuilt !== null
+        ? quickEstimate(systems, ticked, inputs.units, inputs.yearBuilt, currentYear)
+        : null,
+    [systems, ticked, inputs.units, inputs.yearBuilt, currentYear],
+  );
   const shown =
     estimate && inputs.units !== null
       ? { systems: estimate.systems, units: inputs.units, text: estimateText(estimate, inputs.units) }
@@ -259,8 +264,9 @@ export default function QuickEstimate({
         </h3>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-slate-400">
           <li>
-            Each system you tick has been replaced on schedule since the building was built, at the middle of its
-            typical lifespan. So nothing is overdue.
+            {SPREAD_REPLACEMENTS
+              ? `Each system you tick has been replaced on schedule since the building was built. No two last exactly the same time, so each one's replacements are spread across its typical lifespan, up to ${GIVE_OR_TAKE_YEARS} years early or late, rather than all landing in one year. Nothing is overdue.`
+              : "Each system you tick has been replaced on schedule since the building was built, at the middle of its typical lifespan. So nothing is overdue."}
           </li>
           <li>
             The monthly amount is worked out like the full calculator&apos;s: the smallest steady amount, starting from

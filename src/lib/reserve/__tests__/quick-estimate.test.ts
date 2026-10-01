@@ -1,17 +1,21 @@
 import { YEAR_BUILT_TEXT } from "@/components/calculator/draft";
 import { computeForecast } from "@/lib/forecast";
 import { COMPONENT_LIBRARY, TYPICAL_COSTS, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
-import { UNITS_PROBLEM } from "../inputs";
 import {
   FLOOR_SQ_FT_PER_APARTMENT,
+  GIVE_OR_TAKE_YEARS,
   jobShares,
   lastReplacedOnSchedule,
+  MAX_QUICK_UNITS,
   PARKING_SQ_FT_PER_APARTMENT,
+  QUICK_UNITS_PROBLEM,
   quickEstimate,
   quickSystems,
   readQuickInputs,
+  replacementCycles,
   roundEstimate,
   SHARED_JOBS,
+  SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
 } from "../quick-estimate";
 
@@ -65,6 +69,39 @@ describe("replaced on schedule since the building was built", () => {
     // Due this year counts as replaced this year, so nothing is ever overdue.
     expect(lastReplacedOnSchedule(2006, 10, 2026)).toBe(2026);
     expect(lastReplacedOnSchedule(2026, 10, 2026)).toBe(2026);
+    // A schedule that starts after this year hasn't had a replacement yet.
+    expect(lastReplacedOnSchedule(2028, 10, 2026)).toBe(2028);
+  });
+
+  it("never leaves anything overdue or due this year", () => {
+    for (let start = 1900; start <= 2030; start++) {
+      for (const life of [3, 10, 25, 40]) {
+        const last = lastReplacedOnSchedule(start, life, 2026);
+        expect(last + life).toBeGreaterThan(2026);
+        expect((last - start) % life).toBe(0);
+      }
+    }
+  });
+
+  it("spreads a system over every lifespan in its range, a year or two either side of schedule", () => {
+    const furnace = item("furnace", 15, 20);
+    const cycles = replacementCycles(furnace, 1990, 2026, true);
+    expect(cycles).toHaveLength(6 * (2 * GIVE_OR_TAKE_YEARS + 1));
+    expect(new Set(cycles.map((c) => c.life))).toEqual(new Set([15, 16, 17, 18, 19, 20]));
+    expect(cycles.reduce((sum, c) => sum + c.share, 0)).toBeCloseTo(1);
+    // A 15-year life from 1990: replaced 2020, so due 2035. Started 2 years early: 2018, due 2033.
+    expect(cycles).toContainEqual({ life: 15, lastReplaced: 2020, share: 1 / 30 });
+    expect(cycles).toContainEqual({ life: 15, lastReplaced: 2018, share: 1 / 30 });
+    for (const c of cycles) expect(c.lastReplaced + c.life).toBeGreaterThan(2026);
+  });
+
+  it("keeps one schedule at the middle of the range when not spread", () => {
+    expect(replacementCycles(item("furnace", 15, 20), 1990, 2026, false)).toEqual([{ life: 18, lastReplaced: 2026, share: 1 }]);
+  });
+
+  it("spreads replacements by default (Kevin's choice in typical-costs.md)", () => {
+    expect(SPREAD_REPLACEMENTS).toBe(true);
+    expect(replacementCycles(item("furnace", 15, 20), 1990, 2026)).toEqual(replacementCycles(item("furnace", 15, 20), 1990, 2026, true));
   });
 });
 
@@ -83,9 +120,9 @@ describe("the quick estimate", () => {
   const ticked = (...slugs: string[]) => new Set(slugs);
 
   it("uses the full calculator's reserve on typical low and high costs", () => {
-    // One water heater cycle: built 2018, 10-year life, so the next is due in 2028 (2 years).
+    // Exactly on schedule: built 2018, 10-year life, so the next is due in 2028 (2 years).
     const waterHeater = systems.filter((s) => s.item.slug === "tank-water-heater");
-    const estimate = quickEstimate(waterHeater, ticked("tank-water-heater"), 12, 2018, 2026)!;
+    const estimate = quickEstimate(waterHeater, ticked("tank-water-heater"), 12, 2018, 2026, false)!;
     expect(estimate.perUnit.low).toBeCloseTo(800 / 24);
     expect(estimate.perUnit.high).toBeCloseTo(2300 / 24);
     expect(estimate.systems).toBe(1);
@@ -100,6 +137,38 @@ describe("the quick estimate", () => {
     expect(estimate.perUnit.low).toBeCloseTo(forecast.monthlyReservePerUnit!);
   });
 
+  it("spreads a system's next replacement over the years around when it's due", () => {
+    // A 10-year item built 2018, give or take 2 years: a fifth each due in 2027, 2028, 2029 and 2030,
+    // and a fifth replaced this year (due 2036). Saving for 2028–2030 sets the level: 3/5 of the cost in 36 months.
+    const tenYears = quickSystems([item("heater", 10, 10)], [{ slug: "heater", low: 600, high: 1200, per: "apartment" }]);
+    const estimate = quickEstimate(tenYears, ticked("heater"), 12, 2018, 2026, true)!;
+    expect(estimate.perUnit.low).toBeCloseTo(600 / 60);
+    expect(estimate.perUnit.high).toBeCloseTo(1200 / 60);
+    // Exactly on schedule, all of it is due in 2028: the whole cost in 24 months.
+    expect(quickEstimate(tenYears, ticked("heater"), 12, 2018, 2026, false)!.perUnit.low).toBeCloseTo(600 / 24);
+  });
+
+  it("changes gradually from one year built to the next, with every system or the usual ones", () => {
+    // Exactly on schedule, a 2002 building has windows, cabinets, gutters and paint all due next year,
+    // and comes out about 4 times a 2001 building. Spread, neighbouring years stay within 1.5 times.
+    const everything = new Set(systems.map((s) => s.item.slug));
+    for (const tickedSet of [TICKED_BY_DEFAULT, everything]) {
+      let previous: { low: number; high: number } | null = null;
+      for (let yearBuilt = 1900; yearBuilt <= 2026; yearBuilt++) {
+        const { perUnit } = quickEstimate(systems, tickedSet, 12, yearBuilt, 2026, true)!;
+        if (previous) {
+          for (const end of ["low", "high"] as const) {
+            const ratio = perUnit[end] / previous[end];
+            expect(Math.max(ratio, 1 / ratio)).toBeLessThan(1.5);
+          }
+        }
+        previous = perUnit;
+      }
+    }
+    const exact = (yearBuilt: number) => quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026, false)!.perUnit.high;
+    expect(exact(2002) / exact(2001)).toBeGreaterThan(4);
+  });
+
   it("gives the same per-unit figure for any unit count, since costs are per apartment", () => {
     const small = quickEstimate(systems, TICKED_BY_DEFAULT, 5, 1998, 2026)!;
     const large = quickEstimate(systems, TICKED_BY_DEFAULT, 100, 1998, 2026)!;
@@ -108,19 +177,21 @@ describe("the quick estimate", () => {
   });
 
   it("keeps low at or below high, and grows when more systems are ticked", () => {
-    for (const yearBuilt of [1900, 1960, 1985, 1998, 2010, 2026]) {
-      const all = quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026)!;
-      expect(all.perUnit.low).toBeGreaterThan(0);
-      expect(all.perUnit.low).toBeLessThanOrEqual(all.perUnit.high);
-      const fewer = quickEstimate(systems, ticked("asphalt-shingle-roof", "gas-furnace"), 12, yearBuilt, 2026)!;
-      expect(fewer.perUnit.high).toBeLessThan(all.perUnit.high);
+    for (const spread of [true, false]) {
+      for (const yearBuilt of [1900, 1960, 1985, 1998, 2010, 2026]) {
+        const all = quickEstimate(systems, TICKED_BY_DEFAULT, 12, yearBuilt, 2026, spread)!;
+        expect(all.perUnit.low).toBeGreaterThan(0);
+        expect(all.perUnit.low).toBeLessThanOrEqual(all.perUnit.high);
+        const fewer = quickEstimate(systems, ticked("asphalt-shingle-roof", "gas-furnace"), 12, yearBuilt, 2026, spread)!;
+        expect(fewer.perUnit.high).toBeLessThan(all.perUnit.high);
+      }
     }
   });
 
   it("splits a shared floor rather than counting it twice", () => {
-    const carpetOnly = quickEstimate(systems, ticked("carpet"), 12, 2020, 2026)!;
-    const both = quickEstimate(systems, ticked("carpet", "luxury-vinyl-plank"), 12, 2020, 2026)!;
-    const plankOnly = quickEstimate(systems, ticked("luxury-vinyl-plank"), 12, 2020, 2026)!;
+    const carpetOnly = quickEstimate(systems, ticked("carpet"), 12, 2020, 2026, false)!;
+    const both = quickEstimate(systems, ticked("carpet", "luxury-vinyl-plank"), 12, 2020, 2026, false)!;
+    const plankOnly = quickEstimate(systems, ticked("luxury-vinyl-plank"), 12, 2020, 2026, false)!;
     // Carpet due 2028 at $3–$6 × 800 sq ft; half the floor of each when both are ticked.
     expect(carpetOnly.perUnit.low).toBeCloseTo((3 * 800) / 24);
     expect(both.perUnit.low).toBeLessThan(carpetOnly.perUnit.low + plankOnly.perUnit.low);
@@ -131,6 +202,15 @@ describe("the quick estimate", () => {
     expect(quickEstimate(systems, ticked(), 12, 1998, 2026)).toBeNull();
     expect(quickEstimate(systems, ticked("not-in-library"), 12, 1998, 2026)).toBeNull();
     expect(quickEstimate(systems, TICKED_BY_DEFAULT, 0, 1998, 2026)).toBeNull();
+    expect(quickEstimate(systems, TICKED_BY_DEFAULT, -3, 1998, 2026)).toBeNull();
+  });
+
+  it("is empty rather than an error when the unit count is too big to work out", () => {
+    for (const units of [1e308, Infinity, NaN]) {
+      expect(() => quickEstimate(systems, TICKED_BY_DEFAULT, units, 1998, 2026)).not.toThrow();
+      expect(quickEstimate(systems, TICKED_BY_DEFAULT, units, 1998, 2026)).toBeNull();
+    }
+    expect(quickEstimate(systems, TICKED_BY_DEFAULT, MAX_QUICK_UNITS, 1998, 2026)).not.toBeNull();
   });
 });
 
@@ -152,14 +232,21 @@ describe("reading the quick estimate's fields", () => {
     expect(readQuickInputs(" 1,200 ", "", 2026)).toEqual({ units: 1200, yearBuilt: null, unitsProblem: null, yearBuiltProblem: null });
   });
 
-  it("reports what can't be used, in the calculators' words", () => {
+  it("reports what can't be used, with the year in the calculators' words", () => {
     expect(readQuickInputs("12.5", "98", 2026)).toEqual({
       units: null,
       yearBuilt: null,
-      unitsProblem: UNITS_PROBLEM,
+      unitsProblem: QUICK_UNITS_PROBLEM,
       yearBuiltProblem: YEAR_BUILT_TEXT,
     });
-    expect(readQuickInputs("0", "2027", 2026)).toMatchObject({ unitsProblem: UNITS_PROBLEM, yearBuiltProblem: YEAR_BUILT_TEXT });
-    expect(readQuickInputs("twelve", "1800", 2026)).toMatchObject({ unitsProblem: UNITS_PROBLEM, yearBuilt: 1800 });
+    expect(readQuickInputs("0", "2027", 2026)).toMatchObject({ unitsProblem: QUICK_UNITS_PROBLEM, yearBuiltProblem: YEAR_BUILT_TEXT });
+    expect(readQuickInputs("twelve", "1800", 2026)).toMatchObject({ unitsProblem: QUICK_UNITS_PROBLEM, yearBuilt: 1800 });
+  });
+
+  it("takes up to 100,000 units, so a huge number is reported rather than worked out", () => {
+    expect(readQuickInputs("100,000", "1998", 2026)).toMatchObject({ units: 100000, unitsProblem: null });
+    for (const units of ["100001", "1e308", "1e400", "-3"]) {
+      expect(readQuickInputs(units, "1998", 2026)).toMatchObject({ units: null, unitsProblem: QUICK_UNITS_PROBLEM });
+    }
   });
 });

@@ -6,6 +6,7 @@ import ReserveTabs from "@/components/reserve/ReserveTabs";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
+import { SPREAD_REPLACEMENTS } from "@/lib/reserve/quick-estimate";
 
 export const metadata: Metadata = pageMetadata({
   title: "Reserve Calculator for Rental Properties | CapexClock",
@@ -17,7 +18,9 @@ export const metadata: Metadata = pageMetadata({
 const FAQ = [
   {
     q: "How does the quick estimate work?",
-    a: "It takes each system you tick to have been replaced on schedule since the building was built, prices it at typical low and high installed costs, and works out the monthly amount the same way as the full calculator. Building-wide items like the roof are shared out per apartment for a 12-unit building. Typical costs are not quotes, so use your own numbers in the CapEx calculator to plan.",
+    a: `It takes each system you tick to have been replaced on schedule since the building was built${
+      SPREAD_REPLACEMENTS ? ", with its replacements spread across its typical lifespan rather than all in one year" : ""
+    }. It prices each at typical low and high installed costs and works out the monthly amount the same way as the full calculator. Building-wide items like the roof are shared out per apartment for a 12-unit building. Typical costs are not quotes, so use your own numbers in the CapEx calculator to plan.`,
   },
   {
     q: "How is the monthly amount calculated for listed expenses?",
