@@ -96,7 +96,7 @@ export function sendPlan(state: Captcha): { send: true; token?: string } | { sen
 
 export const CAPTCHA_WAIT_TEXT = "The security check isn't finished yet. Wait for it to show a tick, then try again.";
 
-export const CAPTCHA_FAILED_TEXT = `The security check didn't load. Check your connection, allow challenges.cloudflare.com if you use a blocker, and reload the page. If it still doesn't work, email ${CONTACT_EMAIL}.`;
+export const CAPTCHA_FAILED_TEXT = `The security check isn't working. Check your connection, allow challenges.cloudflare.com if you use a blocker, and reload the page. If it still doesn't work, email ${CONTACT_EMAIL}.`;
 
 /** Supabase's error, as far as the sign-in form reads it. */
 export interface SendError {

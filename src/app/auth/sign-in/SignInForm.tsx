@@ -184,7 +184,7 @@ export default function SignInForm({ next }: { next: string }) {
           {SITE_KEY && (
             <div>
               {/* Holds the widget's height while it loads, so the button doesn't jump. */}
-              <div ref={setCaptchaBox} className="min-h-[65px]" />
+              <div ref={setCaptchaBox} className={captcha.kind === "failed" ? undefined : "min-h-[65px]"} />
               {captcha.kind === "failed" && (
                 <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">
                   {CAPTCHA_FAILED_TEXT}
