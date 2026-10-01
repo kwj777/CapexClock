@@ -59,6 +59,8 @@ export interface PropertyEditorProps {
   library: LibraryComponent[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
+  /** The account's email, filled in on the paid-idea "tell me first" forms. */
+  userEmail?: string | null;
 }
 
 /** Reads a property and its components from the database; null if that fails. */
@@ -100,6 +102,7 @@ export default function PropertyEditor({
   importFromCalculator = false,
   library,
   userId,
+  userEmail,
 }: PropertyEditorProps) {
   const router = useRouter();
   const backupKey = unsavedKey(userId, propertyId, importFromCalculator);
@@ -180,10 +183,13 @@ export default function PropertyEditor({
       askToLeave(event);
     };
     // Forms that go to another page (Sign out) ask the same way, before signing out
-    // drops the kept copy.
+    // drops the kept copy. Forms marked data-keeps-edits (the paid-idea sign-ups) stay here.
     const confirmSubmit = (event: SubmitEvent) => {
       if (event.defaultPrevented) return;
-      if (event.target instanceof HTMLFormElement && event.target.hasAttribute("action")) askToLeave(event);
+      const form = event.target;
+      if (form instanceof HTMLFormElement && form.hasAttribute("action") && !form.hasAttribute("data-keeps-edits")) {
+        askToLeave(event);
+      }
     };
     window.addEventListener("beforeunload", warn);
     document.addEventListener("click", confirmLeave, true);
@@ -521,6 +527,8 @@ export default function PropertyEditor({
         exportName={name.trim() || "My property"}
         library={library}
         rowNotes={rowNotes}
+        where="property"
+        ownerEmail={userEmail}
       />
       {propertyId && (
         <div className="border-t border-slate-200 pt-6 dark:border-slate-800">

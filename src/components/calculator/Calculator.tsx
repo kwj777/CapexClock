@@ -13,9 +13,12 @@ import {
   type SetStateAction,
 } from "react";
 import ExportButtons from "@/components/export/ExportButtons";
+import PaidIdeaButton, { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
+import PaidIdeasProvider from "@/components/paid/PaidIdeas";
 import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import { moneyColumn } from "@/lib/export/format";
+import type { PaidWhere } from "@/lib/paid-ideas";
 import {
   COMPONENT_LIBRARY,
   UNIT_LABEL_TEXT,
@@ -103,6 +106,7 @@ export default function Calculator({
       library={library}
       trackEvents
       showExample
+      lookUpOwnerEmail={accountsEnabled}
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
     />
   );
@@ -143,6 +147,12 @@ export interface CalculatorViewProps {
    * with the fields they're about (marked invalid and pointed at the note).
    */
   rowNotes?: Record<string, RowNote>;
+  /** The page, for the paid-idea buttons' events and sign-ups. */
+  where?: PaidWhere;
+  /** The signed-in owner's email, filled in on the paid-idea "tell me first" forms. */
+  ownerEmail?: string | null;
+  /** Look up a signed-in owner's email in this browser when a paid-idea panel opens. */
+  lookUpOwnerEmail?: boolean;
 }
 
 /** A note shown under a row, and the row's fields it's about. */
@@ -152,6 +162,19 @@ export interface RowNote {
 }
 
 export function CalculatorView({
+  where = "calculator",
+  ownerEmail,
+  lookUpOwnerEmail = false,
+  ...props
+}: CalculatorViewProps) {
+  return (
+    <PaidIdeasProvider where={where} ownerEmail={ownerEmail} lookUpOwnerEmail={lookUpOwnerEmail}>
+      <CalculatorBody {...props} />
+    </PaidIdeasProvider>
+  );
+}
+
+function CalculatorBody({
   draft,
   setDraft,
   trackEvents = false,
@@ -161,7 +184,7 @@ export function CalculatorView({
   exportName = "My property",
   library = COMPONENT_LIBRARY,
   rowNotes,
-}: CalculatorViewProps) {
+}: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
@@ -426,6 +449,16 @@ export function CalculatorView({
             </button>
           </div>
         </div>
+        <PaidIdeaDisclosure idea="photo">
+          {(button, panel) =>
+            button && (
+              <div className="mt-3">
+                <div className="flex sm:justify-end">{button}</div>
+                {panel && <div className="mt-3">{panel}</div>}
+              </div>
+            )
+          }
+        </PaidIdeaDisclosure>
 
         {draft.rows.length === 0 ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
@@ -480,20 +513,33 @@ export function CalculatorView({
             Your {forecast.startYear}–{forecast.endYear} forecast
           </h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} emphasis />
-            <Stat
-              label="Per unit, per month"
-              value={
-                forecast.monthlyReservePerUnit === null
-                  ? "Add units"
-                  : formatReserve(forecast.monthlyReservePerUnit)
-              }
-              emphasis
-            />
-            <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
-            <Stat label="10-year total" value={formatMoney(forecast.total)} />
-          </div>
+          {/* The reminders panel opens below the cards, at full width. */}
+          <PaidIdeaDisclosure idea="reminders" tone="dark">
+            {(button, panel) => (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Stat
+                    label="Monthly reserve"
+                    value={formatReserve(forecast.monthlyReserve)}
+                    emphasis
+                    action={button}
+                  />
+                  <Stat
+                    label="Per unit, per month"
+                    value={
+                      forecast.monthlyReservePerUnit === null
+                        ? "Add units"
+                        : formatReserve(forecast.monthlyReservePerUnit)
+                    }
+                    emphasis
+                  />
+                  <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
+                  <Stat label="10-year total" value={formatMoney(forecast.total)} />
+                </div>
+                {panel}
+              </>
+            )}
+          </PaidIdeaDisclosure>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             The monthly reserve is the smallest steady amount that has the cash ready for every
             replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
@@ -706,7 +752,18 @@ function CostNote({ row }: { row: DraftRow }) {
   );
 }
 
-function Stat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
+function Stat({
+  label,
+  value,
+  emphasis = false,
+  action,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  /** A button under the number. */
+  action?: ReactNode;
+}) {
   return (
     <div
       className={`rounded-2xl p-5 ${
@@ -719,6 +776,7 @@ function Stat({ label, value, emphasis = false }: { label: string; value: string
       <p className={`mt-1 text-3xl font-semibold tabular-nums ${emphasis ? "" : "text-slate-950 dark:text-white"}`}>
         {value}
       </p>
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }
@@ -794,6 +852,7 @@ function AtRisk({ forecast }: { forecast: Forecast }) {
           ))}
         </ul>
       )}
+      {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" className="mt-5" />}
     </div>
   );
 }

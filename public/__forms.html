@@ -8,10 +8,11 @@
   <body>
     <!--
       Netlify scans this static file at deploy time to register the
-      "early-access" form. The real form lives in the React app
-      (src/components/SignupForm.tsx) and POSTs here, with fetch or, before
-      JavaScript loads, as a normal form post.
-      Keep field names in sync with that component.
+      "early-access" and "paid-interest" forms. The real forms live in the
+      React app (src/components/SignupForm.tsx and
+      src/components/paid/TellMeFirstForm.tsx) and POST here, with fetch or,
+      before JavaScript loads, as a normal form post.
+      Keep field names in sync with those components.
     -->
     <form name="early-access" data-netlify="true" netlify-honeypot="bot-field" hidden>
       <input type="hidden" name="form-name" value="early-access" />
@@ -31,6 +32,23 @@
         <option value="Other">Other</option>
       </select>
       <input type="text" name="biggest_worry" />
+    </form>
+    <!-- "Tell me first" sign-ups from the paid-idea buttons (src/lib/paid-ideas.ts). -->
+    <form name="paid-interest" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="paid-interest" />
+      <input name="bot-field" />
+      <input type="email" name="email" required />
+      <select name="units">
+        <option value="1–4">1–4</option>
+        <option value="5–20">5–20</option>
+        <option value="21–50">21–50</option>
+        <option value="51–100">51–100</option>
+        <option value="100+">100+</option>
+      </select>
+      <!-- reminders, report or photo -->
+      <input type="text" name="idea" />
+      <!-- calculator or property -->
+      <input type="text" name="where" />
     </form>
   </body>
 </html>
