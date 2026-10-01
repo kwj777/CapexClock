@@ -42,13 +42,19 @@ export function initAnalytics(): Promise<PostHog | null> {
 export type EventProperties = Record<string, string | number | boolean>;
 
 /**
- * Sends an event. `sendNow` skips PostHog's batch, for a click that leaves the
- * page (Buy now): the request is sent at once and survives the page change.
+ * PostHog's options for an event. `sendNow` is for a click that leaves the page
+ * (Buy now): the event skips PostHog's batch and goes at once as a beacon, which
+ * the browser delivers even as the page changes. An ordinary request cut off by
+ * the page change is sent again by PostHog, so one click could count twice.
  */
+export function captureOptions(sendNow: boolean): CaptureOptions | undefined {
+  return sendNow ? { send_instantly: true, transport: "sendBeacon" } : undefined;
+}
+
+/** Sends an event. See captureOptions for `sendNow`. */
 export async function track(event: string, properties?: EventProperties, { sendNow = false } = {}) {
   const posthog = await initAnalytics();
-  const options: CaptureOptions | undefined = sendNow ? { send_instantly: true } : undefined;
-  posthog?.capture(event, properties, options);
+  posthog?.capture(event, properties, captureOptions(sendNow));
 }
 
 /** Page titles can name a property, so they never leave the browser. */
