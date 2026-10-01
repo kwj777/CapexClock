@@ -1,18 +1,44 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { PAID_IDEAS, type PaidIdea, type PaidWhere } from "@/lib/paid-ideas";
 import PaidIdeaButton from "../PaidIdeaButton";
-import PaidIdeasProvider from "../PaidIdeas";
 import TellMeFirstForm from "../TellMeFirstForm";
 
 // The first render only: opening a panel, sending the form and the events are
 // checked in the browser.
 
 describe("paid idea buttons", () => {
-  it("show the idea's words, marked as an idea, closed", () => {
-    const html = renderToStaticMarkup(
-      <PaidIdeasProvider where="calculator">
-        <PaidIdeaButton idea="photo" />
-      </PaidIdeasProvider>,
-    );
+  /**
+   * Renders with NEXT_PUBLIC_TEST_BUTTONS set to `setting` (or unset), using a
+   * fresh copy of the modules (React included), since the setting is read when
+   * the module loads. That way a Netlify setting can't change what's tested.
+   */
+  async function renderWith(setting: string | undefined, ideas: readonly PaidIdea[], where: PaidWhere = "property") {
+    const before = process.env.NEXT_PUBLIC_TEST_BUTTONS;
+    if (setting === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
+    else process.env.NEXT_PUBLIC_TEST_BUTTONS = setting;
+    let html = "";
+    try {
+      await jest.isolateModulesAsync(async () => {
+        const { renderToStaticMarkup: render } = await import("react-dom/server");
+        const { default: Provider } = await import("../PaidIdeas");
+        const { default: Button } = await import("../PaidIdeaButton");
+        html = render(
+          <Provider where={where}>
+            {ideas.map((idea) => (
+              <Button key={idea} idea={idea} />
+            ))}
+          </Provider>,
+        );
+      });
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
+      else process.env.NEXT_PUBLIC_TEST_BUTTONS = before;
+    }
+    return html;
+  }
+
+  it("show the idea's words, marked as an idea, closed", async () => {
+    const html = await renderWith(undefined, ["photo"], "calculator");
     expect(html).toContain('type="button"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("<span>Add from a photo of the label</span>");
@@ -26,32 +52,8 @@ describe("paid idea buttons", () => {
   });
 
   it("all go when NEXT_PUBLIC_TEST_BUTTONS is off", async () => {
-    const before = process.env.NEXT_PUBLIC_TEST_BUTTONS;
-    // A fresh copy of the modules (React included), so the setting is read again.
-    async function renderWith(setting: string) {
-      process.env.NEXT_PUBLIC_TEST_BUTTONS = setting;
-      let html = "";
-      await jest.isolateModulesAsync(async () => {
-        const { renderToStaticMarkup: render } = await import("react-dom/server");
-        const { default: Provider } = await import("../PaidIdeas");
-        const { default: Button } = await import("../PaidIdeaButton");
-        html = render(
-          <Provider where="property">
-            <Button idea="reminders" />
-            <Button idea="report" />
-            <Button idea="photo" />
-          </Provider>,
-        );
-      });
-      return html;
-    }
-    try {
-      expect(await renderWith("off")).toBe("");
-      expect((await renderWith("on")).match(/>Idea<\/span>/g)).toHaveLength(3);
-    } finally {
-      if (before === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
-      else process.env.NEXT_PUBLIC_TEST_BUTTONS = before;
-    }
+    expect(await renderWith("off", PAID_IDEAS)).toBe("");
+    expect((await renderWith("on", PAID_IDEAS)).match(/>Idea<\/span>/g)).toHaveLength(3);
   });
 });
 
