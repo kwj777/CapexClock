@@ -161,8 +161,10 @@ const MAX_ROWS_KEPT_TOGETHER = 12;
 // A row stays on one page unless its name is long enough that it might not fit
 // on one. The database allows 200 characters; the calculator has no limit.
 const MAX_NAME_KEPT_TOGETHER = 500;
-// Notes long enough to need most of a page may break across pages; shorter ones stay whole.
+// Notes long enough to need most of a page (by characters or by lines, for a pasted list)
+// may break across pages; shorter ones stay whole.
 const MAX_NOTES_KEPT_TOGETHER = 1200;
+const MAX_NOTE_LINES_KEPT_TOGETHER = 30;
 
 export interface ForecastPdfProps {
   name: string;
@@ -374,7 +376,11 @@ function ConditionNotes({ items, printable }: { items: ConditionNote[]; printabl
           <View
             key={`${item.name}-${i}`}
             style={s.tr}
-            wrap={item.name.length > MAX_NAME_KEPT_TOGETHER || item.notes.length > MAX_NOTES_KEPT_TOGETHER}
+            wrap={
+              item.name.length > MAX_NAME_KEPT_TOGETHER ||
+              item.notes.length > MAX_NOTES_KEPT_TOGETHER ||
+              item.notes.split("\n").length > MAX_NOTE_LINES_KEPT_TOGETHER
+            }
           >
             <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
             <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>

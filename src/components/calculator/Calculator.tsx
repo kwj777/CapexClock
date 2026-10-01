@@ -857,7 +857,7 @@ function ForecastTable({ forecast }: { forecast: Forecast }) {
 /** Rows by id, for the condition and guess flag the forecast doesn't carry. */
 type RowsById = ReadonlyMap<string, DraftRow>;
 
-/** "(install year is a guess)" or "(install year estimated)", and the row's condition, after a name. */
+/** After a name: the row's condition, then "(install year is a guess)" or "(install year estimated)". */
 function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate: boolean }) {
   const yearNote = installYearNote(isEstimate, { installYearIsGuess: row !== undefined && guessedYear(row) });
   return (
