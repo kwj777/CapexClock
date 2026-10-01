@@ -16,6 +16,7 @@ import ExportButtons from "@/components/export/ExportButtons";
 import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import { moneyColumn } from "@/lib/export/format";
+import { guessedYear, installYearNote } from "@/lib/export/rows";
 import {
   COMPONENT_LIBRARY,
   UNIT_LABEL_TEXT,
@@ -23,15 +24,20 @@ import {
 } from "@/lib/library/components";
 import {
   badYearBuilt,
+  CONDITION_TEXT,
+  CONDITIONS,
   costLabel,
   customRow,
+  detailsSummary,
   editRow,
   exampleDraft,
   EMPTY_DRAFT,
   hasEntries,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
+  MAX_NOTES_LENGTH,
   neighborRowId,
+  notesLeftText,
   parseUnitCount,
   problemFields,
   problemText,
@@ -181,6 +187,8 @@ export function CalculatorView({
   const focusNext = useRef<string | null>(null);
 
   const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
+  // Condition and the guess flag for the lists under the forecast.
+  const rowsById = useMemo(() => new Map(draft.rows.map((r) => [r.id, r])), [draft.rows]);
   const unitCount = parseUnitCount(draft.unitCount);
   const forecast = useMemo(
     () => computeForecast({ startYear, unitCount, components }),
@@ -529,8 +537,8 @@ export function CalculatorView({
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <AtRisk forecast={forecast} />
-            <DueTable forecast={forecast} />
+            <AtRisk forecast={forecast} rows={rowsById} />
+            <DueTable forecast={forecast} rows={rowsById} />
           </div>
 
           <ExportButtons
@@ -567,9 +575,21 @@ function ComponentRow({
 }) {
   const label = row.name.trim() || "this component";
   const problemId = `${idPrefix}-problem`;
+  const detailsId = `${idPrefix}-details`;
+  const notesLeftId = `${idPrefix}-notes-left`;
   // Marks the field the row's note is about and points it at the note.
   const flag = (field: RowField) =>
     problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
+  // Condition and notes sit behind More on narrow screens. They open by themselves
+  // when there's something to fix in them.
+  const [open, setOpen] = useState(false);
+  const showDetails = open || problem?.fields.includes("notes") === true;
+  const summary = detailsSummary(row);
+  const notes = row.notes ?? "";
+  const notesLeft = notesLeftText(notes);
+  const notesDescribedBy =
+    [problem?.fields.includes("notes") ? problemId : "", notesLeft ? notesLeftId : ""].filter(Boolean).join(" ") ||
+    undefined;
 
   return (
     <li className="py-4">
@@ -614,18 +634,30 @@ function ComponentRow({
           </div>
         </label>
         {/* Each name starts with the visible label, so "click Installed" works by voice. */}
-        <label className="block">
-          <span className={`${labelClass} lg:sr-only`}>Installed</span>
-          <input
-            className={`${inputClass} mt-1 lg:mt-0`}
-            inputMode="numeric"
-            value={row.installYear}
-            placeholder={yearBuilt ? `${yearBuilt} (est.)` : "Year"}
-            aria-label={`Installed, ${label}`}
-            {...flag("installYear")}
-            onChange={(e) => onChange({ installYear: e.target.value })}
-          />
-        </label>
+        <div>
+          <label className="block">
+            <span className={`${labelClass} lg:sr-only`}>Installed</span>
+            <input
+              className={`${inputClass} mt-1 lg:mt-0`}
+              inputMode="numeric"
+              value={row.installYear}
+              placeholder={yearBuilt ? `${yearBuilt} (est.)` : "Year"}
+              aria-label={`Installed, ${label}`}
+              {...flag("installYear")}
+              onChange={(e) => onChange({ installYear: e.target.value })}
+            />
+          </label>
+          <label className="mt-1 flex w-fit items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={row.installYearIsGuess === true}
+              aria-label={`Guess, install year of ${label}`}
+              onChange={(e) => onChange({ installYearIsGuess: e.target.checked })}
+              className="h-3.5 w-3.5 accent-amber-500"
+            />
+            Guess
+          </label>
+        </div>
         <label className="block">
           <span className={`${labelClass} lg:sr-only`}>Life (yrs)</span>
           <input
@@ -670,14 +702,73 @@ function ComponentRow({
           />
           <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Remove ${label}`}
-          className="justify-self-end rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-        >
-          Remove
-        </button>
+        <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={showDetails}
+            aria-controls={detailsId}
+            className="rounded-md px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            {showDetails ? "Less" : "More"}
+            {!showDetails && summary && (
+              <span className="font-normal text-slate-500 dark:text-slate-400"> ({summary})</span>
+            )}
+            {/* After the visible words, so the name starts with them and "click More" works by voice. */}
+            <span className="sr-only">, condition and notes for {label}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${label}`}
+            className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+      {/* Always shown on wide screens, as a second line under the row's columns. */}
+      <div
+        id={detailsId}
+        className={`${showDetails ? "grid" : "hidden"} mt-3 grid-cols-1 gap-3 sm:grid-cols-3 lg:grid ${rowGridClass}`}
+      >
+        <label className="block lg:flex lg:items-center lg:gap-2">
+          <span className={labelClass}>Condition</span>
+          <select
+            value={row.condition ?? ""}
+            aria-label={`Condition, ${label}`}
+            onChange={(e) => onChange({ condition: CONDITIONS.find((c) => c === e.target.value) ?? null })}
+            className={`${inputClass} mt-1 lg:mt-0 lg:min-w-0 lg:flex-1`}
+          >
+            <option value="">Not set</option>
+            {CONDITIONS.map((c) => (
+              <option key={c} value={c}>
+                {CONDITION_TEXT[c]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="sm:col-span-2 lg:col-span-6">
+          <label className="block lg:flex lg:items-start lg:gap-2">
+            <span className={`${labelClass} lg:pt-2.5`}>Notes</span>
+            <textarea
+              value={notes}
+              maxLength={MAX_NOTES_LENGTH}
+              rows={2}
+              placeholder="e.g. Leaks a little. Quote from ABC Plumbing."
+              aria-label={`Notes, ${label}`}
+              {...flag("notes")}
+              aria-describedby={notesDescribedBy}
+              onChange={(e) => onChange({ notes: e.target.value })}
+              className={`${inputClass} mt-1 max-h-48 min-h-[4.5rem] field-sizing-content lg:mt-0 lg:min-h-[2.375rem] lg:flex-1`}
+            />
+          </label>
+          {notesLeft && (
+            <p id={notesLeftId} className="mt-1 text-xs text-slate-500 lg:text-right dark:text-slate-400">
+              {notesLeft}
+            </p>
+          )}
+        </div>
       </div>
       {problem && (
         <p id={problemId} className="mt-2 text-sm text-amber-800 dark:text-amber-300">
@@ -759,7 +850,33 @@ function ForecastTable({ forecast }: { forecast: Forecast }) {
   );
 }
 
-function AtRisk({ forecast }: { forecast: Forecast }) {
+/** Rows by id, for the condition and guess flag the forecast doesn't carry. */
+type RowsById = ReadonlyMap<string, DraftRow>;
+
+/** "(install year is a guess)" or "(install year estimated)", and the row's condition, after a name. */
+function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate: boolean }) {
+  const yearNote = installYearNote(isEstimate, { installYearIsGuess: row !== undefined && guessedYear(row) });
+  return (
+    <>
+      {row?.condition && (
+        <>
+          {" "}
+          <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {CONDITION_TEXT[row.condition].toLowerCase()} condition
+          </span>
+        </>
+      )}
+      {yearNote && (
+        <>
+          {" "}
+          <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">({yearNote.toLowerCase()})</span>
+        </>
+      )}
+    </>
+  );
+}
+
+function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
@@ -772,12 +889,7 @@ function AtRisk({ forecast }: { forecast: Forecast }) {
             <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
               <span className="text-slate-900 dark:text-white">
                 {item.name}
-                {item.installYearIsEstimate && (
-                  <>
-                    {" "}
-                    <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
-                  </>
-                )}
+                <NameNotes row={rows.get(item.componentId)} isEstimate={item.installYearIsEstimate} />
               </span>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -798,7 +910,7 @@ function AtRisk({ forecast }: { forecast: Forecast }) {
   );
 }
 
-function DueTable({ forecast }: { forecast: Forecast }) {
+function DueTable({ forecast, rows: formRows }: { forecast: Forecast; rows: RowsById }) {
   const rows = forecast.years.flatMap((y) => y.replacements);
   // Every row shows cents once any row has them, so the rows add up.
   const money = moneyColumn(rows.map((r) => r.cost));
@@ -831,12 +943,7 @@ function DueTable({ forecast }: { forecast: Forecast }) {
                         <span className="ml-0.5 text-xs text-red-700 dark:text-red-400">overdue</span>
                       </>
                     )}
-                    {r.installYearIsEstimate && (
-                      <>
-                        {" "}
-                        <span className="ml-0.5 text-xs text-slate-500 dark:text-slate-400">(install year estimated)</span>
-                      </>
-                    )}
+                    <NameNotes row={formRows.get(r.componentId)} isEstimate={r.installYearIsEstimate} />
                   </td>
                   <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
                     {money(r.cost)}
