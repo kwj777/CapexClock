@@ -172,7 +172,7 @@ export const OFFER_TEXT: Record<Offer, OfferText> = {
       "A condition report on your building for lenders and buyers: each component's age, remaining life and condition, what's at risk, a 10-year forecast and a monthly reserve.",
     delivery: "Made by hand within 2 business days of getting your details.",
     pitch:
-      "Until then, we make them by hand: a condition report on your building for lenders and buyers, ready within 2 business days of getting your details.",
+      "We make them by hand for now: a condition report on your building for lenders and buyers, ready within 2 business days of getting your details.",
   },
 };
 
