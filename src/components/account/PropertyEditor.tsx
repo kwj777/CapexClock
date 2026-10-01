@@ -512,7 +512,8 @@ export default function PropertyEditor({
           className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
         />
       </label>
-      <div className="flex items-center gap-3">
+      {/* Wraps, so a long status (the 0004 message) moves the button below it on phones. */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <span
           className={`max-w-xs text-sm ${
             save.kind === "saved_without_details"
