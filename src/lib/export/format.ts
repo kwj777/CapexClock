@@ -48,3 +48,18 @@ export function moneyColumn(values: number[]): (value: number) => string {
   const format = cents ? withCents : wholeDollars;
   return (value) => format.format(toCents(value));
 }
+
+/** Longest run of characters without a space that a PDF column is left to fit on one line. */
+export const LONG_WORD = 24;
+
+/**
+ * Splits a run longer than LONG_WORD (a pasted link, say) into pieces the PDF can wrap
+ * between, so it doesn't run off the page. Shorter words stay whole.
+ */
+export function longWordParts(word: string): string[] {
+  const characters = Array.from(word);
+  if (characters.length <= LONG_WORD) return [word];
+  const parts: string[] = [];
+  for (let i = 0; i < characters.length; i += LONG_WORD) parts.push(characters.slice(i, i + LONG_WORD).join(""));
+  return parts;
+}

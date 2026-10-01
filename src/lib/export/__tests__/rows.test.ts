@@ -1,5 +1,5 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
+import { formatCostEach, formatPrice, formatQuantity, LONG_WORD, longWordParts, moneyColumn } from "../format";
 import {
   ESTIMATED_NOTE,
   exportDetails,
@@ -95,6 +95,26 @@ describe("money in exports", () => {
     expect(formatCostEach({ costEach: 0.125, unit: "sq ft" })).toBe("$0.125/sq ft");
     expect(formatCostEach({ costEach: 4200, unit: "each" })).toBe("$4,200");
     expect(formatCostEach({ costEach: null, unit: "each" })).toBe("");
+  });
+});
+
+describe("long words in PDF notes", () => {
+  it("leaves ordinary words whole", () => {
+    expect(longWordParts("furnace")).toEqual(["furnace"]);
+    expect(longWordParts("x".repeat(LONG_WORD))).toEqual(["x".repeat(LONG_WORD)]);
+  });
+
+  it("splits a long run, such as a link, into pieces that can wrap", () => {
+    const link = "https://example.com/photos/unit-3/furnace-label.jpg";
+    const parts = longWordParts(link);
+    expect(parts.join("")).toBe(link);
+    expect(parts.every((p) => p.length <= LONG_WORD)).toBe(true);
+    expect(parts).toHaveLength(Math.ceil(link.length / LONG_WORD));
+  });
+
+  it("never splits an emoji in half", () => {
+    const parts = longWordParts("🙂".repeat(LONG_WORD + 1));
+    expect(parts).toEqual(["🙂".repeat(LONG_WORD), "🙂"]);
   });
 });
 

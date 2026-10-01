@@ -2,7 +2,7 @@ import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/re
 import type { ReactElement } from "react";
 import { CONDITION_TEXT } from "@/components/calculator/draft";
 import { formatReserve } from "@/components/calculator/format";
-import { formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
+import { formatCostEach, formatQuantity, longWordParts, moneyColumn } from "@/lib/export/format";
 import {
   ESTIMATED_NOTE,
   exportRows,
@@ -378,7 +378,10 @@ function ConditionNotes({ items, printable }: { items: ConditionNote[]; printabl
           >
             <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
             <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>
-            <Text style={{ flex: 1, paddingLeft: 10 }}>{printable(item.notes)}</Text>
+            {/* Notes can hold a pasted link, too long to fit on one line without breaking. */}
+            <Text style={{ flex: 1, paddingLeft: 10 }} hyphenationCallback={longWordParts}>
+              {printable(item.notes)}
+            </Text>
           </View>
         ))}
       </View>
