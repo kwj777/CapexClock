@@ -237,7 +237,10 @@ export function isTestLink(link: string): boolean {
 }
 
 export interface PresaleLinks {
-  /** Payment Link for each offer; null keeps the "tell me first" form. The membership's needs the portal link too. */
+  /**
+   * Payment Link for each offer; null keeps the "tell me first" form. The
+   * membership's needs the portal link too, from the same Stripe mode.
+   */
   offers: Record<Offer, string | null>;
   /** The customer portal's login link, where members cancel. Null when not set. */
   portal: string | null;
@@ -249,25 +252,46 @@ export interface PresaleSettings {
   portal?: string;
 }
 
+const mode = (link: string) => (isTestLink(link) ? "a test-mode" : "a live");
+
+/**
+ * Why the membership link can't be used with this portal link, or null when
+ * it can. A test-mode portal can't find live members, nor a live one test members.
+ */
+function membershipProblem(membership: string, portal: string | null): string | null {
+  if (!portal) {
+    return (
+      "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP is ignored until NEXT_PUBLIC_STRIPE_PORTAL_LINK is set to the customer " +
+      "portal's login link (https://billing.stripe.com/p/login/…), so members can cancel online. " +
+      "The membership isn't on sale."
+    );
+  }
+  if (isTestLink(membership) !== isTestLink(portal)) {
+    return (
+      "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP and NEXT_PUBLIC_STRIPE_PORTAL_LINK are from different Stripe modes " +
+      `(test and live): the membership link is ${mode(membership)} link, and the portal link is ${mode(portal)} ` +
+      "link. Paste both from the same mode, so members can cancel in the portal that has their membership. " +
+      "The membership isn't on sale."
+    );
+  }
+  return null;
+}
+
 /**
  * Checks the three settings. Refused ones count as blank; `warn` says why.
  * The membership renews every month and promises "Cancel any time online"
  * next to its Buy now, so it goes on sale only when the portal link, where
- * members cancel, is valid too. Without it the reminders panel keeps its form.
+ * members cancel, is valid too and from the same Stripe mode (test or live).
+ * Otherwise the reminders panel keeps its form.
  */
 export function presaleLinks(settings: PresaleSettings, warn?: (message: string) => void): PresaleLinks {
   const named = (name: string) => (message: string) => warn?.(`${name}: ${message}`);
   const membership = stripeLink(settings.membership, "payment", named("NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP"));
   const report = stripeLink(settings.report, "payment", named("NEXT_PUBLIC_STRIPE_LINK_REPORT"));
   const portal = stripeLink(settings.portal, "portal", named("NEXT_PUBLIC_STRIPE_PORTAL_LINK"));
-  if (membership && !portal) {
-    warn?.(
-      "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP is ignored until NEXT_PUBLIC_STRIPE_PORTAL_LINK is set to the customer " +
-        "portal's login link (https://billing.stripe.com/p/login/…), so members can cancel online. " +
-        "The membership isn't on sale.",
-    );
-  }
-  return { offers: { membership: portal ? membership : null, report }, portal };
+  const problem = membership && membershipProblem(membership, portal);
+  if (problem) warn?.(problem);
+  return { offers: { membership: problem ? null : membership, report }, portal };
 }
 
 /** `next build` sets this in the processes that render the pages. */

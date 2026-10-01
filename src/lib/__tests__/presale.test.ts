@@ -104,6 +104,55 @@ describe("presaleLinks", () => {
     }
   });
 
+  it("sells the membership only when it and the portal link are from the same Stripe mode", () => {
+    const LIVE_M = "https://buy.stripe.com/liveM";
+    const TEST_M = "https://buy.stripe.com/test_M";
+    const LIVE_P = "https://billing.stripe.com/p/login/liveP";
+    const TEST_P = "https://billing.stripe.com/p/login/test_P";
+    const cases = [
+      {
+        membership: LIVE_M,
+        portal: TEST_P,
+        said: "the membership link is a live link, and the portal link is a test-mode link",
+      },
+      {
+        membership: TEST_M,
+        portal: LIVE_P,
+        said: "the membership link is a test-mode link, and the portal link is a live link",
+      },
+    ];
+    for (const { membership, portal, said } of cases) {
+      const warn = jest.fn();
+      const links = presaleLinks({ membership, report: "https://buy.stripe.com/r", portal }, warn);
+      // The portal stays, so anyone already a member in that mode can still cancel.
+      expect(links).toEqual({ offers: { membership: null, report: "https://buy.stripe.com/r" }, portal });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(
+        /^NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP and NEXT_PUBLIC_STRIPE_PORTAL_LINK are from different Stripe modes/,
+      );
+      expect(warn.mock.calls[0][0]).toContain(said);
+      expect(warn.mock.calls[0][0]).toContain("The membership isn't on sale.");
+    }
+    for (const [membership, portal] of [
+      [LIVE_M, LIVE_P],
+      [TEST_M, TEST_P],
+    ]) {
+      const warn = jest.fn();
+      expect(presaleLinks({ membership, portal }, warn).offers.membership).toBe(membership);
+      expect(warn).not.toHaveBeenCalled();
+    }
+  });
+
+  it("doesn't tie the report's mode to anything", () => {
+    const warn = jest.fn();
+    const links = presaleLinks(
+      { membership: "https://buy.stripe.com/m", report: "https://buy.stripe.com/test_r", portal: PORTAL },
+      warn,
+    );
+    expect(links.offers).toEqual({ membership: "https://buy.stripe.com/m", report: "https://buy.stripe.com/test_r" });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("keeps the portal link without a membership link, so members can cancel after sales stop", () => {
     const warn = jest.fn();
     expect(presaleLinks({ portal: PORTAL }, warn)).toEqual({
