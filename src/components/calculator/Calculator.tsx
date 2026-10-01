@@ -760,6 +760,8 @@ function ComponentRow({
               aria-label={`Notes, ${label}`}
               {...flag("notes")}
               aria-describedby={notesDescribedBy}
+              // Opened for a problem, it stays open once that's fixed, rather than closing mid-edit.
+              onFocus={() => setOpen(true)}
               onChange={(e) => onChange({ notes: e.target.value })}
               className={`${inputClass} mt-1 max-h-48 min-h-[4.5rem] field-sizing-content lg:mt-0 lg:min-h-[2.375rem] lg:flex-1`}
             />
