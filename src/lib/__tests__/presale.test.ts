@@ -1,4 +1,5 @@
 import {
+  buyNowClick,
   firstCompletionThisVisit,
   FOUNDING_PRICE_TEXT,
   FOUNDING_PROMISE_TEXT,
@@ -244,6 +245,31 @@ describe("offers", () => {
 
   it("send the offer and nothing else with their events", () => {
     expect(presaleEvent("report")).toEqual({ offer: "report" });
+  });
+});
+
+describe("buyNowClick", () => {
+  const click = { leaving: false, counted: false, newTab: false };
+
+  it("goes to Stripe and counts the first click", () => {
+    expect(buyNowClick(click)).toEqual({ step: "go", send: true });
+  });
+
+  it("ignores a double click while the page is leaving", () => {
+    expect(buyNowClick({ ...click, leaving: true, counted: true })).toEqual({ step: "ignore", send: false });
+    expect(buyNowClick({ ...click, leaving: true, counted: true, newTab: true })).toEqual({
+      step: "ignore",
+      send: false,
+    });
+  });
+
+  it("goes again without counting again after a cancelled 'leave page?' prompt", () => {
+    expect(buyNowClick({ ...click, counted: true })).toEqual({ step: "go", send: false });
+  });
+
+  it("counts every new tab, since each is a trip to Stripe", () => {
+    expect(buyNowClick({ ...click, newTab: true })).toEqual({ step: "new-tab", send: true });
+    expect(buyNowClick({ ...click, counted: true, newTab: true })).toEqual({ step: "new-tab", send: true });
   });
 });
 

@@ -329,6 +329,31 @@ export function presaleLinksFromEnv(): PresaleLinks {
   );
 }
 
+export interface BuyNowClick {
+  /** This tab was just sent to Stripe, so this is a double click. */
+  leaving: boolean;
+  /** presale_checkout_clicked already went for this offer since the page was last shown. */
+  counted: boolean;
+  /** A middle, Ctrl, Cmd, Shift or Alt click, which opens Stripe in a new tab or window. */
+  newTab: boolean;
+}
+
+/**
+ * What a click on Buy now does: "ignore" it, let the browser open a new tab,
+ * or "go" to Stripe in this tab. `send` says whether it sends
+ * presale_checkout_clicked: once per trip to Stripe. A click whose "leave
+ * page?" prompt was cancelled leaves the page here, so the next one doesn't
+ * count again. A new tab is a trip of its own.
+ */
+export function buyNowClick({ leaving, counted, newTab }: BuyNowClick): {
+  step: "ignore" | "new-tab" | "go";
+  send: boolean;
+} {
+  if (leaving) return { step: "ignore", send: false };
+  if (newTab) return { step: "new-tab", send: true };
+  return { step: "go", send: !counted };
+}
+
 /** Properties for presale_checkout_clicked and presale_completed: the offer only. */
 export function presaleEvent(offer: Offer): { offer: Offer } {
   return { offer };
