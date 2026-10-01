@@ -147,6 +147,9 @@ export interface OfferText {
   pitch: string;
 }
 
+/** How the membership renews. Its price note adds "Cancel any time online." */
+export const MEMBERSHIP_RENEWS_TEXT = "$12 every month until you cancel.";
+
 // Price wording rules (plan T5): never a struck-through price, "normally $19"
 // or "locked for life". $12 has never been a discount from anything. The
 // report is "for lenders and buyers", never "lender-ready" or "accepted by lenders".
@@ -154,7 +157,7 @@ export const OFFER_TEXT: Record<Offer, OfferText> = {
   membership: {
     name: "Founding membership",
     price: "$12/month",
-    priceNote: "$12 every month until you cancel. Cancel any time online.",
+    priceNote: `${MEMBERSHIP_RENEWS_TEXT} Cancel any time online.`,
     includes:
       "An email from us before each replacement comes due, plus a yearly budget summary and a yearly condition report.",
     delivery: "We send them by hand while we build the automatic version.",
@@ -234,7 +237,7 @@ export function isTestLink(link: string): boolean {
 }
 
 export interface PresaleLinks {
-  /** Payment Link for each offer; null keeps the "tell me first" form. */
+  /** Payment Link for each offer; null keeps the "tell me first" form. The membership's needs the portal link too. */
   offers: Record<Offer, string | null>;
   /** The customer portal's login link, where members cancel. Null when not set. */
   portal: string | null;
@@ -246,22 +249,50 @@ export interface PresaleSettings {
   portal?: string;
 }
 
-/** Checks the three settings. Refused ones count as blank; `warn` says why. */
+/**
+ * Checks the three settings. Refused ones count as blank; `warn` says why.
+ * The membership renews every month and promises "Cancel any time online"
+ * next to its Buy now, so it goes on sale only when the portal link, where
+ * members cancel, is valid too. Without it the reminders panel keeps its form.
+ */
 export function presaleLinks(settings: PresaleSettings, warn?: (message: string) => void): PresaleLinks {
   const named = (name: string) => (message: string) => warn?.(`${name}: ${message}`);
-  return {
-    offers: {
-      membership: stripeLink(settings.membership, "payment", named("NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP")),
-      report: stripeLink(settings.report, "payment", named("NEXT_PUBLIC_STRIPE_LINK_REPORT")),
-    },
-    portal: stripeLink(settings.portal, "portal", named("NEXT_PUBLIC_STRIPE_PORTAL_LINK")),
+  const membership = stripeLink(settings.membership, "payment", named("NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP"));
+  const report = stripeLink(settings.report, "payment", named("NEXT_PUBLIC_STRIPE_LINK_REPORT"));
+  const portal = stripeLink(settings.portal, "portal", named("NEXT_PUBLIC_STRIPE_PORTAL_LINK"));
+  if (membership && !portal) {
+    warn?.(
+      "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP is ignored until NEXT_PUBLIC_STRIPE_PORTAL_LINK is set to the customer " +
+        "portal's login link (https://billing.stripe.com/p/login/…), so members can cancel online. " +
+        "The membership isn't on sale.",
+    );
+  }
+  return { offers: { membership: portal ? membership : null, report }, portal };
+}
+
+/** `next build` sets this in the processes that render the pages. */
+const BUILD_PHASE = "phase-production-build";
+
+const warned = new Set<string>();
+
+/**
+ * Where a refused link is reported: the terminal in development, and the
+ * build output (the Netlify deploy log) during `next build`. Each message
+ * once per process, since several modules read the settings. Nothing is
+ * printed on the live site.
+ */
+function settingsWarning(): ((message: string) => void) | undefined {
+  if (process.env.NODE_ENV !== "development" && process.env.NEXT_PHASE !== BUILD_PHASE) return undefined;
+  return (message) => {
+    if (warned.has(message)) return;
+    warned.add(message);
+    console.warn(`[CapexClock] ${message}`);
   };
 }
 
 /**
  * The links this build was made with (they're baked in at build time). Each
  * setting is named in full so Next can put its value in the browser code.
- * A refused link is reported in development only.
  */
 export function presaleLinksFromEnv(): PresaleLinks {
   return presaleLinks(
@@ -270,7 +301,7 @@ export function presaleLinksFromEnv(): PresaleLinks {
       report: process.env.NEXT_PUBLIC_STRIPE_LINK_REPORT,
       portal: process.env.NEXT_PUBLIC_STRIPE_PORTAL_LINK,
     },
-    process.env.NODE_ENV === "development" ? (message) => console.warn(`[CapexClock] ${message}`) : undefined,
+    settingsWarning(),
   );
 }
 

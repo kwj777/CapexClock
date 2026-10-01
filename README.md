@@ -38,9 +38,9 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 | `NEXT_PUBLIC_TEST_BUTTONS` | No | `off` hides the three paid-idea test buttons. Unset = shown. See [Paid-idea test buttons](#paid-idea-test-buttons). |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile **site** key for the sign-in check. Unset = no check. The secret key goes in Supabase, never here. See [Sign-in CAPTCHA](#sign-in-captcha-cloudflare-turnstile). |
-| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Unset = the reminders panel keeps its email form and /pricing says "Not on sale yet". See [Pre-orders](#pre-orders-stripe-payment-links). |
+| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too, so members can always cancel online. Unset (or no portal link) = the reminders panel keeps its email form and /pricing says "Not on sale yet". See [Pre-orders](#pre-orders-stripe-payment-links). |
 | `NEXT_PUBLIC_STRIPE_LINK_REPORT` | No | Stripe Payment Link for the $29 condition report (`https://buy.stripe.com/…`). Unset = the report panel keeps its email form. |
-| `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal login link (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and pages say to email support@ to cancel. |
+| `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal **login link** (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and the membership isn't on sale (the report still can be). |
 
 Set them in Netlify under **Project configuration → Environment variables**, then redeploy
 (they're baked in at build time).
@@ -48,8 +48,10 @@ Set them in Netlify under **Project configuration → Environment variables**, t
 The three Stripe settings only accept `https://` links on Stripe's own addresses: Payment Links
 on `buy.stripe.com` and the portal on `billing.stripe.com`. Anything else (a typo, an `http://`
 link, a link pasted in the wrong box) is ignored as if it were blank, so the site falls back to
-the email form instead of sending buyers somewhere wrong. `npm run dev` prints a warning when
-that happens. There are no Stripe keys anywhere in the site.
+the email form instead of sending buyers somewhere wrong. The membership link is also ignored
+until the portal link is valid, because "Cancel any time online" sits next to its Buy now. Each
+time a link is ignored, the build prints a warning starting `[CapexClock]` in the Netlify deploy
+log (and `npm run dev` prints it too). There are no Stripe keys anywhere in the site.
 
 ### Netlify forms (early access and paid interest)
 
@@ -179,8 +181,9 @@ They show in the public calculator (`where` = `calculator`) and the property edi
 redeploy. Delete the setting (or set it to `on`) and redeploy to bring them back.
 
 Once a Stripe link is set (see [Pre-orders](#pre-orders-stripe-payment-links)), the reminders
-and report panels show **Buy now** in place of the email form. The photo idea always keeps its
-email form. Hiding the buttons hides those Buy now buttons too, but /pricing keeps selling.
+and report panels show **Buy now** in place of the email form (the reminders panel only once the
+portal link is set too). The photo idea always keeps its email form. Hiding the buttons hides
+those Buy now buttons too, but /pricing keeps selling.
 
 PostHog events, all with `{idea, where}` and never the email or unit count:
 `paid_idea_seen` (once per page view per idea, once the button is actually on screen),
@@ -257,9 +260,11 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
    Add a variable**, same value for every deploy context:
    - `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP`: the membership link
    - `NEXT_PUBLIC_STRIPE_LINK_REPORT`: the report link
-   - `NEXT_PUBLIC_STRIPE_PORTAL_LINK`: the portal login link
+   - `NEXT_PUBLIC_STRIPE_PORTAL_LINK`: the portal login link (from step 4, not the address of
+     the portal's settings page). The membership only goes on sale when this one is right.
 
-   Then **Deploys → Trigger deploy → Deploy project**.
+   Then **Deploys → Trigger deploy → Deploy project**. Open the deploy's log and search for
+   `[CapexClock]`: there should be no matches. A match names the setting that was ignored and why.
 8. **Buy once of each with Stripe's test card.** On the live site, open /pricing: both offers
    show **Buy now** with "Stripe test mode: no real payment is taken." under them. Click Buy now,
    pay with card `4242 4242 4242 4242`, any future date, any CVC and any ZIP, tick the terms box,
@@ -273,10 +278,18 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
 9. **Make the live ones.** Switch test mode off and repeat steps 3–6 in live mode (test-mode
    products, links and portal settings don't carry over; a product page's **Copy to live mode**
    saves retyping the product). Replace the three Netlify values with the live links and redeploy.
-   The "test mode" line under Buy now disappears. That's the start of the six-week check-in.
+   Check the deploy log has no `[CapexClock]` warnings. Then open capexclock.com/pricing and
+   check:
+   - both offers show **Buy now**, and the "test mode" line under them is gone;
+   - **Manage or cancel membership** is at the bottom of the page, and opens Stripe's sign-in
+     page for your **live** portal (its address has no `test_` in it). If it's missing, the
+     membership isn't on sale either: fix `NEXT_PUBLIC_STRIPE_PORTAL_LINK` and redeploy.
+
+   That's the start of the six-week check-in.
 
 To pause sales, delete the two `NEXT_PUBLIC_STRIPE_LINK_…` settings and redeploy: the panels go
-back to the email form and /pricing says "Not on sale yet". After 20 payments Stripe switches a
+back to the email form and /pricing says "Not on sale yet". Keep `NEXT_PUBLIC_STRIPE_PORTAL_LINK`
+while anyone is still a member, so they can cancel online. After 20 payments Stripe switches a
 link off by itself; Buy now then reaches Stripe's "no longer available" page, so delete that
 setting and redeploy when it happens.
 

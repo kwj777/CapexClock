@@ -103,10 +103,23 @@ describe("/pricing", () => {
     }
   });
 
-  it("says how to cancel the way this build allows", async () => {
-    expect(text(await renderPricing(SETTINGS))).toContain("Manage or cancel membership at the bottom of every page");
-    expect(text(await renderPricing({ NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: "https://buy.stripe.com/m" }))).toContain(
-      "Email support@capexclock.com and we'll cancel it.",
+  it("never sells the membership without the portal link, where members cancel online", async () => {
+    const membershipOnly = { NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: SETTINGS.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP };
+    const settingsPage = "https://dashboard.stripe.com/settings/billing/portal";
+    for (const settings of [membershipOnly, { ...membershipOnly, NEXT_PUBLIC_STRIPE_PORTAL_LINK: settingsPage }]) {
+      const html = await renderPricing(settings);
+      expect(html).not.toContain("Buy now");
+      expect(html).not.toContain(SETTINGS.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP);
+      expect(text(html).match(/Not on sale yet\./g)).toHaveLength(2);
+    }
+  });
+
+  it("says how to cancel online, with the link once memberships are on sale", async () => {
+    expect(text(await renderPricing(SETTINGS))).toContain(
+      "Any time online, with Manage or cancel membership at the bottom of every page.",
+    );
+    expect(text(await renderPricing({}))).toContain(
+      "which goes at the bottom of every page when memberships go on sale. Or email support@capexclock.com.",
     );
   });
 });
@@ -145,11 +158,14 @@ describe("/terms", () => {
     expect(page).toContain("licensed professional");
   });
 
-  it("links to the customer portal when it's set, and says to email when it isn't", async () => {
+  it("links to the customer portal when it's set, and says where it goes when it isn't", async () => {
     const withPortal = await renderTerms(SETTINGS);
     expect(withPortal).toContain(`href="${SETTINGS.NEXT_PUBLIC_STRIPE_PORTAL_LINK}"`);
+    expect(text(withPortal)).toContain("You can cancel any time online, through Manage or cancel membership");
     const without = text(await renderTerms({}));
-    expect(without).toContain("You can cancel any time online, by emailing support@capexclock.com.");
+    expect(without).toContain("You can cancel any time online, through Stripe's customer portal.");
+    expect(without).toContain("goes at the bottom of every page when memberships go on sale");
+    expect(without).toContain("You can also cancel by emailing support@capexclock.com.");
   });
 });
 
@@ -194,8 +210,11 @@ describe("the thank-you pages", () => {
     expect(html).toContain('href="/terms"');
   });
 
-  it("say to email to cancel when the portal link isn't set", async () => {
-    expect(text(await renderThanks("membership", {}))).toContain("To cancel, email support@capexclock.com");
+  it("say to email to cancel, and don't promise an online way, if the portal link is taken out", async () => {
+    const page = text(await renderThanks("membership", {}));
+    expect(page).toContain("$12 every month until you cancel.");
+    expect(page).not.toContain("Cancel any time online");
+    expect(page).toContain("To cancel, email support@capexclock.com");
   });
 
   it("tell a report buyer what to send and when it comes", async () => {

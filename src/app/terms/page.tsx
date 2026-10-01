@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 // panels (src/components/paid) and the thank-you pages.
 const UPDATED = "October 1, 2026";
 
-// Baked in at build time. Without it, members cancel by email.
+// Baked in at build time. The membership only goes on sale with it.
 const PORTAL = presaleLinksFromEnv().portal;
 
 const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
@@ -77,10 +77,10 @@ export default function TermsPage() {
             </p>
             <p className="mt-3">{FOUNDING_PRICE_TEXT}</p>
             <p className="mt-3">
-              It renews at $12 every month until you cancel. You can cancel any time online,{" "}
+              It renews at $12 every month until you cancel.{" "}
               {PORTAL ? (
                 <>
-                  through{" "}
+                  You can cancel any time online, through{" "}
                   <a href={PORTAL} className={link}>
                     Manage or cancel membership
                   </a>{" "}
@@ -88,7 +88,9 @@ export default function TermsPage() {
                 </>
               ) : (
                 <>
-                  by emailing <Email />.
+                  You can cancel any time online, through Stripe&apos;s customer portal. Its link, Manage or cancel
+                  membership, goes at the bottom of every page when memberships go on sale. You can also cancel by
+                  emailing <Email />.
                 </>
               )}{" "}
               Once you cancel, it stops renewing and you aren&apos;t charged again. Your membership lasts until the end

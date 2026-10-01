@@ -37,9 +37,10 @@ const FAQ = [
   },
   {
     q: "How do I cancel the membership?",
+    // The membership is only on sale when the portal link is set (see presaleLinks).
     a: LINKS.portal
       ? "Any time online, with Manage or cancel membership at the bottom of every page. It stops renewing, and you aren't charged again."
-      : `Email ${CONTACT_EMAIL} and we'll cancel it. It stops renewing, and you aren't charged again.`,
+      : `Any time online, with Manage or cancel membership, which goes at the bottom of every page when memberships go on sale. Or email ${CONTACT_EMAIL}. It stops renewing, and you aren't charged again.`,
   },
   {
     q: "What's in the condition report?",

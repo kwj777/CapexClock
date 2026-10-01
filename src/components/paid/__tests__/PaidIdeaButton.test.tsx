@@ -96,12 +96,19 @@ describe("the tell me first form", () => {
 });
 
 describe("the Stripe links the panels get", () => {
-  it("are read from the Netlify settings, and only valid ones count", async () => {
+  const SETTINGS = [
+    "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP",
+    "NEXT_PUBLIC_STRIPE_LINK_REPORT",
+    "NEXT_PUBLIC_STRIPE_PORTAL_LINK",
+  ] as const;
+
+  /** The links a panel gets with these settings (and only these), read the way a build reads them. */
+  async function panelLinks(settings: Partial<Record<(typeof SETTINGS)[number], string>>): Promise<unknown> {
     const env = process.env as Record<string, string | undefined>;
     const before = { ...env };
+    for (const key of SETTINGS) delete env[key];
+    Object.assign(env, settings);
     try {
-      env.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP = "https://buy.stripe.com/test_m";
-      env.NEXT_PUBLIC_STRIPE_LINK_REPORT = "https://example.com/r";
       let html = "";
       // A fresh copy of the modules (React included), so the settings are read again.
       await jest.isolateModulesAsync(async () => {
@@ -116,13 +123,29 @@ describe("the Stripe links the panels get", () => {
           </Provider>,
         );
       });
-      expect(JSON.parse(html.replace(/&quot;/g, '"'))).toEqual({
-        membership: "https://buy.stripe.com/test_m",
-        report: null,
-      });
+      return JSON.parse(html.replace(/&quot;/g, '"'));
     } finally {
       for (const key of Object.keys(env)) if (!(key in before)) delete env[key];
       Object.assign(env, before);
     }
+  }
+
+  it("are read from the Netlify settings, and only valid ones count", async () => {
+    expect(
+      await panelLinks({
+        NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: "https://buy.stripe.com/test_m",
+        NEXT_PUBLIC_STRIPE_LINK_REPORT: "https://example.com/r",
+        NEXT_PUBLIC_STRIPE_PORTAL_LINK: "https://billing.stripe.com/p/login/test_p",
+      }),
+    ).toEqual({ membership: "https://buy.stripe.com/test_m", report: null });
+  });
+
+  it("leave the reminders panel's email form until the portal link is set too", async () => {
+    expect(
+      await panelLinks({
+        NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: "https://buy.stripe.com/test_m",
+        NEXT_PUBLIC_STRIPE_LINK_REPORT: "https://buy.stripe.com/test_r",
+      }),
+    ).toEqual({ membership: null, report: "https://buy.stripe.com/test_r" });
   });
 });

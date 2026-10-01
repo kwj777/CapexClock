@@ -4,13 +4,13 @@ import {
   FOUNDING_PROMISE_TEXT,
   isOffer,
   isTestLink,
+  MEMBERSHIP_RENEWS_TEXT,
   OFFER_TEXT,
   OFFERS,
   offerForIdea,
   PAID_IDEAS,
   presaleEvent,
   presaleLinks,
-  presaleLinksFromEnv,
   REPORT_LABEL,
   stripeLink,
 } from "../paid-ideas";
@@ -77,39 +77,104 @@ describe("isTestLink", () => {
 });
 
 describe("presaleLinks", () => {
+  const PORTAL = "https://billing.stripe.com/p/login/p";
+
   it("checks each setting, naming the one that was refused", () => {
     const warn = jest.fn();
     const links = presaleLinks(
-      { membership: "https://buy.stripe.com/m", report: "https://example.com/r", portal: "" },
+      { membership: "https://buy.stripe.com/m", report: "https://example.com/r", portal: PORTAL },
       warn,
     );
-    expect(links).toEqual({ offers: { membership: "https://buy.stripe.com/m", report: null }, portal: null });
+    expect(links).toEqual({ offers: { membership: "https://buy.stripe.com/m", report: null }, portal: PORTAL });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toMatch(/^NEXT_PUBLIC_STRIPE_LINK_REPORT: /);
   });
 
-  it("reads the Netlify settings, and warns only in development", () => {
-    const env = process.env as Record<string, string | undefined>;
-    const before = { ...env };
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      env.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP = "https://buy.stripe.com/m";
-      env.NEXT_PUBLIC_STRIPE_LINK_REPORT = "http://buy.stripe.com/r";
-      env.NEXT_PUBLIC_STRIPE_PORTAL_LINK = "https://billing.stripe.com/p/login/p";
-      expect(presaleLinksFromEnv()).toEqual({
-        offers: { membership: "https://buy.stripe.com/m", report: null },
-        portal: "https://billing.stripe.com/p/login/p",
-      });
-      expect(warn).not.toHaveBeenCalled();
-      env.NODE_ENV = "development";
-      presaleLinksFromEnv();
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("NEXT_PUBLIC_STRIPE_LINK_REPORT");
-    } finally {
-      warn.mockRestore();
-      for (const key of Object.keys(env)) if (!(key in before)) delete env[key];
-      Object.assign(env, before);
+  it("sells the membership only with a portal link, so members can always cancel online", () => {
+    // Blank, or a link that isn't the portal's login link (the portal's settings page, say).
+    for (const portal of [undefined, "", "https://dashboard.stripe.com/settings/billing/portal"]) {
+      const warn = jest.fn();
+      const settings = { membership: "https://buy.stripe.com/m", report: "https://buy.stripe.com/r", portal };
+      const links = presaleLinks(settings, warn);
+      expect(links).toEqual({ offers: { membership: null, report: "https://buy.stripe.com/r" }, portal: null });
+      const said = warn.mock.calls.map(([message]: [string]) => message).join("\n");
+      expect(said).toContain(
+        "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP is ignored until NEXT_PUBLIC_STRIPE_PORTAL_LINK is set",
+      );
     }
+  });
+
+  it("keeps the portal link without a membership link, so members can cancel after sales stop", () => {
+    const warn = jest.fn();
+    expect(presaleLinks({ portal: PORTAL }, warn)).toEqual({
+      offers: { membership: null, report: null },
+      portal: PORTAL,
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("doesn't mention the portal when the membership link is blank", () => {
+    const warn = jest.fn();
+    presaleLinks({ report: "https://buy.stripe.com/r" }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("presaleLinksFromEnv", () => {
+  const env = process.env as Record<string, string | undefined>;
+  let before: Record<string, string | undefined>;
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    before = { ...env };
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    env.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP = "https://buy.stripe.com/m";
+    env.NEXT_PUBLIC_STRIPE_LINK_REPORT = "http://buy.stripe.com/r";
+    env.NEXT_PUBLIC_STRIPE_PORTAL_LINK = "https://billing.stripe.com/p/login/p";
+    delete env.NEXT_PHASE;
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+    for (const key of Object.keys(env)) if (!(key in before)) delete env[key];
+    Object.assign(env, before);
+  });
+
+  /** A fresh copy of the module, so each test starts with nothing warned yet. */
+  function fresh(): typeof import("../paid-ideas") {
+    let mod: typeof import("../paid-ideas") | undefined;
+    jest.isolateModules(() => {
+      mod = jest.requireActual<typeof import("../paid-ideas")>("../paid-ideas");
+    });
+    return mod as typeof import("../paid-ideas");
+  }
+
+  it("reads the Netlify settings, and says nothing on the live site", () => {
+    expect(fresh().presaleLinksFromEnv()).toEqual({
+      offers: { membership: "https://buy.stripe.com/m", report: null },
+      portal: "https://billing.stripe.com/p/login/p",
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns in development", () => {
+    env.NODE_ENV = "development";
+    fresh().presaleLinksFromEnv();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("NEXT_PUBLIC_STRIPE_LINK_REPORT");
+  });
+
+  it("warns during next build, so it shows in the deploy log, once however many pages read it", () => {
+    env.NEXT_PHASE = "phase-production-build";
+    delete env.NEXT_PUBLIC_STRIPE_PORTAL_LINK;
+    const mod = fresh();
+    for (let i = 0; i < 3; i++) expect(mod.presaleLinksFromEnv().offers.membership).toBeNull();
+    const said = warn.mock.calls.map(([message]: [string]) => message);
+    expect(said).toHaveLength(2);
+    expect(said[0]).toMatch(/^\[CapexClock\] NEXT_PUBLIC_STRIPE_LINK_REPORT: /);
+    expect(said[1]).toMatch(
+      /^\[CapexClock\] NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP is ignored until NEXT_PUBLIC_STRIPE_PORTAL_LINK/,
+    );
   });
 });
 
@@ -143,6 +208,7 @@ describe("price and report wording (plan T5)", () => {
 
   it("says the membership price the approved way", () => {
     expect(OFFER_TEXT.membership.priceNote).toBe("$12 every month until you cancel. Cancel any time online.");
+    expect(MEMBERSHIP_RENEWS_TEXT).toBe("$12 every month until you cancel.");
     expect(FOUNDING_PRICE_TEXT).toBe("$12/month founding price, kept for as long as you stay a member.");
     expect(OFFER_TEXT.report.price).toBe("$29 once");
   });

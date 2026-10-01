@@ -7,6 +7,7 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import {
   FOUNDING_PROMISE_TEXT,
   isOffer,
+  MEMBERSHIP_RENEWS_TEXT,
   OFFER_TEXT,
   OFFERS,
   presaleLinksFromEnv,
@@ -36,7 +37,8 @@ const EMAIL_SUBJECTS: Record<Offer, string> = {
   report: "Condition report: my building's details",
 };
 
-// Baked in at build time. Without it, members cancel by email.
+// Baked in at build time. The membership is only on sale with it, but if it's
+// taken out later, members can still cancel by email.
 const PORTAL = presaleLinksFromEnv().portal;
 
 const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
@@ -111,7 +113,9 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
 
           {offer === "membership" ? (
             <Section title="Your membership">
-              <p className="font-medium text-slate-950 dark:text-white">{OFFER_TEXT.membership.priceNote}</p>
+              <p className="font-medium text-slate-950 dark:text-white">
+                {PORTAL ? OFFER_TEXT.membership.priceNote : MEMBERSHIP_RENEWS_TEXT}
+              </p>
               <p className="mt-3">
                 {PORTAL ? (
                   <>
