@@ -68,11 +68,17 @@ export default function QuickEstimate({
         ? ENTER_PROMPT
         : TICK_PROMPT;
 
-  // Screen readers hear the new range once typing pauses, not on every keystroke.
+  // Screen readers hear the new range once typing pauses, not on every keystroke,
+  // and nothing until the owner changes something.
   const summary = shown ? shown.text.spoken : prompt;
   const [spoken, setSpoken] = useState("");
+  const spokenSummary = useRef(summary);
   useEffect(() => {
-    const timer = window.setTimeout(() => setSpoken(summary), 1000);
+    if (summary === spokenSummary.current) return;
+    const timer = window.setTimeout(() => {
+      spokenSummary.current = summary;
+      setSpoken(summary);
+    }, 1000);
     return () => window.clearTimeout(timer);
   }, [summary]);
 
