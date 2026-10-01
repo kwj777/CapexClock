@@ -1,30 +1,39 @@
 "use client";
 
-import { useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { RESERVE_TABS, TAB_LABELS, tabAfterKey, tabFromSearch, tabHref, type ReserveTab } from "./tabs";
 
-// The tab only changes from here (replaceState adds no history), so there's nothing to listen for.
-const subscribe = () => () => {};
+/**
+ * Follows the tab in the address: on the first load, after a link to the page
+ * (the header's drops ?tab), and on back and forward. Renders nothing. The page
+ * is built ahead of time, so the address can only be read in the browser, which
+ * is why this sits in its own Suspense boundary.
+ */
+function FollowAddress({ onTab }: { onTab: (tab: ReserveTab) => void }) {
+  const params = useSearchParams();
+  const tab = params ? tabFromSearch(params.toString()) : null;
+  useEffect(() => {
+    if (tab) onTab(tab);
+  }, [tab, onTab]);
+  return null;
+}
 
 /**
  * The quick estimate and the expense list as tabs. The chosen tab is kept in the
- * address (?tab=expenses), so a reload or a shared link opens it. Both panels stay
- * mounted, so switching back keeps what was typed.
+ * address (?tab=expenses), so a reload or a shared link opens it, and the tab
+ * always follows the address. Both panels stay mounted, so switching back keeps
+ * what was typed.
  */
 export default function ReserveTabs({ panels }: { panels: Record<ReserveTab, ReactNode> }) {
   const baseId = useId();
-  // The page is built ahead of time with the quick estimate showing; the address is read in the browser.
-  const fromAddress = useSyncExternalStore(
-    subscribe,
-    () => tabFromSearch(window.location.search),
-    (): ReserveTab => "quick",
-  );
-  const [picked, setPicked] = useState<ReserveTab | null>(null);
-  const tab = picked ?? fromAddress;
+  // The quick estimate until the address is read.
+  const [tab, setTab] = useState<ReserveTab>("quick");
   const buttons = useRef<Partial<Record<ReserveTab, HTMLButtonElement | null>>>({});
 
   function choose(next: ReserveTab) {
-    setPicked(next);
+    setTab(next);
+    // Next.js picks this up, so FollowAddress sees the same tab.
     window.history.replaceState(null, "", tabHref(window.location, next));
   }
 
@@ -38,6 +47,9 @@ export default function ReserveTabs({ panels }: { panels: Record<ReserveTab, Rea
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <FollowAddress onTab={setTab} />
+      </Suspense>
       <div
         role="tablist"
         aria-label="Ways to work out your reserve"
