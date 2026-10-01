@@ -20,7 +20,7 @@ const FAQ = [
     a: "It takes each system you tick to have been replaced on schedule since the building was built, prices it at typical low and high installed costs, and works out the monthly amount the same way as the full calculator. Building-wide items like the roof are shared out per apartment for a 12-unit building. Typical costs are not quotes, so use your own numbers in the CapEx calculator to plan.",
   },
   {
-    q: "How is the monthly amount calculated?",
+    q: "How is the monthly amount calculated for listed expenses?",
     a: "It's the smallest steady monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short.",
   },
   {
@@ -33,7 +33,7 @@ const FAQ = [
   },
   {
     q: "How much should a rental property keep in reserves?",
-    a: "Enough to pay for every major replacement when it comes due. A rule of thumb like a percent of rent can be far too low for an older building, which is why this calculator works from your actual upcoming expenses.",
+    a: "Enough to pay for every major replacement when it comes due. A rule of thumb like a percent of rent can be far too low for an older building, which is why this calculator works from your building's own systems and expenses.",
   },
 ];
 
