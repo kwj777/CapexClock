@@ -1,5 +1,5 @@
 import { MAX_NOTES_LENGTH } from "@/components/calculator/draft";
-import { KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
+import { isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
 import {
   AGE_ROWS,
   APARTMENT_ROWS,
@@ -303,6 +303,52 @@ describe("totals, repeated headings and section headings", () => {
     expect(unnamed?.issues).toEqual([{ field: "name", text: "This row has no item name. Type one." }]);
     const named = preview(sheet, { fixes: { r9: { name: "Range" } } });
     expect(named.rows.some((r) => r.row.librarySlug === "range-oven" && r.sheetRows[0] === 10)).toBe(true);
+  });
+});
+
+describe("total rows", () => {
+  it.each([
+    "Total",
+    "TOTALS",
+    "Total:",
+    "Grand total",
+    "Subtotal",
+    "Sub-total",
+    "Subtotal - interiors",
+    "Total CapEx",
+    "Total replacement cost",
+    "Totals for building",
+    "Total reserve needed",
+    "Total (all items)",
+    "Annual total",
+    "Roofing subtotal",
+    "Sum",
+    "Sum:",
+    "Sum of costs",
+  ])("knows %p is a total", (label) => {
+    expect(isTotalLabel(label)).toBe(true);
+  });
+
+  it.each(["Water heater", "Totaled washer", "Sump pump", "Summit boiler", "Sum pump", "Subfloor"])("knows %p isn't", (label) => {
+    expect(isTotalLabel(label)).toBe(false);
+  });
+
+  it("skips amounts with no name and nothing else, but asks about a row with other numbers", () => {
+    const sheet = ["Item,Qty,Cost,Total", "Fridge,12,$1100,\"$13,200\"", ",,,\"$48,000\"", ",,$1100,", ",12,,$500"].join("\n");
+    const p = preview(sheet);
+    expect(p.skipped).toEqual([
+      { sheetRow: 3, reason: "total" },
+      { sheetRow: 4, reason: "total" },
+    ]);
+    expect(p.rows.map((r) => [r.row.name, r.status])).toEqual([
+      ["Refrigerator", "changed"],
+      ["", "needs_you"],
+    ]);
+  });
+
+  it("skips totals in a sheet with a column per item", () => {
+    const sheet = ["Apt,Water heater installed,Furnace installed", "101,2014,2012", "Total units,1,1"].join("\n");
+    expect(preview(sheet).skipped).toEqual([{ sheetRow: 3, reason: "total" }]);
   });
 });
 

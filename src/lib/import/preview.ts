@@ -126,7 +126,28 @@ export interface Sheet {
   headerRow: number;
 }
 
-const TOTAL = /^(?:grand |sub ?|sub-)?totals?(?: cost| costs| \$| amount)?:?$/i;
+// "Total", "Total CapEx", "Subtotal - interiors", "Grand total:", "Annual total", "Sum".
+const TOTAL_START = /^(?:grand\s+|sub\s*-?\s*)?totals?\b/i;
+const TOTAL_END = /\b(?:sub-?)?totals?\s*:?$/i;
+const SUM = /^sum(?:\s*$|\s*[:(\-–—]|\s+(?:of|total)\b)/i;
+
+/** A label that says its row adds up the others. */
+export function isTotalLabel(text: string): boolean {
+  const t = text.trim();
+  return TOTAL_START.test(t) || TOTAL_END.test(t) || SUM.test(t);
+}
+
+// A cell that's only a number or an amount, like "4", "$48,000" or "1.4k".
+const NUMBER_ONLY = /^[\d$.,\s%()-]+k?$/i;
+
+/** A total row: its label, or the first words in it, say total or sum. */
+function isTotalRow(row: readonly Cell[], itemText: string): boolean {
+  if (isTotalLabel(itemText)) return true;
+  const texts = row.map(cellText).filter((t) => t !== "");
+  const label = texts.find((t) => !NUMBER_ONLY.test(t));
+  return (texts[0] !== undefined && isTotalLabel(texts[0])) || (label !== undefined && isTotalLabel(label));
+}
+
 const SECTION_NAMES = new Set(
   "roofing hvac mechanical plumbing appliances flooring interior interiors exterior exteriors site electrical safety other systems".split(" "),
 );
@@ -189,14 +210,6 @@ function isRepeatedHeadings(row: readonly Cell[], heads: readonly string[]): boo
   const named = heads.filter((h) => h !== "");
   const same = heads.filter((h, i) => h !== "" && cellText(row[i]).toLowerCase() === h.toLowerCase()).length;
   return same >= Math.min(2, named.length) && same > 0;
-}
-
-function firstText(row: readonly Cell[]): string {
-  for (const cell of row) {
-    const text = cellText(cell);
-    if (text !== "") return text;
-  }
-  return "";
 }
 
 /** Applies a typed fix, read with the same rules as the sheet. */
@@ -293,11 +306,14 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     quantity: 1,
   };
 
-  if (TOTAL.test(firstText(row)) || TOTAL.test(original)) return "total";
+  if (isTotalRow(row, cellText(cell("item")))) return "total";
   const valueRoles: FieldKind[] = ["quantity", "installYear", "age", "life", "remaining", "replaceBy", "cost", "total"];
   const hasValues = valueRoles.some((r) => cellText(cell(r)) !== "");
   if (original === "") {
     if (!hasValues) return "no_name";
+    // Amounts with no name and nothing else, like a SUM at the foot of the cost column.
+    const onlyAmounts = row.every((c, i) => cellText(c) === "" || columns[i] === "cost" || columns[i] === "total");
+    if (onlyAmounts) return "total";
     record.issues.push({ field: "name", text: "This row has no item name. Type one." });
   } else if (!hasValues && cellText(cell("notes")) === "" && cellText(cell("condition")) === "") {
     const plain = original.replace(/:$/, "").toLowerCase();
@@ -629,7 +645,7 @@ export function buildPreview(
       continue;
     }
     if (layout === "columns") {
-      if (TOTAL.test(firstText(row))) {
+      if (isTotalRow(row, cellText(cellFor(row, columns, "location")))) {
         skip("total");
         continue;
       }
