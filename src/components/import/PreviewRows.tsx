@@ -150,7 +150,7 @@ function Row({
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <p className="text-sm font-medium break-words text-slate-900 dark:text-white">
+        <p className="min-w-0 text-sm font-medium wrap-anywhere text-slate-900 dark:text-white">
           {name || "No name yet"}
           {duplicate && (
             <>
@@ -163,14 +163,14 @@ function Row({
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{rowNumbers(row.sheetRows)}</p>
       </div>
-      <p className="mt-0.5 text-sm break-words text-slate-600 dark:text-slate-300">{detailsText(row.row, row.lifeIsTypical)}</p>
+      <p className="mt-0.5 text-sm wrap-anywhere text-slate-600 dark:text-slate-300">{detailsText(row.row, row.lifeIsTypical)}</p>
       {notes && (
-        <p className="mt-0.5 text-xs whitespace-pre-line break-words text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-xs whitespace-pre-line wrap-anywhere text-slate-500 dark:text-slate-400">
           Notes: {clip(notes, 300)}
         </p>
       )}
       {row.changes.length > 0 && (
-        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs break-words text-slate-600 dark:text-slate-400">
+        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs wrap-anywhere text-slate-600 dark:text-slate-400">
           {row.changes.map((c) => (
             <li key={c}>{c}</li>
           ))}
@@ -209,7 +209,7 @@ function FixForm({
       className="mt-2 rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30"
     >
       {asked.map((issue) => (
-        <p key={issue.text} className="text-sm text-amber-900 dark:text-amber-200">
+        <p key={issue.text} className="text-sm wrap-anywhere text-amber-900 dark:text-amber-200">
           {issue.text}
         </p>
       ))}
@@ -230,7 +230,7 @@ function FixForm({
               aria-describedby={textId}
               onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
             />
-            <p id={textId} className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            <p id={textId} className="mt-1 text-sm wrap-anywhere text-amber-900 dark:text-amber-200">
               {fixable
                 .filter((i) => i.field === field)
                 .map((i) => i.text)

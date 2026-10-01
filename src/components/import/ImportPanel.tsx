@@ -335,7 +335,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
                 return (
                   <li key={i} className="grid gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-center">
                     <div className="min-w-0">
-                      <label htmlFor={selectId} className="block text-sm font-medium break-words text-slate-900 dark:text-white">
+                      <label htmlFor={selectId} className="block text-sm font-medium wrap-anywhere text-slate-900 dark:text-white">
                         <span className="sr-only">Column </span>
                         <span className="mr-1.5 text-xs font-normal text-slate-500 dark:text-slate-400">
                           {columnLetter(i)}
@@ -414,7 +414,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
                     <legend className="sr-only">
                       {`"${q.text}", ${q.rows} ${q.rows === 1 ? "row" : "rows"}`}
                     </legend>
-                    <p aria-hidden="true" className="text-sm font-medium break-words text-slate-900 dark:text-white">
+                    <p aria-hidden="true" className="text-sm font-medium wrap-anywhere text-slate-900 dark:text-white">
                       &ldquo;{q.text}&rdquo;{" "}
                       <span className="font-normal text-slate-500 dark:text-slate-400">
                         ({q.rows} {q.rows === 1 ? "row" : "rows"})
@@ -449,7 +449,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
               {summary}
             </p>
             {previewHints(preview).map((hint) => (
-              <p key={hint} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              <p key={hint} className="mt-1 text-sm wrap-anywhere text-slate-600 dark:text-slate-400">
                 {hint}
               </p>
             ))}
@@ -465,7 +465,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
 
           <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
             {dup && dup.names.length > 0 && (
-              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
+              <p className="rounded-lg bg-amber-50 p-3 text-sm wrap-anywhere text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
                 {duplicateText(dup.names)}
               </p>
             )}
