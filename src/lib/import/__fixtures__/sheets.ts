@@ -82,6 +82,20 @@ export const NUMBERED_ROWS = [
   "4\tTotal CapEx\t\t\t$124,800",
 ].join("\n");
 
+/** A reserve-study style list: "No.", "Description", "Quantity", subtotals and a SUM with no label. */
+export const STUDY_ROWS = [
+  "Oak Street 8-plex reserve study",
+  "No.,Description,Quantity,Install year,Unit cost,Total",
+  ' 1,Asphalt shingle roof,1,2009,"$32,000","$32,000"',
+  ' 2,Gutters,1,1990s,"$2,800","$2,800"',
+  ',Subtotal - exterior,,,,"$34,800"',
+  ' 3,Carpet,6400 sq ft,pre-2000,$4,"$25,600"',
+  ' 4,Interior paint,8,early 2000s,"$2,500","$20,000"',
+  ',Subtotal - interiors,,,,"$45,600"',
+  ',,,,,"$80,400"',
+  ',Total replacement cost,,,,"$80,400"',
+].join("\n");
+
 /** Opens a sheet the way the panel does, failing the test if it can't. */
 export function open(text: string, source: ImportSource = "file"): OpenedSheet {
   const grid = readText(text, parse, source);

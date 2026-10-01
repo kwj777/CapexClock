@@ -9,6 +9,7 @@ import {
   preview,
   REMAINING_ROWS,
   REPLACE_BY_ROWS,
+  STUDY_ROWS,
 } from "../__fixtures__/sheets";
 
 function byName(p: Preview, name: string): PreviewRow {
@@ -336,6 +337,36 @@ describe("a sheet with numbered rows", () => {
   });
 });
 
+describe("a reserve study with subtotals, decades and limits", () => {
+  const p = preview(STUDY_ROWS);
+
+  it("skips every subtotal and total, labelled or not", () => {
+    expect(p.skipped).toEqual([
+      { sheetRow: 1, reason: "above_headings" },
+      { sheetRow: 5, reason: "total" },
+      { sheetRow: 8, reason: "total" },
+      { sheetRow: 9, reason: "total" },
+      { sheetRow: 10, reason: "total" },
+    ]);
+    expect(p.rows).toHaveLength(4);
+  });
+
+  it("reads decades as guesses and asks about years before a limit", () => {
+    expect(byName(p, "Gutters and downspouts").row).toMatchObject({ installYear: "1990", installYearIsGuess: true });
+    expect(byName(p, "Gutters and downspouts").changes).toContain('Read "1990s" as 1990, marked a guess');
+    expect(byName(p, "Interior paint (turnover)").row).toMatchObject({ installYear: "2000", installYearIsGuess: true, quantity: "8" });
+    const carpet = byName(p, "Carpet");
+    expect(carpet.status).toBe("needs_you");
+    expect(carpet.row.installYear).toBe("pre-2000");
+    expect(carpet.issues).toEqual([
+      { field: "installYear", text: '"pre-2000" doesn\'t give one year. Type your best guess, with "approx" in front to mark it a guess.' },
+    ]);
+    const fixed = byName(preview(STUDY_ROWS, { fixes: { r5: { installYear: "approx 1996" } } }), "Carpet");
+    expect(fixed.row).toMatchObject({ installYear: "1996", installYearIsGuess: true });
+    expect(fixed.status).toBe("changed");
+  });
+});
+
 describe("total rows", () => {
   it.each([
     "Total",
@@ -379,6 +410,45 @@ describe("total rows", () => {
   it("skips totals in a sheet with a column per item", () => {
     const sheet = ["Apt,Water heater installed,Furnace installed", "101,2014,2012", "Total units,1,1"].join("\n");
     expect(preview(sheet).skipped).toEqual([{ sheetRow: 3, reason: "total" }]);
+  });
+});
+
+describe("a total that disagrees with the quantity and cost each", () => {
+  it("works out the quantity from the total when the sheet has no quantity", () => {
+    const p = preview(["Item,Units,Unit cost,Total", "Water heater,12,1400,16800"].join("\n"));
+    const heater = byName(p, "Tank water heater");
+    expect(heater.row).toMatchObject({ quantity: "12", costEach: "1400" });
+    expect(heater.changes).toContain("Worked out the quantity, 12, from the $16,800 total at $1,400 each");
+    expect(heater.status).toBe("changed");
+  });
+
+  it("asks when the sheet's quantity doesn't fit, and takes a fix", () => {
+    const sheet = ["Item,Qty,Cost each,Total", "Water heater,1,1400,16800", "Fridge,3,333.33,1000"].join("\n");
+    const p = preview(sheet);
+    const heater = byName(p, "Tank water heater");
+    expect(heater.status).toBe("needs_you");
+    expect(heater.issues).toEqual([
+      { field: "quantity", text: "The sheet's total, $16,800, isn't 1 × $1,400. Fix the quantity or the cost each, or ignore the Total column." },
+      { field: "costEach", text: "Leave this blank to keep $1,400." },
+    ]);
+    // Rounding is fine.
+    expect(byName(p, "Refrigerator").issues).toEqual([]);
+    const fixed = byName(preview(sheet, { fixes: { r1: { quantity: "12" } } }), "Tank water heater");
+    expect(fixed.issues).toEqual([]);
+    expect(fixed.row.quantity).toBe("12");
+  });
+
+  it("asks when the total isn't a whole number of the cost each", () => {
+    const p = preview(["Item,Cost,Total", "Fridge,1100,2000"].join("\n"));
+    expect(byName(p, "Refrigerator").issues[0]).toEqual({
+      field: "quantity",
+      text: "The sheet's total, $2,000, isn't 1 × $1,100. Fix the quantity or the cost each, or ignore the Total column.",
+    });
+  });
+
+  it("doesn't check a cost range against the total", () => {
+    const p = preview(["Item,Qty,Cost,Total", "Dishwasher,12,$650-$800,$9000"].join("\n"));
+    expect(byName(p, "Dishwasher").issues).toEqual([]);
   });
 });
 

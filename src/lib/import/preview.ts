@@ -157,6 +157,8 @@ const SECTION_NAMES = new Set(
 const ABSENT = /^(?:no|n|none|n\/a|na|not present|-+|–|—|0)$/i;
 const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
+const NO_QUANTITY = "No quantity, so counted as 1";
+
 /** Cuts a value read from a number to a plain string: 1400, 0.25, never 1.4e+3. */
 function numberText(value: number): string {
   return String(Math.round(value * 1e6) / 1e6);
@@ -335,6 +337,8 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   const quantityFix = fixed(ctx, key, "quantity");
   const quantityCell = quantityFix ?? cell("quantity");
   let squareFeet = false;
+  // The sheet or a fix gave a number, so a total can't change it.
+  let quantityGiven = false;
   if (quantityFix !== undefined || hasRole(columns, "quantity")) {
     const q = readQuantity(quantityCell);
     squareFeet = q.squareFeet === true;
@@ -345,10 +349,11 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     } else if (q.value === 0) {
       return "zero_quantity";
     } else if (q.value === null) {
-      record.changes.push("No quantity, so counted as 1");
+      record.changes.push(NO_QUANTITY);
     } else {
       record.quantity = q.value;
       record.row.quantity = numberText(q.value);
+      quantityGiven = true;
     }
   }
 
@@ -406,6 +411,8 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     } else {
       if (c.value !== null) record.row.costEach = numberText(c.value);
       if (c.note) record.changes.push(c.note);
+      const t = cellText(totalCell) !== "" ? readMoney(totalCell) : null;
+      if (c.value !== null && !c.range && t?.value != null && !t.problem) checkTotal(record, c.value, t.value, quantityGiven);
     }
   } else if (cellText(totalCell) !== "") {
     const t = readMoney(totalCell);
@@ -440,6 +447,39 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     if (text !== "") record.details.push(text);
   }
   return record;
+}
+
+/** Two amounts agree, give or take rounding. */
+function sameAmount(a: number, b: number): boolean {
+  return Math.abs(a - b) <= Math.max(1, Math.abs(b) * 0.01);
+}
+
+/**
+ * Checks a row's total against its quantity and cost each. With no quantity on the
+ * sheet, the total says how many there are; a total that disagrees with a quantity
+ * the sheet does give needs the owner.
+ */
+function checkTotal(record: Record_, each: number, total: number, quantityGiven: boolean) {
+  const quantity = record.quantity;
+  if (quantity === null) return;
+  if (sameAmount(quantity * each, total)) return;
+  if (!quantityGiven && each > 0) {
+    const worked = total / each;
+    const whole = Math.round(worked);
+    if (whole >= 1 && sameAmount(whole * each, total)) {
+      record.quantity = whole;
+      record.row.quantity = numberText(whole);
+      const i = record.changes.indexOf(NO_QUANTITY);
+      if (i >= 0) record.changes.splice(i, 1);
+      record.changes.push(`Worked out the quantity, ${whole}, from the ${money(total)} total at ${money(each)} each`);
+      return;
+    }
+  }
+  const sum = `${quantity.toLocaleString("en-US")} × ${money(each)}`;
+  record.issues.push(
+    { field: "quantity", text: `The sheet's total, ${money(total)}, isn't ${sum}. Fix the quantity or the cost each, or ignore the Total column.` },
+    { field: "costEach", text: `Leave this blank to keep ${money(each)}.` },
+  );
 }
 
 /** Puts an install year reading into a record. Unsolved ones keep what the sheet says, so the form flags it. */

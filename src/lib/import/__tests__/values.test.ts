@@ -289,7 +289,7 @@ describe("money", () => {
   });
 
   it("uses the higher figure of a range, and flags it", () => {
-    expect(readMoney("1200–1500")).toEqual({ value: 1500, note: 'Used the higher figure of "1200–1500": $1,500' });
+    expect(readMoney("1200–1500")).toEqual({ value: 1500, note: 'Used the higher figure of "1200–1500": $1,500', range: true });
     expect(readMoney("$1,200 - $1,500").value).toBe(1500);
     expect(readMoney("1.2k to 1.5k").value).toBe(1500);
   });

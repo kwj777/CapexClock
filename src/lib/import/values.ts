@@ -364,7 +364,7 @@ function money(value: number): string {
  * A cost: "$1,400", "1.4k" and "1,400 ea" are read as they are. A range such as
  * "1200–1500" uses the higher figure, and says so.
  */
-export function readMoney(cell: Cell): Reading<number> {
+export function readMoney(cell: Cell): Reading<number> & { range?: boolean } {
   if (typeof cell === "number") {
     if (!Number.isFinite(cell) || cell < 0) return { value: null, problem: `Couldn't read ${quote(String(cell))} as a cost.` };
     return cell < MAX_COST ? { value: cell } : { value: null, problem: `${quote(String(cell))} is too large for a cost.` };
@@ -380,11 +380,13 @@ export function readMoney(cell: Cell): Reading<number> {
   const parts = bare.split(/\s*(?:-|–|—|\bto\b)\s*/i);
   let value: number | null = null;
   let note: string | undefined;
+  let range = false;
   if (parts.length === 2 && parts.every((p) => amount(p) !== null)) {
     const [a, b] = parts.map((p) => amount(p) as number);
     // A range: plan for the higher figure.
     value = Math.max(a, b);
     note = `Used the higher figure of ${quote(text)}: ${money(value)}`;
+    range = true;
   } else {
     value = amount(bare);
     if (value !== null && (guess || /\d\s*(?:k|m)/i.test(bare))) note = `Read ${quote(text)} as ${money(value)}`;
@@ -396,7 +398,7 @@ export function readMoney(cell: Cell): Reading<number> {
     return { value: null, problem };
   }
   if (value >= MAX_COST) return { value: null, problem: `${quote(text)} is too large for a cost.` };
-  return { value, note };
+  return range ? { value, note, range } : { value, note };
 }
 
 const QUANTITY_WORDS =
