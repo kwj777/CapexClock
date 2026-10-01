@@ -11,8 +11,10 @@ import {
   type ReplaceNowComparison,
 } from "@/lib/forecast";
 import {
+  applyChosen,
   applyLabel,
   appliedText,
+  canUndoApply,
   EMERGENCY_HINT,
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
@@ -25,8 +27,10 @@ import {
   reserveVariants,
   compareSummary,
   totalChange,
-  undoneText,
-  withReplaceNow,
+  undoApplied,
+  viewedEvent,
+  type AppliedChange,
+  type CompareAction,
 } from "./compare";
 import type { Draft, DraftRow } from "./draft";
 import { formatMoney, formatReserve } from "./format";
@@ -37,13 +41,6 @@ const inputClass =
 /** A repeat of the same words wouldn't be read again, so vary it invisibly. */
 function sayAgain(current: string, message: string): string {
   return current === message ? `${message}\u00a0` : message;
-}
-
-/** Draft as it was before Apply, offered back until anything else changes it (like Clear). */
-interface Applied {
-  before: Draft;
-  after: Draft;
-  count: number;
 }
 
 /**
@@ -78,7 +75,7 @@ export default function CompareAtRisk({
   const [editingPercent, setEditingPercent] = useState(false);
   // Unticked rather than ticked, so an item that comes into the list starts ticked.
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(() => new Set());
-  const [applied, setApplied] = useState<Applied | null>(null);
+  const [applied, setApplied] = useState<AppliedChange | null>(null);
   const [spoken, setSpoken] = useState("");
   // Set when ticking or the emergency box changes the figures; they're read out once that pauses.
   const [speak, setSpeak] = useState(false);
@@ -97,11 +94,7 @@ export default function CompareAtRisk({
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components]);
   const summary = compareSummary(comparison, startYear);
 
-  const canUndo =
-    applied !== null &&
-    applied.after.rows === draft.rows &&
-    applied.after.unitCount === draft.unitCount &&
-    applied.after.yearBuilt === draft.yearBuilt;
+  const canUndo = canUndoApply(applied, draft);
 
   function say(message: string) {
     setSpoken((current) => sayAgain(current, message));
@@ -123,9 +116,10 @@ export default function CompareAtRisk({
   });
 
   function toggle() {
-    if (!open && !viewed.current && comparison.items.length > 0) {
+    const event = viewedEvent(!open, viewed.current, comparison.items.length);
+    if (event) {
       viewed.current = true;
-      void track("compare_viewed", { items: comparison.items.length });
+      void track("compare_viewed", event);
     }
     setOpen((o) => !o);
   }
@@ -140,25 +134,24 @@ export default function CompareAtRisk({
     setSpeak(true);
   }
 
-  function apply() {
-    const count = comparison.chosen.length;
-    if (count === 0) return;
-    const next = withReplaceNow(draft, new Set(comparison.chosen));
-    setApplied({ before: draft, after: next, count });
-    setDraft(next);
-    void track("compare_applied", { items: count });
+  function run(action: CompareAction) {
+    setApplied(action.applied);
+    setDraft(action.draft);
     setSpeak(false);
-    say(`${appliedText(count)} The forecast above is updated.`);
-    // Apply goes with the items it moved, so move to Undo.
-    focusNext.current = undoId;
+    say(action.message);
+    focusNext.current = { undo: undoId, apply: applyId, toggle: toggleId }[action.focus];
+  }
+
+  function apply() {
+    const action = applyChosen(draft, comparison.chosen);
+    if (!action) return;
+    run(action);
+    void track("compare_applied", { items: comparison.chosen.length });
   }
 
   function undo() {
-    if (!canUndo) return;
-    setDraft(applied.before);
-    setApplied(null);
-    say(undoneText(applied.count));
-    focusNext.current = open ? applyId : toggleId;
+    const action = undoApplied(applied, draft, open);
+    if (action) run(action);
   }
 
   return (
@@ -202,36 +195,34 @@ export default function CompareAtRisk({
         </p>
       )}
       <div id={panelId} hidden={!open} className="mt-4">
-        {open &&
-          (comparison.items.length === 0 ? (
-            <p className="text-sm text-slate-600 dark:text-slate-300">Everything at risk is set to Replace this year.</p>
-          ) : (
-            <ComparisonPanel
-              baseId={baseId}
-              applyId={applyId}
-              startYear={startYear}
-              comparison={comparison}
-              byId={byId}
-              rows={rows}
-              unticked={unticked}
-              onTick={setTicked}
-              percentText={percentText}
-              percent={percent}
-              showPercentError={percentError && !editingPercent}
-              onPercentChange={(value) => {
-                setPercentText(value);
-                setSpeak(true);
-              }}
-              onPercentEditing={setEditingPercent}
-              onApply={apply}
-            />
-          ))}
+        {open && (
+          <ComparisonPanel
+            baseId={baseId}
+            applyId={applyId}
+            startYear={startYear}
+            comparison={comparison}
+            byId={byId}
+            rows={rows}
+            unticked={unticked}
+            onTick={setTicked}
+            percentText={percentText}
+            percent={percent}
+            showPercentError={percentError && !editingPercent}
+            onPercentChange={(value) => {
+              setPercentText(value);
+              setSpeak(true);
+            }}
+            onPercentEditing={setEditingPercent}
+            onApply={apply}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function ComparisonPanel({
+/** The open panel: the figures, the emergency box, the items to tick and Apply. */
+export function ComparisonPanel({
   baseId,
   applyId,
   startYear,
@@ -277,6 +268,10 @@ function ComparisonPanel({
   const sure = items.filter((i) => !i.installYearIsEstimate);
   const toCheck = items.filter((i) => i.installYearIsEstimate);
   const shownHint = showPercentError ? errorId : percent > 0 ? noteId : hintId;
+
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-600 dark:text-slate-300">Everything at risk is set to Replace this year.</p>;
+  }
 
   const choice = (item: AtRiskItem) => {
     const component = byId.get(item.componentId);

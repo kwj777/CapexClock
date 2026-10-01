@@ -147,6 +147,71 @@ export function undoneText(count: number): string {
   return `Replace this year is off again for ${count === 1 ? "that item" : `those ${count} items`}.`;
 }
 
+/** compare_viewed {items}: once per page view, the first time the panel opens with something in it. */
+export function viewedEvent(opening: boolean, alreadySent: boolean, items: number): { items: number } | null {
+  return opening && !alreadySent && items > 0 ? { items } : null;
+}
+
+/** What Apply did, kept so Undo can put the draft back. */
+export interface AppliedChange {
+  before: Draft;
+  after: Draft;
+  count: number;
+}
+
+/** The draft after Apply or Undo, and what the panel says and focuses next. */
+export interface CompareAction {
+  draft: Draft;
+  /** What Undo would put back, or null once there's nothing to undo. */
+  applied: AppliedChange | null;
+  /** For the live region. */
+  message: string;
+  /** The control that gets focus next. */
+  focus: "undo" | "apply" | "toggle";
+}
+
+/**
+ * Apply: turns on Replace this year for the chosen rows only. Focus goes to Undo,
+ * which stands in for the items Apply moved. Null when nothing is chosen.
+ */
+export function applyChosen(draft: Draft, chosen: readonly string[]): CompareAction | null {
+  if (chosen.length === 0) return null;
+  const after = withReplaceNow(draft, new Set(chosen));
+  return {
+    draft: after,
+    applied: { before: draft, after, count: chosen.length },
+    message: `${appliedText(chosen.length)} The forecast above is updated.`,
+    focus: "undo",
+  };
+}
+
+/**
+ * Undo is offered while the form is exactly as Apply left it. Any other edit,
+ * Clear or a reload ends it, like the calculator's own Undo.
+ */
+export function canUndoApply(applied: AppliedChange | null, draft: Draft): applied is AppliedChange {
+  return (
+    applied !== null &&
+    applied.after.rows === draft.rows &&
+    applied.after.unitCount === draft.unitCount &&
+    applied.after.yearBuilt === draft.yearBuilt
+  );
+}
+
+/**
+ * Undo: puts the draft back as it was before Apply. Focus goes back to Apply, or
+ * to the panel's button when the panel is closed. Null when there's nothing to undo.
+ */
+export function undoApplied(applied: AppliedChange | null, draft: Draft, panelOpen: boolean): CompareAction | null {
+  if (!canUndoApply(applied, draft)) return null;
+  return {
+    draft: applied.before,
+    applied: null,
+    message: undoneText(applied.count),
+    focus: panelOpen ? "apply" : "toggle",
+  };
+}
+
 /** For screen readers, once ticking items or the emergency box changes the figures. */
 export function compareSummary(comparison: ReplaceNowComparison, startYear: number): string {
   const { asPlanned, replaceNow, chosen, items } = comparison;

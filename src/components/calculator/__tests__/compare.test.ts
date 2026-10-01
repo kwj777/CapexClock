@@ -1,8 +1,10 @@
 import { compareReplaceNow, computeForecast, type ReplaceNowComparison } from "@/lib/forecast";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import {
+  applyChosen,
   applyLabel,
   appliedText,
+  canUndoApply,
   compareSummary,
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
@@ -18,10 +20,12 @@ import {
   reserveVariants,
   riskText,
   totalChange,
+  undoApplied,
   undoneText,
+  viewedEvent,
   withReplaceNow,
 } from "../compare";
-import { exampleDraft, rowFromLibrary, toComponents, type Draft } from "../draft";
+import { EMPTY_DRAFT, editRow, exampleDraft, rowFromLibrary, toComponents, type Draft } from "../draft";
 
 const shown = (variants: { text: string; shown: boolean }[]) => variants.filter((v) => v.shown).map((v) => v.text);
 
@@ -112,6 +116,57 @@ describe("applying the comparison", () => {
     expect(appliedText(3)).toBe("Turned on Replace this year for 3 items.");
     expect(undoneText(1)).toBe("Replace this year is off again for that item.");
     expect(undoneText(3)).toBe("Replace this year is off again for those 3 items.");
+  });
+});
+
+describe("Apply and Undo in the panel", () => {
+  const draft = exampleDraft();
+  const { components } = toComponents(draft, 2026);
+  const { chosen } = compareReplaceNow({ startYear: 2026, unitCount: 12, components });
+
+  it("sends compare_viewed once, the first time the panel opens with items in it", () => {
+    expect(viewedEvent(true, false, 4)).toEqual({ items: 4 });
+    // Closing it, opening it again, or opening it with nothing to compare sends nothing.
+    expect(viewedEvent(false, true, 4)).toBeNull();
+    expect(viewedEvent(true, true, 4)).toBeNull();
+    expect(viewedEvent(true, false, 0)).toBeNull();
+  });
+
+  it("applies the chosen rows, says so and moves focus to Undo", () => {
+    const action = applyChosen(draft, chosen)!;
+    expect(action.draft).toEqual(withReplaceNow(draft, new Set(chosen)));
+    expect(action.applied).toEqual({ before: draft, after: action.draft, count: 4 });
+    expect(action.message).toBe("Turned on Replace this year for 4 items. The forecast above is updated.");
+    expect(action.focus).toBe("undo");
+    expect(applyChosen(draft, [])).toBeNull();
+  });
+
+  it("offers Undo only while the form is as Apply left it", () => {
+    const { draft: after, applied } = applyChosen(draft, chosen)!;
+    expect(canUndoApply(applied, after)).toBe(true);
+    expect(canUndoApply(null, after)).toBe(false);
+    // Any other edit ends it.
+    const edited = { ...after, rows: after.rows.map((r, i) => (i === 0 ? editRow(r, { name: "Roof" }, after.unitCount) : r)) };
+    expect(canUndoApply(applied, edited)).toBe(false);
+    expect(canUndoApply(applied, { ...after, unitCount: "13" })).toBe(false);
+    expect(canUndoApply(applied, { ...after, yearBuilt: "1990" })).toBe(false);
+    expect(canUndoApply(applied, EMPTY_DRAFT)).toBe(false);
+    // Sending forecast_generated doesn't change the form, so Undo stays.
+    expect(canUndoApply(applied, { ...after, forecastTracked: true })).toBe(true);
+    // A reload starts with nothing to undo, even though the rows read the same.
+    expect(canUndoApply(applied, structuredClone(after))).toBe(false);
+  });
+
+  it("puts the draft back, says so and returns focus to Apply, or to the button when closed", () => {
+    const { draft: after, applied } = applyChosen(draft, chosen.slice(0, 1))!;
+    const undone = undoApplied(applied, after, true)!;
+    expect(undone.draft).toBe(draft);
+    expect(undone.applied).toBeNull();
+    expect(undone.message).toBe("Replace this year is off again for that item.");
+    expect(undone.focus).toBe("apply");
+    expect(undoApplied(applied, after, false)!.focus).toBe("toggle");
+    expect(undoApplied(applied, { ...after, unitCount: "13" }, true)).toBeNull();
+    expect(undoApplied(null, after, true)).toBeNull();
   });
 });
 
