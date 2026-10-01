@@ -130,6 +130,14 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   instead of saving it and leaving it off the site. It's safe to run again. If it notes that
   some existing rows break a rule, fix them under **Table Editor → component_library**; until
   then the site skips them and logs why.
+- `0004_condition_notes.sql`: lets the site save each component's condition, notes and the
+  "Guess" tick next to its install year. Run it before merging the pull request that adds them
+  (Phase 3, step 3). Until it runs, everything else still saves, and after a save that has a
+  condition, notes or a ticked Guess the property editor says "Your database needs update 0004.
+  Condition and notes weren't saved." in place of "Saved". It needs 0002 first, and stops with
+  "Run 0002_safer_saves.sql first" if that hasn't run. It's safe to run again. Don't run 0002
+  again after it: that brings back the old save, which ignores condition and notes. If that
+  happens, run 0004 again.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
