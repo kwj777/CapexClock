@@ -18,11 +18,14 @@ import { track } from "@/lib/analytics";
 import { moneyColumn } from "@/lib/export/format";
 import {
   COMPONENT_LIBRARY,
+  TYPICAL_COSTS,
   UNIT_LABEL_TEXT,
   type LibraryComponent,
+  type TypicalCost,
 } from "@/lib/library/components";
 import {
   badYearBuilt,
+  costHint,
   costLabel,
   customRow,
   editRow,
@@ -80,9 +83,11 @@ const cardClass =
 export default function Calculator({
   accountsEnabled = false,
   library = COMPONENT_LIBRARY,
+  typicalCosts = TYPICAL_COSTS,
 }: {
   accountsEnabled?: boolean;
   library?: LibraryComponent[];
+  typicalCosts?: TypicalCost[];
 }) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   const [draft, setDraft] = useState<Draft>(loadDraft);
@@ -101,6 +106,7 @@ export default function Calculator({
       draft={draft}
       setDraft={setDraft}
       library={library}
+      typicalCosts={typicalCosts}
       trackEvents
       showExample
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
@@ -138,6 +144,8 @@ export interface CalculatorViewProps {
   exportName?: string;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
+  /** Typical costs shown as hints under the cost fields; defaults to the built-in list. */
+  typicalCosts?: TypicalCost[];
   /**
    * Notes by row id that replace the row's forecast note, e.g. why it can't be saved,
    * with the fields they're about (marked invalid and pointed at the note).
@@ -160,9 +168,11 @@ export function CalculatorView({
   footer,
   exportName = "My property",
   library = COMPONENT_LIBRARY,
+  typicalCosts = TYPICAL_COSTS,
   rowNotes,
 }: CalculatorViewProps) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
+  const typicalBySlug = useMemo(() => new Map(typicalCosts.map((c) => [c.slug, c])), [typicalCosts]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
   const tracked = useRef({ started: !trackEvents || draft.rows.length > 0 });
@@ -454,6 +464,7 @@ export function CalculatorView({
                     idPrefix={rowIdPrefix(row.id)}
                     yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
                     lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
+                    typical={row.librarySlug ? typicalBySlug.get(row.librarySlug) : undefined}
                     problem={
                       rowNotes?.[row.id] ??
                       (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)
@@ -552,6 +563,7 @@ function ComponentRow({
   idPrefix,
   yearBuilt,
   lib,
+  typical,
   problem,
   onChange,
   onRemove,
@@ -561,15 +573,19 @@ function ComponentRow({
   idPrefix: string;
   yearBuilt: string;
   lib: LibraryComponent | undefined;
+  typical: TypicalCost | undefined;
   problem: RowNote | null;
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
   const label = row.name.trim() || "this component";
   const problemId = `${idPrefix}-problem`;
+  const hintId = `${idPrefix}-cost-hint`;
+  const hint = costHint(row, typical);
   // Marks the field the row's note is about and points it at the note.
   const flag = (field: RowField) =>
     problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
+  const costFlag = flag("costEach");
 
   return (
     <li className="py-4">
@@ -654,11 +670,17 @@ function ComponentRow({
               value={row.costEach}
               placeholder="Quote or estimate"
               aria-label={`${costLabel(row)}, ${label}`}
-              {...flag("costEach")}
+              {...costFlag}
+              aria-describedby={[costFlag["aria-describedby"], hint && hintId].filter(Boolean).join(" ") || undefined}
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
           <CostNote row={row} />
+          {hint && (
+            <span id={hintId} className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+              {hint}
+            </span>
+          )}
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-700 lg:justify-center dark:text-slate-300">
           <input

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import CalculatorLoader from "@/components/calculator/CalculatorLoader";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
-import { getLibrary } from "@/lib/library/source";
+import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
 import { supabaseEnv } from "@/lib/supabase/env";
 
@@ -20,7 +20,7 @@ const FAQ = [
   },
   {
     q: "How do I enter costs?",
-    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per unit are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 × $650 = $7,800.",
+    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per unit are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 × $650 = $7,800. While a cost is per apartment or per sq ft, a grey hint shows the typical range to compare with. It's never used in the math, so enter your own quote.",
   },
   {
     q: "What if I don't know when something was installed?",
@@ -55,7 +55,7 @@ const faqJsonLd = {
 };
 
 export default async function CapexCalculatorPage() {
-  const library = await getLibrary();
+  const [library, typicalCosts] = await Promise.all([getLibrary(), getTypicalCosts()]);
   return (
     <>
       <script
@@ -75,7 +75,7 @@ export default async function CapexCalculatorPage() {
           </p>
 
           <div className="mt-8">
-            <CalculatorLoader accountsEnabled={supabaseEnv() !== null} library={library} />
+            <CalculatorLoader accountsEnabled={supabaseEnv() !== null} library={library} typicalCosts={typicalCosts} />
           </div>
 
           <section className="mt-16 max-w-3xl" aria-labelledby="faq-heading">

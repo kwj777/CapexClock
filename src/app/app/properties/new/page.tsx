@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PropertyEditorLoader from "@/components/account/PropertyEditorLoader";
-import { getLibrary } from "@/lib/library/source";
+import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { EMPTY_DRAFT } from "@/components/calculator/draft";
 import { getAccount } from "../../account";
 
@@ -17,7 +17,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/app/propert
 export default async function NewPropertyPage({ searchParams }: PageProps<"/app/properties/new">) {
   const params = await searchParams;
   const fromCalculator = params.from === "calculator";
-  const [library, account] = await Promise.all([getLibrary(), getAccount()]);
+  const [library, typicalCosts, account] = await Promise.all([getLibrary(), getTypicalCosts(), getAccount()]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-6 sm:px-6">
@@ -29,6 +29,7 @@ export default async function NewPropertyPage({ searchParams }: PageProps<"/app/
       </h1>
       <PropertyEditorLoader
         library={library}
+        typicalCosts={typicalCosts}
         userId={account.id}
         initialName=""
         initialDraft={EMPTY_DRAFT}

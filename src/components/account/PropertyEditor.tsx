@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalculatorView, type RowNote } from "@/components/calculator/Calculator";
 import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import { SAVE_PROBLEM_TEXT, saveProblemFields, toSaveInput, type SaveInput } from "@/lib/properties/convert";
 import { fetchAllRows } from "@/lib/properties/load";
 import {
@@ -57,6 +57,7 @@ export interface PropertyEditorProps {
   /** New property started from the public calculator's work in this browser. */
   importFromCalculator?: boolean;
   library: LibraryComponent[];
+  typicalCosts: TypicalCost[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
 }
@@ -99,6 +100,7 @@ export default function PropertyEditor({
   initialDraft,
   importFromCalculator = false,
   library,
+  typicalCosts,
   userId,
 }: PropertyEditorProps) {
   const router = useRouter();
@@ -520,6 +522,7 @@ export default function PropertyEditor({
         header={header}
         exportName={name.trim() || "My property"}
         library={library}
+        typicalCosts={typicalCosts}
         rowNotes={rowNotes}
       />
       {propertyId && (

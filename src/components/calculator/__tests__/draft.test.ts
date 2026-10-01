@@ -1,6 +1,7 @@
 import { computeForecast } from "@/lib/forecast";
 import {
   badYearBuilt,
+  costHint,
   costLabel,
   customRow,
   editRow,
@@ -22,7 +23,7 @@ import {
   type Draft,
   type DraftRow,
 } from "../draft";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "@/lib/library/components";
 import { DRAFT_STORAGE_KEY } from "../storage-key";
 
 const waterHeater = COMPONENT_LIBRARY.find((c) => c.slug === "tank-water-heater")!;
@@ -296,6 +297,63 @@ describe("how a row is counted", () => {
     expect(rowTotal({ quantity: "12", costEach: "$650" })).toEqual({ quantity: 12, each: 650, total: 7800 });
     expect(rowTotal({ quantity: "", costEach: "650" })).toBeNull();
     expect(rowTotal({ quantity: "12", costEach: "1.4k" })).toBeNull();
+  });
+});
+
+describe("typical cost hints under the cost field", () => {
+  const typical = (slug: string) => TYPICAL_COSTS.find((c) => c.slug === slug);
+  const windows = COMPONENT_LIBRARY.find((c) => c.slug === "vinyl-windows")!;
+
+  it("shows the typical range while the field says per apartment or per sq ft", () => {
+    expect(costHint(rowFromLibrary(waterHeater, "12"), typical("tank-water-heater"))).toBe(
+      "Typical $800–$2,300, use your quote",
+    );
+    expect(costHint(rowFromLibrary(windows, "12"), typical("vinyl-windows"))).toBe("Typical $3,200–$7,200, use your quote");
+    expect(costHint(rowFromLibrary(carpet, "12"), typical("carpet"))).toBe("Typical $3–$6, use your quote");
+    const sealCoat = COMPONENT_LIBRARY.find((c) => c.slug === "parking-lot-seal-coat")!;
+    expect(costHint(rowFromLibrary(sealCoat, "12"), typical("parking-lot-seal-coat"))).toBe(
+      "Typical $0.15–$0.30, use your quote",
+    );
+  });
+
+  it("shows none once the owner sets their own count, which makes the field a cost each", () => {
+    // 90 windows: the field is now one window's price, about an eighth of an apartment's.
+    const ninety = editRow(rowFromLibrary(windows, "12"), { quantity: "90" }, "12");
+    expect(costLabel(ninety)).toBe("Cost each");
+    expect(costHint(ninety, typical("vinyl-windows"))).toBeNull();
+  });
+
+  it("shows none for the building, or when the field and the typical cost count different things", () => {
+    const roofRow = rowFromLibrary(roof, "12");
+    expect(costLabel(roofRow)).toBe("Cost for the building");
+    expect(costHint(roofRow, typical("asphalt-shingle-roof"))).toBeNull();
+    // Carpet counted per apartment: the per sq ft range would read as an apartment's cost.
+    const carpetPerApartment = editRow(rowFromLibrary(carpet, "12"), { unitLabel: "per_unit" }, "12");
+    expect(costLabel(carpetPerApartment)).toBe("Cost per apartment");
+    expect(costHint(carpetPerApartment, typical("carpet"))).toBeNull();
+    // A roof shared out per apartment does match its per-apartment typical cost.
+    const roofPerApartment = editRow(roofRow, { unitLabel: "per_unit" }, "12");
+    expect(costHint(roofPerApartment, typical("asphalt-shingle-roof"))).toBe("Typical $2,600–$4,700, use your quote");
+  });
+
+  it("shows none for custom components or library items without a typical cost", () => {
+    expect(costHint(customRow(), undefined)).toBeNull();
+    expect(costHint(rowFromLibrary(waterHeater, "12"), undefined)).toBeNull();
+  });
+
+  it("follows the field as the unit count changes it", () => {
+    const blank = rowFromLibrary(waterHeater, "");
+    expect(costHint(blank, typical("tank-water-heater"))).not.toBeNull();
+    const draft = withUnitCount({ unitCount: "", yearBuilt: "", rows: [blank] }, "14");
+    expect(costHint(draft.rows[0], typical("tank-water-heater"))).toBe("Typical $800–$2,300, use your quote");
+  });
+
+  it("never enters the forecast", () => {
+    const row = rowFromLibrary(waterHeater, "12");
+    expect(toComponents({ unitCount: "12", yearBuilt: "1998", rows: [row] }, 2026)).toEqual({
+      components: [],
+      problems: { [row.id]: "missing_cost" },
+    });
   });
 });
 
