@@ -18,7 +18,7 @@ import {
   TICKED_BY_DEFAULT,
   type QuickSystem,
 } from "@/lib/reserve/quick-estimate";
-import { ENTER_PROMPT, estimateText, FIX_PROMPT, TICK_PROMPT } from "./estimate-text";
+import { estimateText, quickPrompt } from "./estimate-text";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -66,12 +66,7 @@ export default function QuickEstimate({
     estimate && inputs.units !== null
       ? { systems: estimate.systems, units: inputs.units, text: estimateText(estimate, inputs.units) }
       : null;
-  const prompt =
-    inputs.unitsProblem || inputs.yearBuiltProblem
-      ? FIX_PROMPT
-      : inputs.units === null || inputs.yearBuilt === null
-        ? ENTER_PROMPT
-        : TICK_PROMPT;
+  const prompt = quickPrompt(inputs, showYearProblem);
 
   // Screen readers hear the new range once typing pauses, not on every keystroke,
   // and nothing until the owner changes something.

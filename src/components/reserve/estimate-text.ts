@@ -1,9 +1,20 @@
 import { formatMoney } from "@/components/calculator/format";
-import { roundEstimate, type QuickEstimate } from "@/lib/reserve/quick-estimate";
+import { roundEstimate, type QuickEstimate, type QuickInputs } from "@/lib/reserve/quick-estimate";
 
 export const ENTER_PROMPT = "Enter your units and year built to see an estimate.";
 export const FIX_PROMPT = "Fix the highlighted fields to see an estimate.";
 export const TICK_PROMPT = "Tick at least one system to see an estimate.";
+
+/**
+ * What shows in place of the estimate. "Fix" only when a field is marked: a year
+ * built is only marked once the owner leaves it, so while it's being typed this
+ * still asks for it.
+ */
+export function quickPrompt(inputs: QuickInputs, yearProblemShown: boolean): string {
+  if (inputs.unitsProblem !== null || yearProblemShown) return FIX_PROMPT;
+  if (inputs.units === null || inputs.yearBuilt === null) return ENTER_PROMPT;
+  return TICK_PROMPT;
+}
 
 export interface EstimateText {
   /** "$175–$380" */
