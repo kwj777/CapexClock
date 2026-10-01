@@ -68,6 +68,20 @@ describe("matching names to the library", () => {
     expect(both.kind === "unsure" && both.suggestions).toEqual(expect.arrayContaining(["kitchen-cabinets", "laminate-countertops"]));
   });
 
+  it("doesn't read a typo into a short alias", () => {
+    expect(match("Store")).toEqual({ kind: "none" });
+    expect(match("Storage")).toEqual({ kind: "none" });
+    expect(match("Stove")).toEqual({ kind: "matched", slug: "range-oven", extraWords: false });
+    // Library names still allow one typo from five letters.
+    expect(match("Furnance").kind).toBe("matched");
+  });
+
+  it("asks about electrical, which often means the wiring", () => {
+    expect(match("Electrical")).toEqual({ kind: "unsure", suggestions: ["electrical-panel"], extraWords: false });
+    expect(match("Electrical panel")).toEqual({ kind: "exact", slug: "electrical-panel" });
+    expect(match("Breaker panel")).toEqual({ kind: "matched", slug: "electrical-panel", extraWords: false });
+  });
+
   it("keeps everything else as the owner's own item", () => {
     expect(match("Elevator")).toEqual({ kind: "none" });
     expect(match("Mailboxes")).toEqual({ kind: "none" });

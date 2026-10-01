@@ -30,7 +30,7 @@ export const ALIASES: Readonly<Record<string, readonly string[]>> = {
   "vinyl-siding": ["siding"],
   "parking-lot-seal-coat": ["seal coat", "sealcoat", "sealcoating", "seal coating", "parking lot seal", "parking lot sealing"],
   "parking-lot-resurface": ["parking lot", "repave", "repaving", "resurface", "resurfacing", "paving", "asphalt paving", "parking lot repave", "parking lot overlay", "overlay"],
-  "electrical-panel": ["electrical panel", "electric panel", "breaker panel", "breaker box", "service panel", "electrical"],
+  "electrical-panel": ["electrical panel", "electric panel", "breaker panel", "breaker box", "service panel"],
   "fire-alarm-panel": ["fire alarm", "fire panel", "fire alarm system", "facp", "fire alarm control panel"],
 };
 
@@ -52,6 +52,8 @@ export const UNSURE_NAMES: Readonly<Record<string, readonly string[]>> = {
   asphalt: ["asphalt-shingle-roof", "parking-lot-resurface", "parking-lot-seal-coat"],
   appliances: ["refrigerator", "range-oven", "dishwasher"],
   kitchen: ["kitchen-cabinets", "laminate-countertops"],
+  // Often the wiring, not the panel.
+  electrical: ["electrical-panel"],
 };
 
 // Words that don't change what an item is: sizes, fuels, brands, "unit 3".
@@ -101,6 +103,16 @@ function typosAllowed(length: number): number {
 }
 
 /**
+ * Typos allowed against one phrase. Short aliases need a longer word before a
+ * typo counts, so "store" isn't read as "stove".
+ */
+function typosFor(phrase: Phrase): number {
+  const n = phrase.key.length;
+  if (!phrase.alias) return typosAllowed(n);
+  return n >= 9 ? 2 : n >= 6 ? 1 : 0;
+}
+
+/**
  * How a name matched the library:
  * - exact: it is the library name, so nothing changed
  * - matched: an alias, a typo or extra words like a brand ("Rheem water heater")
@@ -121,6 +133,8 @@ interface Phrase {
   slugs: string[];
   /** From UNSURE_NAMES: even an exact match is only a suggestion. */
   unsure: boolean;
+  /** One of our other names for an item, not the library's own name for it. */
+  alias: boolean;
 }
 
 export type NameMatcher = (name: string) => NameMatch;
@@ -130,23 +144,23 @@ export function createMatcher(library: readonly LibraryComponent[]): NameMatcher
   const slugs = new Set(library.map((c) => c.slug));
   const byName = new Map(library.map((c) => [c.name.trim().toLowerCase(), c.slug]));
   const phrases = new Map<string, Phrase>();
-  const add = (text: string, phraseSlugs: string[], unsure: boolean) => {
+  const add = (text: string, phraseSlugs: string[], unsure: boolean, alias: boolean) => {
     const key = nameKey(text);
     const known = phraseSlugs.filter((s) => slugs.has(s));
     if (key === "" || known.length === 0) return;
     const existing = phrases.get(key);
     // A library name or alias is sure; it wins over an unsure name with the same words.
     if (existing && (!existing.unsure || unsure)) return;
-    phrases.set(key, { key, tokens: key.split(" "), slugs: known, unsure });
+    phrases.set(key, { key, tokens: key.split(" "), slugs: known, unsure, alias });
   };
   for (const c of library) {
-    add(c.name, [c.slug], false);
-    add(c.slug.replace(/-/g, " "), [c.slug], false);
+    add(c.name, [c.slug], false, false);
+    add(c.slug.replace(/-/g, " "), [c.slug], false, false);
     // "Windows (vinyl)" and "Central AC / condenser" are also known by their first part.
-    add(c.name.replace(/\s*\(.*\)\s*$/, ""), [c.slug], false);
+    add(c.name.replace(/\s*\(.*\)\s*$/, ""), [c.slug], false, false);
   }
-  for (const [slug, aliases] of Object.entries(ALIASES)) for (const a of aliases) add(a, [slug], false);
-  for (const [name, options] of Object.entries(UNSURE_NAMES)) add(name, [...options], true);
+  for (const [slug, aliases] of Object.entries(ALIASES)) for (const a of aliases) add(a, [slug], false, true);
+  for (const [name, options] of Object.entries(UNSURE_NAMES)) add(name, [...options], true, true);
   const all = [...phrases.values()];
 
   const cache = new Map<string, NameMatch>();
@@ -186,12 +200,14 @@ function match(key: string, phrases: Phrase[]): NameMatch {
     let best = Infinity;
     let closest: Phrase[] = [];
     for (const p of phrases) {
-      if (Math.abs(p.key.length - key.length) > allowed) continue;
+      const limit = Math.min(allowed, typosFor(p));
+      if (Math.abs(p.key.length - key.length) > limit) continue;
       const d = editDistance(key, p.key);
+      if (d > limit) continue;
       if (d < best) [best, closest] = [d, [p]];
       else if (d === best) closest.push(p);
     }
-    if (best <= allowed) return closest.length === 1 ? sure(closest[0]) : unsureOf(closest, false);
+    if (closest.length > 0) return closest.length === 1 ? sure(closest[0]) : unsureOf(closest, false);
   }
 
   // A library name inside a longer name, typos allowed: "Rheem water heatr 40 gal".
@@ -201,7 +217,7 @@ function match(key: string, phrases: Phrase[]): NameMatch {
     const n = p.tokens.length;
     for (let start = 0; start + n <= tokens.length; start++) {
       const window = tokens.slice(start, start + n).join(" ");
-      if (window === p.key || editDistance(window, p.key) <= typosAllowed(p.key.length)) {
+      if (window === p.key || editDistance(window, p.key) <= typosFor(p)) {
         found.push({ phrase: p, start });
         break;
       }
