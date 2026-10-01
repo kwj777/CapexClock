@@ -7,14 +7,13 @@ import {
   COLUMN_LAYOUT_FIELDS,
   FIELD_TEXT,
   FIELDS,
-  guessColumns,
   parseRole,
   samples,
   type ColumnRole,
   type Layout,
 } from "@/lib/import/columns";
 import { createMatcher } from "@/lib/import/names";
-import { openSheet, parseSheetYear, startingChoices, type OpenedSheet } from "@/lib/import/open";
+import { columnsFor, openSheet, parseSheetYear, startingChoices, type OpenedSheet } from "@/lib/import/open";
 import {
   buildPreview,
   KEEP_OWN,
@@ -190,7 +189,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
   function setLayout(layout: Layout) {
     if (!opened) return;
     // Fixes were for the other layout's rows, so they start again.
-    setChoices((c) => c && { ...c, layout, columns: guessColumns(opened.headings, match, layout), fixes: {} });
+    setChoices((c) => c && { ...c, layout, columns: columnsFor(opened, match, layout), fixes: {} });
   }
 
   function setSheetYear(value: string) {

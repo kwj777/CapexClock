@@ -125,6 +125,7 @@ describe("import wording", () => {
       usesSheetYear: false,
       missingItemColumn: false,
       noQuantityColumn: false,
+      doubtfulQuantity: null,
       withoutCost: 0,
       counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
     };
@@ -138,6 +139,9 @@ describe("import wording", () => {
     ]);
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",
+    ]);
+    expect(previewHints({ ...base, doubtfulQuantity: { column: 0, heading: "#" } })).toEqual([
+      'We used column A, "#", as the quantity. If it numbers the rows or apartments instead, set it to Ignore.',
     ]);
   });
 

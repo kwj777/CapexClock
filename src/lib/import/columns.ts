@@ -51,8 +51,6 @@ export const COLUMN_LAYOUT_FIELDS: readonly FieldKind[] = ["location"];
 // Whole headings, after words(): checked before the keyword rules below. Null means
 // the heading is about something else (the building, a tenant), so it's left out.
 const EXACT: Record<string, FieldKind | null> = {
-  "#": "quantity",
-  "no": "quantity",
   "qty": "quantity",
   "count": "quantity",
   "how many": "quantity",
@@ -84,6 +82,18 @@ const EXACT: Record<string, FieldKind | null> = {
   "rating": "condition",
   "what": "item",
   "name": "item",
+  // Row and reference numbers, not items or quantities.
+  "item #": null,
+  "item no": null,
+  "item number": null,
+  "line": null,
+  "line #": null,
+  "line no": null,
+  "row": null,
+  "row #": null,
+  "ref": null,
+  "ref #": null,
+  "id": null,
   // Step 5 reads these for the property itself; here they're left out.
   "units": null,
   "building": null,
@@ -186,6 +196,28 @@ export function guessField(heading: string): FieldKind | null {
   return null;
 }
 
+// Headings that might number the rows or apartments rather than count anything.
+const NUMBER_HEADINGS = new Set(["#", "no", "number", "num", "nbr"]);
+
+/**
+ * A heading that might be a quantity but might not: "#" or "No." often numbers the
+ * rows, and "Units" can be the building's unit count. These are used only when no
+ * heading names a quantity, and only if the values look like counts.
+ */
+export function doubtfulQuantity(heading: string): "number" | "units" | null {
+  const text = words(heading);
+  if (NUMBER_HEADINGS.has(text)) return "number";
+  if (text === "units") return "units";
+  return null;
+}
+
+/** Values that run 1, 2, 3 (or 101, 102, 103) down the sheet number the rows or apartments. */
+export function isCounting(values: readonly string[]): boolean {
+  const numbers = values.map((v) => (/^\d{1,6}\.?$/.test(v) ? Number.parseInt(v, 10) : Number.NaN));
+  if (numbers.length < 3 || numbers.some(Number.isNaN)) return false;
+  return numbers.every((n, i) => i === 0 || n === numbers[i - 1] + 1);
+}
+
 // Words that say when, in a heading like "Water heater installed" or "WH age".
 const TIMING_WORDS = new Set(
   "installed install installation year yr yrs date age old replaced last when in".split(" "),
@@ -218,7 +250,7 @@ function headingScore(row: Grid[number], match: NameMatcher): number {
     const text = cellText(cell);
     // Long text is a title or a note, not a heading.
     if (text === "" || text.length > 60 || /^[\d$.,\s-]+$/.test(text)) continue;
-    if (guessField(text) !== null || headingItem(text, match) !== null) score += 1;
+    if (guessField(text) !== null || doubtfulQuantity(text) !== null || headingItem(text, match) !== null) score += 1;
   }
   return score;
 }
@@ -263,14 +295,41 @@ export function guessLayout(heads: readonly string[], match: NameMatcher): Layou
   return guessColumns(heads, match, "rows").includes("item") ? "rows" : "columns";
 }
 
+/** The values under each heading, by column, for guesses that need to see them. */
+export type ColumnValues = (column: number) => readonly string[];
+
+/** Every filled cell under the headings, column by column. */
+export function columnValues(grid: Grid, headerRow: number): ColumnValues {
+  const cache = new Map<number, string[]>();
+  return (column) => {
+    let values = cache.get(column);
+    if (!values) {
+      values = [];
+      for (let i = headerRow + 1; i < grid.length; i++) {
+        const text = cellText(grid[i]?.[column]);
+        if (text !== "") values.push(text);
+      }
+      cache.set(column, values);
+    }
+    return values;
+  };
+}
+
 /**
  * A role for each column, from its heading. Only the first column of each kind is
- * used (notes columns are all kept), so later ones start as "ignore".
+ * used (notes columns are all kept), so later ones start as "ignore". A "#", "No."
+ * or "Units" column is the quantity only when no heading names one and its values
+ * look like counts. With no item column, a "System" column holds the item names.
  */
-export function guessColumns(heads: readonly string[], match: NameMatcher, layout: Layout): ColumnRole[] {
+export function guessColumns(
+  heads: readonly string[],
+  match: NameMatcher,
+  layout: Layout,
+  values: ColumnValues = () => [],
+): ColumnRole[] {
   const items = componentColumns(heads, match);
   const seen = new Set<ColumnRole>();
-  return heads.map((heading, i): ColumnRole => {
+  const roles = heads.map((heading, i): ColumnRole => {
     const field = guessField(heading);
     let role: ColumnRole;
     if (layout === "columns") {
@@ -285,6 +344,40 @@ export function guessColumns(heads: readonly string[], match: NameMatcher, layou
     seen.add(role);
     return role;
   });
+
+  if (layout === "columns") {
+    // "#" or "No." in a sheet of apartments is the apartment number.
+    if (!roles.includes("location")) {
+      const at = heads.findIndex((h, i) => roles[i] === "ignore" && doubtfulQuantity(h) === "number");
+      if (at >= 0) roles[at] = "location";
+    }
+    return roles;
+  }
+
+  if (!roles.includes("quantity")) {
+    const at = heads.findIndex((h, i) => {
+      const kind = doubtfulQuantity(h);
+      if (roles[i] !== "ignore" || kind === null) return false;
+      const cells = values(i);
+      if (cells.length === 0 || !cells.every((v) => /^\d[\d,]*(?:\.\d+)?$/.test(v)) || isCounting(cells)) return false;
+      // The same number on every row is the building's unit count.
+      return kind === "number" || new Set(cells).size > 1;
+    });
+    if (at >= 0) roles[at] = "quantity";
+  }
+  if (!roles.includes("item")) {
+    const at = heads.findIndex(
+      (h, i) => (roles[i] === "category" || roles[i] === "ignore") && guessField(h) === "category" && /\bsystems?\b/.test(words(h)),
+    );
+    if (at >= 0) roles[at] = "item";
+  }
+  return roles;
+}
+
+/** The quantity column, when its heading only might be one ("#", "No.", "Units"). */
+export function doubtfulQuantityColumn(heads: readonly string[], columns: readonly ColumnRole[]): number | null {
+  const at = columns.indexOf("quantity");
+  return at >= 0 && guessField(heads[at] ?? "") === null && doubtfulQuantity(heads[at] ?? "") !== null ? at : null;
 }
 
 /** The library slug of a component column's role, or null. */

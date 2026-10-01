@@ -122,6 +122,12 @@ export function previewHints(preview: Preview): string[] {
   if (preview.noQuantityColumn && !preview.missingItemColumn) {
     hints.push("There's no quantity column, so each row counts as one, and identical rows are added up.");
   }
+  if (preview.doubtfulQuantity) {
+    const { column, heading } = preview.doubtfulQuantity;
+    hints.push(
+      `We used column ${columnLetter(column)}, ${quote(heading)}, as the quantity. If it numbers the rows or apartments instead, set it to Ignore.`,
+    );
+  }
   if (preview.withoutCost > 0) {
     hints.push(
       `${plural(preview.withoutCost, "row has", "rows have")} no cost yet. Add costs after importing to include ${

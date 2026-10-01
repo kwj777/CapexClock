@@ -4,6 +4,7 @@ import {
   AGE_ROWS,
   APARTMENT_ROWS,
   ITEM_ROWS,
+  NUMBERED_ROWS,
   open,
   preview,
   REMAINING_ROWS,
@@ -303,6 +304,35 @@ describe("totals, repeated headings and section headings", () => {
     expect(unnamed?.issues).toEqual([{ field: "name", text: "This row has no item name. Type one." }]);
     const named = preview(sheet, { fixes: { r9: { name: "Range" } } });
     expect(named.rows.some((r) => r.row.librarySlug === "range-oven" && r.sheetRows[0] === 10)).toBe(true);
+  });
+});
+
+describe("a sheet with numbered rows", () => {
+  const p = preview(NUMBERED_ROWS, {}, "paste");
+
+  it("reads the Qty column for quantities, not the row numbers", () => {
+    expect(open(NUMBERED_ROWS, "paste").columns).toEqual(["ignore", "item", "quantity", "installYear", "cost"]);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity])).toEqual([
+      ["Tank water heater", "12"],
+      ["Gas furnace", "12"],
+      ["Boiler", "1"],
+    ]);
+    expect(p.doubtfulQuantity).toBeNull();
+  });
+
+  it("skips the total at the foot, even with a number in front of it", () => {
+    expect(p.skipped).toEqual([{ sheetRow: 5, reason: "total" }]);
+  });
+
+  it("uses # as the quantity when nothing else is, and says so", () => {
+    const sheet = ["#,Item,Year", "12,Fridge,2018", "1,Roof,2008", "24,Smoke detector,2020"].join("\n");
+    const counts = preview(sheet);
+    expect(counts.rows.map((r) => r.row.quantity)).toEqual(["12", "1", "24"]);
+    expect(counts.doubtfulQuantity).toEqual({ column: 0, heading: "#" });
+    const numbered = preview(["#,Item,Year", "1,Fridge,2018", "2,Roof,2008", "3,Smoke detector,2020"].join("\n"));
+    expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
+    expect(numbered.noQuantityColumn).toBe(true);
+    expect(numbered.doubtfulQuantity).toBeNull();
   });
 });
 

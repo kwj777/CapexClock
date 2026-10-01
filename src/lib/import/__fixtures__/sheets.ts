@@ -73,6 +73,15 @@ export const REPLACE_BY_ROWS = [
   "Gas furnace,12,2040,\"$4,000\"",
 ].join("\n");
 
+/** Copied from Excel with the rows numbered, and a total at the foot. The numbers aren't quantities. */
+export const NUMBERED_ROWS = [
+  "#\tItem\tQty\tYear installed\tCost each",
+  "1\tWater heater\t12\t2016\t$1,400",
+  "2\tGas furnace\t12\t2012\t$4,200",
+  "3\tBoiler\t1\t2010\t$60,000",
+  "4\tTotal CapEx\t\t\t$124,800",
+].join("\n");
+
 /** Opens a sheet the way the panel does, failing the test if it can't. */
 export function open(text: string, source: ImportSource = "file"): OpenedSheet {
   const grid = readText(text, parse, source);

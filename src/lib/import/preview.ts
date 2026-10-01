@@ -5,6 +5,7 @@ import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
   componentSlug,
+  doubtfulQuantityColumn,
   headings,
   headingTiming,
   type ColumnRole,
@@ -102,6 +103,8 @@ export interface Preview {
   missingItemColumn: boolean;
   /** No quantity column, so each row counts as one. */
   noQuantityColumn: boolean;
+  /** The quantity comes from a column whose heading only might mean one ("#", "No.", "Units"). */
+  doubtfulQuantity: { column: number; heading: string } | null;
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
   counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
@@ -686,6 +689,7 @@ export function buildPreview(
       ? columns.some((role, c) => componentSlug(role) !== null && headingTiming(heads[c]) === "age")
       : used.has("age") || used.has("remaining") || used.has("replaceBy");
   const count = (status: RowStatus) => rows.filter((r) => r.status === status).length;
+  const doubtful = layout === "rows" ? doubtfulQuantityColumn(heads, columns) : null;
   return {
     rows,
     skipped,
@@ -693,6 +697,7 @@ export function buildPreview(
     usesSheetYear,
     missingItemColumn: layout === "rows" && !used.has("item"),
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
+    doubtfulQuantity: doubtful === null ? null : { column: doubtful, heading: heads[doubtful] },
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
     counts: {
       rows: rows.length,

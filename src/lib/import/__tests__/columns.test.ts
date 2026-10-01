@@ -1,5 +1,8 @@
 import {
+  columnValues,
   componentSlug,
+  doubtfulQuantity,
+  doubtfulQuantityColumn,
   findHeaderRow,
   guessColumns,
   guessField,
@@ -7,6 +10,7 @@ import {
   headingItem,
   headings,
   headingTiming,
+  isCounting,
   offersColumnLayout,
   parseRole,
   samples,
@@ -67,7 +71,7 @@ describe("guessing a column from its heading", () => {
     expect(guessField(heading)).toBe(field);
   });
 
-  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Year built", "Warranty", "Units", "Building", "", "Whatever", "constructor"])(
+  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Year built", "Warranty", "Units", "Building", "", "Whatever", "constructor", "#", "No.", "Item #", "Item no.", "Line", "Ref #", "ID"])(
     "leaves %p unguessed",
     (heading) => {
       expect(guessField(heading)).toBeNull();
@@ -97,6 +101,11 @@ describe("finding the heading row", () => {
     const grid = [["Maple Court CapEx"], ["Updated 2024"], [], ["Item", "Qty", "Year installed", "Cost"], ["Roof", "1", "2008", "38000"]];
     expect(findHeaderRow(grid, match)).toBe(3);
     expect(headings(grid, 3)).toEqual(["Item", "Qty", "Year installed", "Cost"]);
+  });
+
+  it("finds headings that start with a row-number column", () => {
+    const grid = [["Pine Ridge"], ["#", "Item", "Qty"], ["1", "Fridge", "12"]];
+    expect(findHeaderRow(grid, match)).toBe(1);
   });
 
   it("finds item headings in a sheet with a column per item", () => {
@@ -144,6 +153,80 @@ describe("guessing the layout and every column", () => {
 
   it("keeps a sheet with an item column one row per item, even with item headings", () => {
     expect(guessLayout(["Item", "Water heater", "Furnace"], match)).toBe("rows");
+  });
+
+  it("doesn't take a row-number column for the quantity", () => {
+    const grid = [
+      ["#", "Item", "Qty", "Year installed", "Cost each"],
+      ["1", "Water heater", "12", "2016", "$1,400"],
+      ["2", "Gas furnace", "12", "2012", "$4,200"],
+      ["3", "Boiler", "1", "2010", "$60,000"],
+    ];
+    const heads = headings(grid, 0);
+    expect(guessColumns(heads, match, "rows", columnValues(grid, 0))).toEqual(["ignore", "item", "quantity", "installYear", "cost"]);
+    // Even before the values are looked at, a heading that says quantity wins.
+    expect(guessColumns(["No.", "Description", "Quantity", "Install year"], match, "rows")).toEqual([
+      "ignore",
+      "item",
+      "quantity",
+      "installYear",
+    ]);
+    expect(guessColumns(["Item", "Qty", "#"], match, "rows")).toEqual(["item", "quantity", "ignore"]);
+  });
+
+  it("uses a # or Units column as the quantity only when no heading names one and the values are counts", () => {
+    const sheet = (head: string, values: string[]) => {
+      const grid = [["Item", head], ...values.map((v, i) => [`Item ${i}`, v])];
+      return guessColumns(headings(grid, 0), match, "rows", columnValues(grid, 0))[1];
+    };
+    expect(sheet("#", ["1", "2", "3", "4"])).toBe("ignore");
+    expect(sheet("No.", ["101", "102", "103"])).toBe("ignore");
+    expect(sheet("#", ["12", "1", "24"])).toBe("quantity");
+    expect(sheet("#", ["A1", "A2", "B1"])).toBe("ignore");
+    expect(sheet("Units", ["12", "1", "24", "12"])).toBe("quantity");
+    // The same number on every row is the building's unit count.
+    expect(sheet("Units", ["12", "12", "12"])).toBe("ignore");
+    expect(sheet("Units", ["12"])).toBe("ignore");
+    expect(sheet("#", [])).toBe("ignore");
+  });
+
+  it("names the quantity column when its heading only might mean one", () => {
+    expect(doubtfulQuantityColumn(["Item", "#"], ["item", "quantity"])).toBe(1);
+    expect(doubtfulQuantityColumn(["Item", "Units"], ["item", "quantity"])).toBe(1);
+    expect(doubtfulQuantityColumn(["Item", "Qty"], ["item", "quantity"])).toBeNull();
+    expect(doubtfulQuantityColumn(["Item", "#"], ["item", "ignore"])).toBeNull();
+    expect(doubtfulQuantity("No.")).toBe("number");
+    expect(doubtfulQuantity("Units")).toBe("units");
+    expect(doubtfulQuantity("# of units")).toBeNull();
+  });
+
+  it("knows numbering when it sees it", () => {
+    expect(isCounting(["1", "2", "3"])).toBe(true);
+    expect(isCounting(["1.", "2.", "3.", "4."])).toBe(true);
+    expect(isCounting(["101", "102", "103"])).toBe(true);
+    expect(isCounting(["1", "2"])).toBe(false);
+    expect(isCounting(["1", "1", "1"])).toBe(false);
+    expect(isCounting(["12", "1", "2"])).toBe(false);
+    expect(isCounting(["1", "2", "x"])).toBe(false);
+  });
+
+  it("uses # or No. as the apartment in a sheet with a column per item", () => {
+    expect(guessColumns(["#", "Water heater installed", "Furnace installed"], match, "columns")).toEqual([
+      "location",
+      "component:tank-water-heater",
+      "component:gas-furnace",
+    ]);
+    expect(guessColumns(["Apt", "No.", "Water heater installed"], match, "columns")).toEqual([
+      "location",
+      "ignore",
+      "component:tank-water-heater",
+    ]);
+  });
+
+  it("reads a System column as the item names when there's no item column", () => {
+    expect(guessColumns(["System", "Qty", "Year installed", "Cost"], match, "rows")).toEqual(["item", "quantity", "installYear", "cost"]);
+    expect(guessColumns(["Category", "Building system", "Qty"], match, "rows")).toEqual(["category", "item", "quantity"]);
+    expect(guessColumns(["Item", "System"], match, "rows")).toEqual(["item", "category"]);
   });
 
   it("reads a dropdown's value back as a role", () => {

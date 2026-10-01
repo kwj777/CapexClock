@@ -1,4 +1,5 @@
 import {
+  columnValues,
   findHeaderRow,
   guessColumns,
   guessLayout,
@@ -34,8 +35,14 @@ export function openSheet(grid: Grid, match: NameMatcher): OpenedSheet | FailRea
     headings: heads,
     offersColumnLayout: offersColumnLayout(heads, match),
     layout,
-    columns: guessColumns(heads, match, layout),
+    columns: guessColumns(heads, match, layout, columnValues(grid, headerRow)),
   };
+}
+
+/** The guesses for a layout, when the owner switches to it. */
+export function columnsFor(opened: OpenedSheet, match: NameMatcher, layout: Layout): ColumnRole[] {
+  const { grid, headerRow } = opened.sheet;
+  return guessColumns(opened.headings, match, layout, columnValues(grid, headerRow));
 }
 
 /** The choices a newly opened sheet starts with: the guesses, and this year as the sheet's year. */
