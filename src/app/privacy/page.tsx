@@ -8,13 +8,13 @@ import { turnstileSiteKey } from "@/lib/turnstile";
 export const metadata: Metadata = {
   title: "Privacy | CapexClock",
   description:
-    "What CapexClock collects, why, and who helps run the site: PostHog analytics, Supabase accounts and Netlify Forms. We don't sell your data.",
+    "What CapexClock collects, why, and who helps run the site: PostHog analytics, Supabase accounts, Netlify Forms and Stripe payments. We don't sell your data.",
   alternates: { canonical: "/privacy" },
 };
 
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
-// src/lib/turnstile.ts) whenever those change.
+// src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
 const UPDATED = "October 1, 2026";
 
 // The sign-in check is mentioned only on deploys that have it switched on.
@@ -38,6 +38,7 @@ export default function PrivacyPage() {
               <li>We don&apos;t sell your data or share it with advertisers.</li>
               <li>The free calculators work without an account. What you enter stays in your browser unless you save it to an account.</li>
               <li>We use PostHog to see how the site is used. It never gets your email, your property names or addresses, or anything you type.</li>
+              <li>Payments go through Stripe. We never see your card number.</li>
             </ul>
           </Section>
 
@@ -78,6 +79,16 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
+          <Section title="Payments">
+            <p>
+              If you buy a founding membership or a condition report, Stripe processes the payment on its own secure
+              page, and we never see your card number. Stripe shows us your name, email, billing country and postal
+              code, your card&apos;s brand and last four digits, what you bought, and whether it was paid or refunded.
+              We use these to deliver your order, send your reminders and answer you. Stripe also emails your receipts
+              and runs the page where members cancel, and it handles your card details under its own privacy policy.
+            </p>
+          </Section>
+
           <Section title="Files you email us">
             <p>
               You might email us a spreadsheet, a PDF export or photos, for example to ask for a report or to have rows
@@ -104,6 +115,7 @@ export default function PrivacyPage() {
                 your answers to our one-question survey, and which buttons for ideas we haven&apos;t built yet you saw,
                 clicked or signed up for, but not the email or unit count you gave,
               </li>
+              <li>clicks on Buy now and visits to a thank-you page after paying, with which offer it was and nothing else,</li>
               <li>on the early access form, your answers about units and how you track CapEx, but not your email,</li>
               <li>basic details such as your browser, screen size and rough location, which PostHog works out from your IP address.</li>
             </ul>
@@ -118,7 +130,7 @@ export default function PrivacyPage() {
           <Section title="Who we share data with">
             <p>
               Only the services that run the site: Netlify (hosting, the early access list and idea sign-ups), Supabase
-              (accounts, saved properties and sign-in emails), PostHog (analytics),{" "}
+              (accounts, saved properties and sign-in emails), PostHog (analytics), Stripe (payments),{" "}
               {CAPTCHA_ON && "Cloudflare (the check on the sign-in page), "}and Anthropic (reading files you email us).
               We don&apos;t sell your data, and we don&apos;t share it with advertisers.
             </p>
@@ -131,7 +143,7 @@ export default function PrivacyPage() {
               <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
                 {CONTACT_EMAIL}
               </a>
-              .
+              . Records of payments stay with Stripe and in our accounts for as long as tax law requires.
             </p>
           </Section>
 
