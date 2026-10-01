@@ -1,0 +1,422 @@
+"use client";
+
+import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { track } from "@/lib/analytics";
+import { guessedYear } from "@/lib/export/rows";
+import { compareReplaceNow, replacementCost, type AtRiskItem, type ForecastComponent } from "@/lib/forecast";
+import {
+  applyLabel,
+  appliedText,
+  EMERGENCY_HINT,
+  EMERGENCY_PERCENT_TEXT,
+  emergencyNote,
+  eitherWayText,
+  ifYouWait,
+  itemDetail,
+  leadVariants,
+  parseEmergencyPercent,
+  perUnitText,
+  reserveVariants,
+  compareSummary,
+  totalChange,
+  undoneText,
+  withReplaceNow,
+} from "./compare";
+import type { Draft, DraftRow } from "./draft";
+import { formatMoney, formatReserve } from "./format";
+
+const inputClass =
+  "block rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+
+/** Draft as it was before Apply, offered back until anything else changes it (like Clear). */
+interface Applied {
+  before: Draft;
+  after: Draft;
+  count: number;
+}
+
+/**
+ * "What if we replace everything at risk now?" under the at-risk list. It compares
+ * the forecast with a copy where the ticked at-risk rows are set to replace this
+ * year. Nothing in the draft changes until Apply, which can be undone.
+ */
+export default function CompareAtRisk({
+  startYear,
+  unitCount,
+  components,
+  rows,
+  draft,
+  setDraft,
+}: {
+  startYear: number;
+  unitCount: number;
+  /** The forecast's components, as the calculator worked them out from the draft. */
+  components: ForecastComponent[];
+  /** Form rows by id, for whether an install year was typed and ticked as a guess. */
+  rows: ReadonlyMap<string, DraftRow>;
+  draft: Draft;
+  setDraft: Dispatch<SetStateAction<Draft>>;
+}) {
+  const baseId = useId();
+  const toggleId = `${baseId}-toggle`;
+  const panelId = `${baseId}-panel`;
+  const undoId = `${baseId}-undo`;
+  const applyId = `${baseId}-apply`;
+  const [open, setOpen] = useState(false);
+  const [percentText, setPercentText] = useState("");
+  const [editingPercent, setEditingPercent] = useState(false);
+  // Unticked rather than ticked, so an item that comes into the list starts ticked.
+  const [unticked, setUnticked] = useState<ReadonlySet<string>>(() => new Set());
+  const [applied, setApplied] = useState<Applied | null>(null);
+  const [spoken, setSpoken] = useState("");
+  // Set when ticking or the emergency box changes the figures; they're read out once that pauses.
+  const [speak, setSpeak] = useState(false);
+  const viewed = useRef(false);
+  const focusNext = useRef<string | null>(null);
+
+  const { percent, error: percentError } = parseEmergencyPercent(percentText);
+  const comparison = useMemo(
+    () =>
+      compareReplaceNow(
+        { startYear, unitCount, components },
+        { only: new Set(components.filter((c) => !unticked.has(c.id)).map((c) => c.id)), emergencyPercent: percent },
+      ),
+    [startYear, unitCount, components, unticked, percent],
+  );
+  const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components]);
+  const summary = compareSummary(comparison, startYear);
+
+  const canUndo =
+    applied !== null &&
+    applied.after.rows === draft.rows &&
+    applied.after.unitCount === draft.unitCount &&
+    applied.after.yearBuilt === draft.yearBuilt;
+
+  function say(message: string) {
+    // A repeat of the same words wouldn't be read again, so vary it invisibly.
+    setSpoken((current) => (current === message ? `${message} ` : message));
+  }
+
+  useEffect(() => {
+    if (!speak) return;
+    const timer = window.setTimeout(() => {
+      setSpeak(false);
+      setSpoken((current) => (current === summary ? `${summary} ` : summary));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [speak, summary]);
+
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  });
+
+  function toggle() {
+    if (!open && !viewed.current && comparison.items.length > 0) {
+      viewed.current = true;
+      void track("compare_viewed", { items: String(comparison.items.length) });
+    }
+    setOpen((o) => !o);
+  }
+
+  function setTicked(id: string, ticked: boolean) {
+    setUnticked((current) => {
+      const next = new Set(current);
+      if (ticked) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setSpeak(true);
+  }
+
+  function apply() {
+    const count = comparison.chosen.length;
+    if (count === 0) return;
+    const next = withReplaceNow(draft, new Set(comparison.chosen));
+    setApplied({ before: draft, after: next, count });
+    setDraft(next);
+    void track("compare_applied", { items: String(count) });
+    setSpeak(false);
+    say(`${appliedText(count)} The forecast above is updated.`);
+    // Apply goes with the items it moved, so move to Undo.
+    focusNext.current = undoId;
+  }
+
+  function undo() {
+    if (!canUndo) return;
+    setDraft(applied.before);
+    setApplied(null);
+    say(undoneText(applied.count));
+    focusNext.current = open ? applyId : toggleId;
+  }
+
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {spoken}
+      </p>
+      <button
+        id={toggleId}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800"
+      >
+        What if we replace everything at risk now?
+        <svg
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-400 ${open ? "rotate-180" : ""}`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+      {canUndo && (
+        <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
+          {appliedText(applied.count)}{" "}
+          <button
+            id={undoId}
+            type="button"
+            onClick={undo}
+            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+          >
+            Undo
+          </button>
+        </p>
+      )}
+      <div id={panelId} hidden={!open} className="mt-4">
+        {open &&
+          (comparison.items.length === 0 ? (
+            <p className="text-sm text-slate-600 dark:text-slate-300">Everything at risk is set to Replace this year.</p>
+          ) : (
+            <ComparisonPanel
+              baseId={baseId}
+              applyId={applyId}
+              startYear={startYear}
+              comparison={comparison}
+              byId={byId}
+              rows={rows}
+              unticked={unticked}
+              onTick={setTicked}
+              percentText={percentText}
+              percent={percent}
+              showPercentError={percentError && !editingPercent}
+              onPercentChange={(value) => {
+                setPercentText(value);
+                setSpeak(true);
+              }}
+              onPercentEditing={setEditingPercent}
+              onApply={apply}
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonPanel({
+  baseId,
+  applyId,
+  startYear,
+  comparison,
+  byId,
+  rows,
+  unticked,
+  onTick,
+  percentText,
+  percent,
+  showPercentError,
+  onPercentChange,
+  onPercentEditing,
+  onApply,
+}: {
+  baseId: string;
+  applyId: string;
+  startYear: number;
+  comparison: ReturnType<typeof compareReplaceNow>;
+  byId: ReadonlyMap<string, ForecastComponent>;
+  rows: ReadonlyMap<string, DraftRow>;
+  unticked: ReadonlySet<string>;
+  onTick: (id: string, ticked: boolean) => void;
+  percentText: string;
+  percent: number;
+  showPercentError: boolean;
+  onPercentChange: (value: string) => void;
+  onPercentEditing: (editing: boolean) => void;
+  onApply: () => void;
+}) {
+  const { items, chosen, alreadyReplacing, asPlanned, replaceNow } = comparison;
+  const percentId = `${baseId}-percent`;
+  const percentLabelId = `${baseId}-percent-label`;
+  const percentSuffixId = `${baseId}-percent-suffix`;
+  const hintId = `${baseId}-percent-hint`;
+  const noteId = `${baseId}-percent-note`;
+  const errorId = `${baseId}-percent-error`;
+  const cash = formatMoney(replaceNow.neededNow);
+  const total = totalChange(asPlanned.total, replaceNow.total);
+  const monthly = formatReserve(replaceNow.monthlyReserve);
+  const perUnit = perUnitText(asPlanned, replaceNow);
+  const eitherWay = eitherWayText(items, startYear);
+  const sure = items.filter((i) => !i.installYearIsEstimate);
+  const toCheck = items.filter((i) => i.installYearIsEstimate);
+  const shownHint = showPercentError ? errorId : percent > 0 ? noteId : hintId;
+
+  const choice = (item: AtRiskItem) => {
+    const component = byId.get(item.componentId);
+    const row = rows.get(item.componentId);
+    return (
+      <li key={item.componentId}>
+        <label className="flex items-start gap-2.5 py-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={!unticked.has(item.componentId)}
+            onChange={(e) => onTick(item.componentId, e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="text-slate-900 dark:text-white">{item.name}</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              {itemDetail(item, component?.installYear ?? item.endOfLifeYear, row !== undefined && guessedYear(row))}
+            </span>
+          </span>
+          {component && (
+            <span className="shrink-0 tabular-nums text-slate-900 dark:text-white">
+              {formatMoney(replacementCost(component))}
+            </span>
+          )}
+        </label>
+      </li>
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <OneOf variants={leadVariants(chosen.length, items.length, startYear)} className="text-sm text-slate-700 dark:text-slate-300" />
+        <dl className="mt-3 space-y-3">
+          <Figure label={`Cash needed in ${startYear}`} value={cash} detail={ifYouWait(cash, formatMoney(asPlanned.neededNow))} />
+          <Figure label="10-year total" value={total.change} detail={total.detail} />
+          <Figure
+            label="Monthly reserve"
+            value={monthly}
+            detail={ifYouWait(monthly, formatReserve(asPlanned.monthlyReserve))}
+            extra={perUnit}
+          />
+        </dl>
+        <OneOf
+          variants={reserveVariants(asPlanned.monthlyReserve, replaceNow.monthlyReserve)}
+          className="mt-3 text-sm text-slate-700 dark:text-slate-300"
+        />
+        {eitherWay && <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{eitherWay}</p>}
+      </div>
+
+      <div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label id={percentLabelId} htmlFor={percentId}>
+            Emergency replacements cost
+          </label>
+          <input
+            id={percentId}
+            className={`${inputClass} w-20`}
+            inputMode="decimal"
+            value={percentText}
+            aria-labelledby={`${percentLabelId} ${percentSuffixId}`}
+            aria-invalid={showPercentError || undefined}
+            aria-describedby={shownHint}
+            onFocus={() => onPercentEditing(true)}
+            onBlur={() => onPercentEditing(false)}
+            onChange={(e) => onPercentChange(e.target.value)}
+          />
+          <span id={percentSuffixId}>% more</span>
+        </div>
+        {/* The hint, the note and the error share one spot sized for the longest, so
+            typing never moves what's below. */}
+        <div className="mt-1.5 grid text-xs">
+          <p id={hintId} className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${shownHint === hintId ? "" : "invisible"}`}>
+            {EMERGENCY_HINT}
+          </p>
+          <p id={noteId} className={`col-start-1 row-start-1 text-slate-600 dark:text-slate-300 ${shownHint === noteId ? "" : "invisible"}`}>
+            {emergencyNote(percent || 25)}
+          </p>
+          <p
+            id={errorId}
+            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${shownHint === errorId ? "" : "invisible"}`}
+          >
+            {EMERGENCY_PERCENT_TEXT}
+          </p>
+        </div>
+      </div>
+
+      {sure.length > 0 && (
+        <fieldset>
+          <legend className="text-sm font-semibold text-slate-950 dark:text-white">Replace in {startYear}</legend>
+          <ul className="mt-1">{sure.map(choice)}</ul>
+        </fieldset>
+      )}
+      {toCheck.length > 0 && (
+        <fieldset>
+          <legend className="text-sm font-semibold text-slate-950 dark:text-white">
+            Check these install years before applying.
+          </legend>
+          <ul className="mt-1">{toCheck.map(choice)}</ul>
+        </fieldset>
+      )}
+      {alreadyReplacing > 0 && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {alreadyReplacing === 1
+            ? "1 more is already set to Replace this year."
+            : `${alreadyReplacing} more are already set to Replace this year.`}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button
+          id={applyId}
+          type="button"
+          onClick={onApply}
+          disabled={chosen.length === 0}
+          className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {applyLabel(chosen.length)}
+        </button>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Apply ticks Replace this year for the items you chose. Nothing changes until you click it.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** One figure on the replace-now side, with what it is as things stand under it. */
+function Figure({ label, value, detail, extra }: { label: string; value: string; detail: string; extra?: string | null }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}</dt>
+      <dd>
+        <span className="block text-xl font-semibold tabular-nums text-slate-950 dark:text-white">{value}</span>
+        <span className="block text-sm tabular-nums text-slate-500 dark:text-slate-400">{detail}</span>
+        {extra && <span className="block text-sm tabular-nums text-slate-500 dark:text-slate-400">{extra}</span>}
+      </dd>
+    </div>
+  );
+}
+
+/** Draws every variant in one spot, sized for the longest, and shows only the one that applies. */
+function OneOf({ variants, className }: { variants: { text: string; shown: boolean }[]; className: string }) {
+  return (
+    <div className={`grid ${className}`}>
+      {variants.map((v, i) => (
+        <p key={i} className={`col-start-1 row-start-1 ${v.shown ? "" : "invisible"}`}>
+          {v.text}
+        </p>
+      ))}
+    </div>
+  );
+}

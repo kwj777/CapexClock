@@ -53,6 +53,8 @@ import {
 } from "./draft";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
+import { riskText } from "./compare";
+import CompareAtRisk from "./CompareAtRisk";
 import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.
@@ -537,7 +539,16 @@ export function CalculatorView({
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <AtRisk forecast={forecast} rows={rowsById} />
+            <AtRisk forecast={forecast} rows={rowsById}>
+              <CompareAtRisk
+                startYear={startYear}
+                unitCount={unitCount}
+                components={components}
+                rows={rowsById}
+                draft={draft}
+                setDraft={setDraft}
+              />
+            </AtRisk>
             <DueTable forecast={forecast} rows={rowsById} />
           </div>
 
@@ -880,7 +891,8 @@ function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate:
   );
 }
 
-function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
+/** The at-risk list; children (the replace-now comparison) show under it when it isn't empty. */
+function AtRisk({ forecast, rows, children }: { forecast: Forecast; rows: RowsById; children?: ReactNode }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
@@ -902,14 +914,13 @@ function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
                     : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
                 }`}
               >
-                {item.status === "overdue"
-                  ? `Past due since ${item.endOfLifeYear}`
-                  : `Due ${item.endOfLifeYear}`}
+                {riskText(item)}
               </span>
             </li>
           ))}
         </ul>
       )}
+      {forecast.atRisk.length > 0 && children}
     </div>
   );
 }
