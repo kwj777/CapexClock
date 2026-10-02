@@ -38,8 +38,8 @@ export const FORMAT_COLUMNS: readonly FormatColumn[] = [
   {
     heading: "Component",
     field: "item",
-    what: "What it is: Roof, Water heater, Furnace, Refrigerator.",
-    why: "Names we know fill in the category and a typical useful life.",
+    what: "What it is, like Asphalt shingle roof, Water heater, Furnace or Refrigerator.",
+    why: "Names we know fill in the category and a typical useful life. For a short name like Roof, the import asks which kind.",
   },
   {
     heading: "Category",
