@@ -1,3 +1,4 @@
+import { preview } from "../__fixtures__/sheets";
 import type { ImportedRow, Preview, PreviewRow } from "../preview";
 import {
   addLabel,
@@ -127,6 +128,8 @@ describe("import wording", () => {
       noQuantityColumn: false,
       quantityFromTotals: false,
       doubtfulQuantity: null,
+      noYearColumn: false,
+      doubtfulYears: [],
       withoutCost: 0,
       counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
     };
@@ -144,9 +147,24 @@ describe("import wording", () => {
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",
     ]);
+    expect(previewHints({ ...base, noYearColumn: true })).toEqual([
+      "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above.",
+    ]);
     expect(previewHints({ ...base, doubtfulQuantity: { column: 0, heading: "#" } })).toEqual([
       'We used column A, "#", as the quantity. If it numbers the rows or apartments instead, set it to Ignore.',
     ]);
+  });
+
+  it("names year columns that could mean something else", () => {
+    const base = preview("Item,Qty,Date,Cost\nFridge,12,2018,900");
+    expect(previewHints({ ...base, withoutCost: 0 })).toEqual([
+      'We read column C, "Date", as when each item was installed or last replaced. If it\'s another date, like a service date or the year to replace by, change it above.',
+    ]);
+    const due = preview("Item,Qty,Replacement year,Cost\nFridge,12,2030,900");
+    expect(previewHints(due)).toEqual([
+      'We read column C, "Replacement year", as the year to replace each item by. If it\'s when each item was last replaced, choose Install year for it above.',
+    ]);
+    expect(previewHints(preview("Item,Qty,Year installed,Cost\nFridge,12,2018,900"))).toEqual([]);
   });
 
   it("names columns the way spreadsheets do", () => {

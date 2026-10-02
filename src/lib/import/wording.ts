@@ -132,6 +132,19 @@ export function previewHints(preview: Preview): string[] {
       `We used column ${columnLetter(column)}, ${quote(heading)}, as the quantity. If it numbers the rows or apartments instead, set it to Ignore.`,
     );
   }
+  if (preview.noYearColumn && !preview.missingItemColumn) {
+    hints.push(
+      "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above.",
+    );
+  }
+  for (const { column, heading, role } of preview.doubtfulYears) {
+    const named = `column ${columnLetter(column)}, ${quote(heading)}`;
+    hints.push(
+      role === "installYear"
+        ? `We read ${named}, as when each item was installed or last replaced. If it's another date, like a service date or the year to replace by, change it above.`
+        : `We read ${named}, as the year to replace each item by. If it's when each item was last replaced, choose Install year for it above.`,
+    );
+  }
   if (preview.withoutCost > 0) {
     hints.push(
       `${plural(preview.withoutCost, "row has", "rows have")} no cost yet. Add costs after importing to include ${

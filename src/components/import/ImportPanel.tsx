@@ -156,7 +156,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
     begin(source);
     const grid = readText(input, parse, source);
     if (typeof grid === "string") return fail(grid);
-    const result = openSheet(grid, match);
+    const result = openSheet(grid, match, currentYear);
     if (typeof result === "string") return fail(result);
     setProblem(null);
     setOpened(result);
@@ -189,7 +189,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
   function setLayout(layout: Layout) {
     if (!opened) return;
     // Fixes were for the other layout's rows, so they start again.
-    setChoices((c) => c && { ...c, layout, columns: columnsFor(opened, match, layout), fixes: {} });
+    setChoices((c) => c && { ...c, layout, columns: columnsFor(opened, match, layout, currentYear), fixes: {} });
   }
 
   function setSheetYear(value: string) {

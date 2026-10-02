@@ -6,6 +6,7 @@ import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
   componentSlug,
   doubtfulQuantityColumn,
+  doubtfulYearColumns,
   headings,
   headingTiming,
   type ColumnRole,
@@ -107,6 +108,10 @@ export interface Preview {
   quantityFromTotals: boolean;
   /** The quantity comes from a column whose heading only might mean one ("#", "No.", "Units"). */
   doubtfulQuantity: { column: number; heading: string } | null;
+  /** No column gives install years (or ages, years left or replace-by years), so each row uses the year built. */
+  noYearColumn: boolean;
+  /** Year columns whose headings could mean something else, like "Date" or "Replacement year". */
+  doubtfulYears: { column: number; heading: string; role: "installYear" | "replaceBy" }[];
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
   counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
@@ -749,6 +754,8 @@ export function buildPreview(
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
     quantityFromTotals: layout === "rows" && !used.has("quantity") && used.has("total") && used.has("cost"),
     doubtfulQuantity: doubtful === null ? null : { column: doubtful, heading: heads[doubtful] },
+    noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
+    doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
     counts: {
       rows: rows.length,

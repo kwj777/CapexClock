@@ -74,19 +74,19 @@ describe("reading pasted rows and CSV files", () => {
 
 describe("opening a sheet", () => {
   it("says when there are no headings", () => {
-    expect(openSheet([["Water heater", "12", "2016"]], match)).toBe("no_header");
+    expect(openSheet([["Water heater", "12", "2016"]], match, 2026)).toBe("no_header");
   });
 
   it("stops at 2,000 rows under the headings", () => {
     const rows = (n: number) => [["Item", "Qty"], ...Array.from({ length: n }, () => ["Fridge", "1"])];
-    expect(openSheet(rows(2001), match)).toBe("too_big");
-    expect(typeof openSheet(rows(2000), match)).toBe("object");
+    expect(openSheet(rows(2001), match, 2026)).toBe("too_big");
+    expect(typeof openSheet(rows(2000), match, 2026)).toBe("object");
     // Blank rows at the end don't count.
-    expect(typeof openSheet([...rows(2000), [""], [""]], match)).toBe("object");
+    expect(typeof openSheet([...rows(2000), [""], [""]], match, 2026)).toBe("object");
   });
 
   it("starts with the guesses and this year as the sheet's year", () => {
-    const opened = openSheet([["Item", "Age"], ["Fridge", "8"]], match);
+    const opened = openSheet([["Item", "Age"], ["Fridge", "8"]], match, 2026);
     if (typeof opened === "string") throw new Error(opened);
     expect(startingChoices(opened, 2026)).toEqual({
       layout: "rows",

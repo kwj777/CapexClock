@@ -70,6 +70,7 @@ const EXACT: Record<string, FieldKind | null> = {
   "year": "installYear",
   "yr": "installYear",
   "date": "installYear",
+  "when": "installYear",
   "eul": "life",
   "rul": "remaining",
   "due": "replaceBy",
@@ -106,10 +107,27 @@ const EXACT: Record<string, FieldKind | null> = {
 const EXACT_HEADINGS = new Map(Object.entries(EXACT));
 
 /**
+ * How sure a heading is about its kind. A weak one ("Year") gives way to a sure one
+ * ("Year installed") in another column. A doubtful one is named in the preview so
+ * the owner can check it: a bare "Date" may be a service date, and "Replacement
+ * year" may be when an item was last replaced or when it's due.
+ */
+export type Strength = "sure" | "weak" | "doubtful";
+
+const RANK: Record<Strength, number> = { sure: 2, weak: 1, doubtful: 0 };
+
+const EXACT_STRENGTH = new Map<string, Strength>([
+  ["year", "weak"],
+  ["yr", "weak"],
+  ["date", "doubtful"],
+  ["when", "doubtful"],
+]);
+
+/**
  * Keyword rules, in order: the first one whose words are all in the heading wins.
  * Null rules come first: tenant details and the year built are never read.
  */
-const RULES: [FieldKind | null, string[]][] = [
+const RULES: [FieldKind | null, string[], Strength?][] = [
   [null, ["tenant"]],
   [null, ["tenants"]],
   [null, ["resident"]],
@@ -117,6 +135,8 @@ const RULES: [FieldKind | null, string[]][] = [
   [null, ["phone"]],
   [null, ["email"]],
   [null, ["rent"]],
+  [null, ["lease"]],
+  [null, ["move"]],
   [null, ["built"]],
   [null, ["warranty"]],
   [null, ["sq", "ft"]],
@@ -125,6 +145,7 @@ const RULES: [FieldKind | null, string[]][] = [
   ["total", ["ext", "cost"]],
   ["cost", ["cost"]],
   ["cost", ["price"]],
+  ["replaceBy", ["budget", "year"]],
   ["cost", ["budget"]],
   ["cost", ["$"]],
   ["remaining", ["remaining"]],
@@ -136,23 +157,43 @@ const RULES: [FieldKind | null, string[]][] = [
   ["life", ["expectancy"]],
   ["age", ["age"]],
   ["age", ["old"]],
+  ["age", ["years", "since"]],
+  ["age", ["yrs", "since"]],
+  ["age", ["years", "in", "service"]],
+  ["age", ["yrs", "in", "service"]],
+  ["quantity", ["qty"]],
+  ["quantity", ["quantity"]],
+  // A past replacement is an install year: "Date of last replacement", "Install/replace year".
+  ["installYear", ["install"]],
+  ["installYear", ["installed"]],
+  ["installYear", ["installation"]],
+  ["installYear", ["last", "replacement"]],
+  ["installYear", ["last", "replace"]],
+  ["installYear", ["previous", "replacement"]],
+  ["installYear", ["prior", "replacement"]],
+  ["installYear", ["recent", "replacement"]],
+  ["installYear", ["in", "service"]],
   ["replaceBy", ["replace", "by"]],
-  ["replaceBy", ["replacement", "year"]],
-  ["replaceBy", ["replacement", "date"]],
   ["replaceBy", ["replace", "year"]],
   ["replaceBy", ["replace", "in"]],
   ["replaceBy", ["next", "replacement"]],
   ["replaceBy", ["due"]],
   ["replaceBy", ["end", "of"]],
-  ["installYear", ["install"]],
-  ["installYear", ["installed"]],
-  ["installYear", ["installation"]],
+  ["replaceBy", ["planned"]],
+  ["replaceBy", ["scheduled"]],
+  ["replaceBy", ["projected"]],
+  ["replaceBy", ["target"]],
+  // Reserve studies mean the year it's due; an owner's own list may mean the last one.
+  ["replaceBy", ["replacement", "year"], "doubtful"],
+  ["replaceBy", ["replacement", "yr"], "doubtful"],
+  ["replaceBy", ["replacement", "date"], "doubtful"],
   ["installYear", ["replaced"]],
-  ["installYear", ["year"]],
-  ["installYear", ["yr"]],
-  ["installYear", ["date"]],
-  ["quantity", ["qty"]],
-  ["quantity", ["quantity"]],
+  ["installYear", ["purchased"]],
+  ["installYear", ["purchase"]],
+  ["installYear", ["bought"]],
+  ["installYear", ["year"], "weak"],
+  ["installYear", ["yr"], "weak"],
+  ["installYear", ["date"], "doubtful"],
   ["quantity", ["count"]],
   ["quantity", ["number", "of"]],
   ["quantity", ["#", "of"]],
@@ -185,15 +226,38 @@ const RULES: [FieldKind | null, string[]][] = [
   ["item", ["assets"]],
 ];
 
+/**
+ * Things done to an item that don't replace it. A heading with one of these, like
+ * "Last service date", "Date inspected" or "Repair cost", isn't an install year,
+ * an age or a replacement cost, so it's left out. "Service life" is still a life.
+ */
+const EVENT_WORDS = new Set(
+  "service serviced servicing inspection inspections inspected inspect insp maintenance maintained maint tested test testing checked cleaned cleaning repaired repair repairs pumped".split(
+    " ",
+  ),
+);
+const EVENT_BLOCKS = new Set<FieldKind>(["installYear", "replaceBy", "age", "cost", "total", "quantity"]);
+
+/** A heading's field and how sure it is, or null for a heading that isn't read. */
+export function guessHeading(heading: string): { field: FieldKind | null; strength: Strength } {
+  const text = words(heading);
+  if (text === "") return { field: null, strength: "sure" };
+  const exact = EXACT_HEADINGS.get(text);
+  if (exact !== undefined) return { field: exact, strength: EXACT_STRENGTH.get(text) ?? "sure" };
+  const have = text.split(" ");
+  for (const [field, needed, strength = "sure"] of RULES) {
+    if (!needed.every((w) => have.includes(w))) continue;
+    // "Service" in "Years in service" is the rule's own word; in "Service date" it isn't.
+    const event = have.some((w) => EVENT_WORDS.has(w) && !needed.includes(w));
+    if (field !== null && EVENT_BLOCKS.has(field) && event) return { field: null, strength: "sure" };
+    return { field, strength };
+  }
+  return { field: null, strength: "sure" };
+}
+
 /** The field a heading names, or null: "Year installed" is installYear, "Unit" is a location. */
 export function guessField(heading: string): FieldKind | null {
-  const text = words(heading);
-  if (text === "") return null;
-  const exact = EXACT_HEADINGS.get(text);
-  if (exact !== undefined) return exact;
-  const have = new Set(text.split(" "));
-  for (const [kind, needed] of RULES) if (needed.every((w) => have.has(w))) return kind;
-  return null;
+  return guessHeading(heading).field;
 }
 
 // Headings that might number the rows or apartments rather than count anything.
@@ -220,7 +284,7 @@ export function isCounting(values: readonly string[]): boolean {
 
 // Words that say when, in a heading like "Water heater installed" or "WH age".
 const TIMING_WORDS = new Set(
-  "installed install installation year yr yrs date age old replaced last when in".split(" "),
+  "installed install installation year yr yrs date age old replaced last when in purchased purchase bought".split(" "),
 );
 
 /** How a component column's cells give the install year. */
@@ -234,10 +298,10 @@ export function headingTiming(heading: string): Timing {
 
 /** The library item a heading names, if sure: "Water heater installed" is Tank water heater. */
 export function headingItem(heading: string, match: NameMatcher): string | null {
-  const rest = words(heading)
-    .split(" ")
-    .filter((w) => !TIMING_WORDS.has(w))
-    .join(" ");
+  const all = words(heading).split(" ");
+  // "Water heater service date" holds service dates, not install years.
+  if (all.some((w) => EVENT_WORDS.has(w))) return null;
+  const rest = all.filter((w) => !TIMING_WORDS.has(w)).join(" ");
   if (rest === "") return null;
   const found = match(rest);
   return found.kind === "exact" || found.kind === "matched" ? found.slug : null;
@@ -315,22 +379,41 @@ export function columnValues(grid: Grid, headerRow: number): ColumnValues {
   };
 }
 
+/** Every year named in a column is before this year, so none of them can still be due. */
+export function yearsHavePassed(values: readonly string[], currentYear: number): boolean {
+  let found = false;
+  for (const value of values) {
+    const years = value.match(/(?<!\d)(?:1[89]\d\d|2\d\d\d)(?!\d)/g);
+    if (!years) {
+      // "ASAP" or "next year" says the column is about what's coming.
+      if (/\b(?:now|asap|due|overdue|next|soon)\b/i.test(value)) return false;
+      continue;
+    }
+    if (years.some((y) => Number(y) >= currentYear)) return false;
+    found = true;
+  }
+  return found;
+}
+
 /**
- * A role for each column, from its heading. Only the first column of each kind is
- * used (notes columns are all kept), so later ones start as "ignore". A "#", "No."
- * or "Units" column is the quantity only when no heading names one and its values
- * look like counts. With no item column, a "System" column holds the item names.
+ * A role for each column, from its heading. Only one column of each kind is used
+ * (notes columns are all kept): the surest heading, or the first of equally sure
+ * ones, so "Year installed" wins over a bare "Date". A "#", "No." or "Units" column
+ * is the quantity only when no heading names one and its values look like counts.
+ * With no item column, a "System" column holds the item names. A "Replacement year"
+ * column whose years have all gone by (before `currentYear`) is read as when each
+ * item was last replaced.
  */
 export function guessColumns(
   heads: readonly string[],
   match: NameMatcher,
   layout: Layout,
   values: ColumnValues = () => [],
+  currentYear?: number,
 ): ColumnRole[] {
   const items = componentColumns(heads, match);
-  const seen = new Set<ColumnRole>();
-  const roles = heads.map((heading, i): ColumnRole => {
-    const field = guessField(heading);
+  const guesses = heads.map((heading, i): { role: ColumnRole; rank: number } => {
+    const { field, strength } = guessHeading(heading);
     let role: ColumnRole;
     if (layout === "columns") {
       const slug = items[i];
@@ -339,11 +422,16 @@ export function guessColumns(
       // A heading that names an item belongs to the other layout.
       role = items[i] ? "ignore" : (field ?? "ignore");
     }
-    if (role === "ignore" || role === "notes" || role.startsWith("component:")) return role;
-    if (seen.has(role)) return "ignore";
-    seen.add(role);
-    return role;
+    return { role, rank: RANK[strength] };
   });
+  const many = (role: ColumnRole) => role === "ignore" || role === "notes" || role.startsWith("component:");
+  const chosen = new Map<ColumnRole, number>();
+  guesses.forEach(({ role, rank }, i) => {
+    if (many(role)) return;
+    const at = chosen.get(role);
+    if (at === undefined || rank > guesses[at].rank) chosen.set(role, i);
+  });
+  const roles = guesses.map(({ role }, i): ColumnRole => (many(role) || chosen.get(role) === i ? role : "ignore"));
 
   if (layout === "columns") {
     // "#" or "No." in a sheet of apartments is the apartment number.
@@ -371,6 +459,16 @@ export function guessColumns(
     );
     if (at >= 0) roles[at] = "item";
   }
+  const due = roles.indexOf("replaceBy");
+  if (
+    due >= 0 &&
+    currentYear !== undefined &&
+    !roles.includes("installYear") &&
+    guessHeading(heads[due]).strength === "doubtful" &&
+    yearsHavePassed(values(due), currentYear)
+  ) {
+    roles[due] = "installYear";
+  }
   return roles;
 }
 
@@ -378,6 +476,20 @@ export function guessColumns(
 export function doubtfulQuantityColumn(heads: readonly string[], columns: readonly ColumnRole[]): number | null {
   const at = columns.indexOf("quantity");
   return at >= 0 && guessField(heads[at] ?? "") === null && doubtfulQuantity(heads[at] ?? "") !== null ? at : null;
+}
+
+/** Install-year and replace-by columns whose headings could mean something else, for the preview to name. */
+export function doubtfulYearColumns(
+  heads: readonly string[],
+  columns: readonly ColumnRole[],
+): { column: number; heading: string; role: "installYear" | "replaceBy" }[] {
+  const found: { column: number; heading: string; role: "installYear" | "replaceBy" }[] = [];
+  columns.forEach((role, column) => {
+    if ((role === "installYear" || role === "replaceBy") && guessHeading(heads[column] ?? "").strength === "doubtful") {
+      found.push({ column, heading: heads[column], role });
+    }
+  });
+  return found;
 }
 
 /** The library slug of a component column's role, or null. */

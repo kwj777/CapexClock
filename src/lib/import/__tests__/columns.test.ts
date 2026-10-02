@@ -3,9 +3,11 @@ import {
   componentSlug,
   doubtfulQuantity,
   doubtfulQuantityColumn,
+  doubtfulYearColumns,
   findHeaderRow,
   guessColumns,
   guessField,
+  guessHeading,
   guessLayout,
   headingItem,
   headings,
@@ -14,6 +16,7 @@ import {
   offersColumnLayout,
   parseRole,
   samples,
+  yearsHavePassed,
 } from "../columns";
 import { match } from "../__fixtures__/sheets";
 
@@ -77,6 +80,68 @@ describe("guessing a column from its heading", () => {
       expect(guessField(heading)).toBeNull();
     },
   );
+
+  it.each([
+    "Last service date",
+    "Service date",
+    "Serviced",
+    "Inspection date",
+    "Date inspected",
+    "Last inspected",
+    "Maintenance year",
+    "Next service due",
+    "Service cost",
+    "Repair cost",
+    "Date tested",
+    "Last cleaned",
+    "Septic pumped",
+    "Move-in date",
+    "Lease end",
+    "Warranty end date",
+  ])("leaves %p out: a service, inspection or tenant date isn't an install year", (heading) => {
+    expect(guessField(heading)).toBeNull();
+  });
+
+  it.each([
+    ["Last replacement year", "installYear"],
+    ["Last replacement date", "installYear"],
+    ["Date of last replacement", "installYear"],
+    ["Previous replacement", "installYear"],
+    ["Install/replace year", "installYear"],
+    ["Install or replacement year", "installYear"],
+    ["Year last replaced", "installYear"],
+    ["Replaced on", "installYear"],
+    ["Date purchased", "installYear"],
+    ["In-service date", "installYear"],
+    ["Placed in service", "installYear"],
+    ["Years in service", "age"],
+    ["Years since installed", "age"],
+    ["Service life", "life"],
+    ["Remaining service life", "remaining"],
+    ["Condition at last inspection", "condition"],
+    ["Inspection notes", "notes"],
+    ["Planned year", "replaceBy"],
+    ["Budget year", "replaceBy"],
+    ["Budget", "cost"],
+    ["Projected replacement year", "replaceBy"],
+    ["Next replacement", "replaceBy"],
+    ["Year of replacement", "replaceBy"],
+    ["Qty installed", "quantity"],
+    ["When", "installYear"],
+  ])("reads %p as %p", (heading, field) => {
+    expect(guessField(heading)).toBe(field);
+  });
+
+  it("says how sure a heading is", () => {
+    expect(guessHeading("Year installed").strength).toBe("sure");
+    expect(guessHeading("Year").strength).toBe("weak");
+    expect(guessHeading("Yr").strength).toBe("weak");
+    expect(guessHeading("Date").strength).toBe("doubtful");
+    expect(guessHeading("Purchase date").strength).toBe("sure");
+    expect(guessHeading("Date of record").strength).toBe("doubtful");
+    expect(guessHeading("Replacement year").strength).toBe("doubtful");
+    expect(guessHeading("Replace by").strength).toBe("sure");
+  });
 });
 
 describe("headings that name a library item", () => {
@@ -93,6 +158,12 @@ describe("headings that name a library item", () => {
     expect(headingItem("Year installed", match)).toBeNull();
     expect(headingItem("Cost", match)).toBeNull();
     expect(headingItem("Roof", match)).toBeNull();
+  });
+
+  it("doesn't take a column of service dates for a column of install years", () => {
+    expect(headingItem("Water heater service date", match)).toBeNull();
+    expect(headingItem("Furnace inspected", match)).toBeNull();
+    expect(headingItem("Fridge purchased", match)).toBe("refrigerator");
   });
 });
 
@@ -227,6 +298,62 @@ describe("guessing the layout and every column", () => {
     expect(guessColumns(["System", "Qty", "Year installed", "Cost"], match, "rows")).toEqual(["item", "quantity", "installYear", "cost"]);
     expect(guessColumns(["Category", "Building system", "Qty"], match, "rows")).toEqual(["category", "item", "quantity"]);
     expect(guessColumns(["Item", "System"], match, "rows")).toEqual(["item", "category"]);
+  });
+
+  it("takes the surest year heading, not the first one", () => {
+    const grid = [
+      ["Item", "Qty", "Inspection date", "Year installed", "Cost"],
+      ["Water heater", "12", "3/1/2025", "2014", "$1,400"],
+    ];
+    expect(guessColumns(headings(grid, 0), match, "rows", columnValues(grid, 0), 2026)).toEqual([
+      "item",
+      "quantity",
+      "ignore",
+      "installYear",
+      "cost",
+    ]);
+    expect(guessColumns(["Item", "Date", "Year installed"], match, "rows")).toEqual(["item", "ignore", "installYear"]);
+    expect(guessColumns(["Item", "Year", "Install date"], match, "rows")).toEqual(["item", "ignore", "installYear"]);
+    expect(guessColumns(["Item", "Date", "Year"], match, "rows")).toEqual(["item", "ignore", "installYear"]);
+    // Equally sure: the first one.
+    expect(guessColumns(["Item", "Installed", "Year installed"], match, "rows")).toEqual(["item", "installYear", "ignore"]);
+    expect(guessColumns(["Item", "Due", "Replacement year"], match, "rows")).toEqual(["item", "replaceBy", "ignore"]);
+  });
+
+  it("reads a Replacement year column of past years as when each item was last replaced", () => {
+    const sheet = (head: string, values: string[], others: string[] = []) => {
+      const grid = [["Item", ...others, head], ...values.map((v) => ["Fridge", ...others.map(() => "2010"), v])];
+      return guessColumns(headings(grid, 0), match, "rows", columnValues(grid, 0), 2026).at(-1);
+    };
+    expect(sheet("Replacement year", ["2016", "2019", "2008"])).toBe("installYear");
+    expect(sheet("Replacement date", ["3/1/2016", "2020-05-01"])).toBe("installYear");
+    expect(sheet("Replacement year", ["2016", "2031"])).toBe("replaceBy");
+    expect(sheet("Replacement year", ["2026"])).toBe("replaceBy");
+    expect(sheet("Replacement year", ["2016", "ASAP"])).toBe("replaceBy");
+    expect(sheet("Replacement year", ["unknown"])).toBe("replaceBy");
+    // A sure heading isn't second-guessed.
+    expect(sheet("Replace by", ["2016", "2019"])).toBe("replaceBy");
+    // With an install year column already, it's the year to replace by.
+    expect(sheet("Replacement year", ["2016", "2019"], ["Year installed"])).toBe("replaceBy");
+    // Without this year, there's nothing to compare with.
+    expect(guessColumns(["Item", "Replacement year"], match, "rows", () => ["2016"])).toEqual(["item", "replaceBy"]);
+  });
+
+  it("knows when every year in a column has gone by", () => {
+    expect(yearsHavePassed(["2016", "approx 2019", "", "orig"], 2026)).toBe(true);
+    expect(yearsHavePassed(["2016", "2026"], 2026)).toBe(false);
+    expect(yearsHavePassed(["2016", "now"], 2026)).toBe(false);
+    expect(yearsHavePassed(["unknown"], 2026)).toBe(false);
+    expect(yearsHavePassed([], 2026)).toBe(false);
+  });
+
+  it("names year columns whose headings could mean something else", () => {
+    const heads = ["Item", "Date", "Replacement year", "Year installed"];
+    expect(doubtfulYearColumns(heads, ["item", "installYear", "replaceBy", "ignore"])).toEqual([
+      { column: 1, heading: "Date", role: "installYear" },
+      { column: 2, heading: "Replacement year", role: "replaceBy" },
+    ]);
+    expect(doubtfulYearColumns(heads, ["item", "ignore", "ignore", "installYear"])).toEqual([]);
   });
 
   it("reads a dropdown's value back as a role", () => {

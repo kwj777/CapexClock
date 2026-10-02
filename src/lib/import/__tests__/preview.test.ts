@@ -507,3 +507,47 @@ describe("fitting notes", () => {
     expect(notes).toMatch(/\n…and \d+ more notes$/);
   });
 });
+
+describe("service, inspection and replacement dates", () => {
+  it("doesn't read a service date as the install year, and says no column has one", () => {
+    const sheet = ["Item\tQty\tLast service date\tCost each", "Water heater\t12\t3/1/2025\t$1,400", "Gas furnace\t12\t10/15/2025\t$4,200", "Boiler\t1\t11/2/2024\t$60,000"].join("\n");
+    const opened = open(sheet, "paste");
+    expect(opened.columns).toEqual(["item", "quantity", "ignore", "cost"]);
+    const p = preview(sheet, {}, "paste");
+    expect(p.rows.map((r) => r.row.installYear)).toEqual(["", "", ""]);
+    expect(p.noYearColumn).toBe(true);
+  });
+
+  it("reads Year installed, not an inspection date to its left", () => {
+    const sheet = ["Item,Qty,Inspection date,Year installed,Cost", "Water heater,12,3/1/2025,2014,1400", "Boiler,1,11/2/2024,2010,60000"].join("\n");
+    const p = preview(sheet);
+    expect(open(sheet).columns).toEqual(["item", "quantity", "ignore", "installYear", "cost"]);
+    expect(p.rows.map((r) => r.row.installYear)).toEqual(["2014", "2010"]);
+    expect(p.noYearColumn).toBe(false);
+  });
+
+  it("reads the last replacement as the install year, not the year to replace by", () => {
+    const p = preview(["Item,Qty,Last replacement year,Cost", "Water heater,12,2016,1400", "Gas furnace,12,2012,4200"].join("\n"));
+    expect(p.rows.map((r) => [r.row.name, r.row.installYear, r.row.installYearIsGuess, r.status])).toEqual([
+      ["Tank water heater", "2016", false, "changed"],
+      ["Gas furnace", "2012", false, "ready"],
+    ]);
+    expect(p.usesSheetYear).toBe(false);
+    expect(p.doubtfulYears).toEqual([]);
+  });
+
+  it("reads a Replacement year column by its years, and names it either way", () => {
+    const past = preview(["Item,Qty,Replacement year,Cost", "Gas furnace,12,2012,4200"].join("\n"));
+    expect(byName(past, "Gas furnace").row).toMatchObject({ installYear: "2012", installYearIsGuess: false });
+    expect(past.doubtfulYears).toEqual([{ column: 2, heading: "Replacement year", role: "installYear" }]);
+    const ahead = preview(["Item,Qty,Replacement year,Cost", "Gas furnace,12,2032,4200", "Range,12,2012,900"].join("\n"));
+    expect(byName(ahead, "Gas furnace").row).toMatchObject({ installYear: "2014", installYearIsGuess: true });
+    expect(ahead.doubtfulYears).toEqual([{ column: 2, heading: "Replacement year", role: "replaceBy" }]);
+  });
+
+  it("names a bare Date column, which may be some other date", () => {
+    const p = preview(["Item,Qty,Date,Cost", "Fridge,12,6/12/2018,900"].join("\n"));
+    expect(byName(p, "Refrigerator").row.installYear).toBe("2018");
+    expect(p.doubtfulYears).toEqual([{ column: 2, heading: "Date", role: "installYear" }]);
+  });
+});

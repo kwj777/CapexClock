@@ -100,7 +100,7 @@ export const STUDY_ROWS = [
 export function open(text: string, source: ImportSource = "file"): OpenedSheet {
   const grid = readText(text, parse, source);
   if (typeof grid === "string") throw new Error(`readText failed: ${grid}`);
-  const opened = openSheet(grid, match);
+  const opened = openSheet(grid, match, CURRENT_YEAR);
   if (typeof opened === "string") throw new Error(`openSheet failed: ${opened}`);
   return opened;
 }
