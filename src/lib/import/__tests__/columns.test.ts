@@ -10,6 +10,7 @@ import {
   guessHeading,
   guessLayout,
   headingItem,
+  headingSaysSqFt,
   headings,
   headingTiming,
   isCounting,
@@ -129,8 +130,21 @@ describe("guessing a column from its heading", () => {
     ["Year of replacement", "replaceBy"],
     ["Qty installed", "quantity"],
     ["When", "installYear"],
+    ["Cost per sq ft", "cost"],
+    ["$/sq ft", "cost"],
+    ["Cost/SF", "cost"],
+    ["Qty (sq ft)", "quantity"],
+    ["Quantity, sq ft", "quantity"],
+    ["Sq ft", null],
+    ["Apartment sq ft", null],
+    ["Total sq ft", null],
   ])("reads %p as %p", (heading, field) => {
     expect(guessField(heading)).toBe(field);
+  });
+
+  it("knows a heading in square feet", () => {
+    for (const h of ["Qty (sq ft)", "Cost/SF", "$ psf", "Area, square feet", "Cost per sq. ft.", "ft²", "Qty (sqft)"]) expect(headingSaysSqFt(h)).toBe(true);
+    for (const h of ["Qty", "Cost each", "Staff", "Sofa", ""]) expect(headingSaysSqFt(h)).toBe(false);
   });
 
   it("says how sure a heading is", () => {

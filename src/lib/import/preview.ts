@@ -9,6 +9,7 @@ import {
   doubtfulQuantityColumn,
   doubtfulYearColumns,
   headings,
+  headingSaysSqFt,
   headingTiming,
   sameUnitsColumn,
   type ColumnRole,
@@ -213,6 +214,9 @@ interface Context {
   currentYear: number;
   /** A "Units" column the owner hasn't said is the quantity or not, so rows counted as one ask. */
   unitsPending: number | null;
+  /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
+  quantityInSqFt: boolean;
+  costInSqFt: boolean;
 }
 
 /** The first column with this role that has something in this row (or the first with the role). */
@@ -362,7 +366,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   let quantityGiven = false;
   if (quantityFix !== undefined || hasRole(columns, "quantity")) {
     const q = readQuantity(quantityCell);
-    squareFeet = q.squareFeet === true;
+    squareFeet = q.squareFeet === true || ctx.quantityInSqFt;
     if (q.problem) {
       record.issues.push({ field: "quantity", text: q.problem });
       record.row.quantity = cellText(quantityCell);
@@ -396,7 +400,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   // a count priced each, even for an item the library counts in square feet.
   const costFix = fixed(ctx, key, "costEach");
   const costCell = costFix ?? cell("cost");
-  const costPerSqFt = saysPerSqFt(costCell);
+  const costPerSqFt = saysPerSqFt(costCell) || ctx.costInSqFt;
   if (squareFeet || costPerSqFt) {
     if (squareFeet && record.row.librarySlug && record.row.unitLabel !== "per_sq_ft") {
       record.changes.push("Counted in square feet, as the sheet does");
@@ -729,6 +733,8 @@ export function buildPreview(
     choices,
     currentYear,
     unitsPending: units && unitsAnswer === null ? units.column : null,
+    quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
+    costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
   };
   const skipped: Skipped[] = [];
   const records: Record_[] = [];

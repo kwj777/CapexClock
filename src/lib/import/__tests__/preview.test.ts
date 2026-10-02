@@ -573,6 +573,17 @@ describe("items the library counts in square feet", () => {
     expect(byName(p, "Hallway tile").row).toMatchObject({ quantity: "800", unitLabel: "per_sq_ft" });
   });
 
+  it("counts square feet when the quantity or cost heading says so", () => {
+    const byHeading = preview(["Item,Qty (sq ft),Cost per sq ft", "Carpet,9600,4", "Parking lot seal coat,12000,0.25"].join("\n"));
+    expect(byHeading.rows.map((r) => [r.row.name, r.row.quantity, r.row.unitLabel, r.status])).toEqual([
+      ["Carpet", "9600", "per_sq_ft", "ready"],
+      ["Parking lot seal coat", "12000", "per_sq_ft", "ready"],
+    ]);
+    const lvp = byName(preview(["Item,Qty,Cost/SF", "LVP,4000,5"].join("\n")), "Luxury vinyl plank");
+    expect(lvp.row).toMatchObject({ quantity: "4000", unitLabel: "per_sq_ft", costEach: "5" });
+    expect(lvp.changes).toContain("Read the quantity as square feet, since the cost is per sq ft");
+  });
+
   it("asks for the square feet when the cost is per sq ft but there's no quantity", () => {
     const p = preview(["Item,Cost", "Carpet,$4/sf"].join("\n"));
     const carpet = byName(p, "Carpet");

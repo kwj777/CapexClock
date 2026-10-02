@@ -106,6 +106,11 @@ const EXACT: Record<string, FieldKind | null> = {
 // A Map, so a heading like "constructor" can't find Object's own keys.
 const EXACT_HEADINGS = new Map(Object.entries(EXACT));
 
+/** A heading that says its column is in square feet: "Qty (sq ft)", "Cost/SF", "$ psf". */
+export function headingSaysSqFt(heading: string): boolean {
+  return /\b(?:sq\.?\s*f(?:t|ee?t)|sf|sqft|psf|square\s+f(?:ee|oo)t|ft2)\b|ft²/i.test(heading);
+}
+
 /**
  * How sure a heading is about its kind. A weak one ("Year") gives way to a sure one
  * ("Year installed") in another column. A doubtful one is named in the preview so
@@ -139,6 +144,12 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   [null, ["move"]],
   [null, ["built"]],
   [null, ["warranty"]],
+  // An apartment's or the building's size isn't read, but a cost or quantity in square feet is.
+  ["cost", ["cost", "sq", "ft"]],
+  ["cost", ["$", "sq", "ft"]],
+  ["cost", ["price", "sq", "ft"]],
+  ["quantity", ["qty", "sq", "ft"]],
+  ["quantity", ["quantity", "sq", "ft"]],
   [null, ["sq", "ft"]],
   ["total", ["total"]],
   ["total", ["extended"]],
