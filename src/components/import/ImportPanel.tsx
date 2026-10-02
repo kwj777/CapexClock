@@ -358,19 +358,19 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
                   <li key={i} className="grid gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-center">
                     <div className="min-w-0">
                       <label htmlFor={selectId} className="block text-sm font-medium wrap-anywhere text-slate-900 dark:text-white">
-                        <span className="sr-only">Column </span>
                         <span className="mr-1.5 text-xs font-normal text-slate-500 dark:text-slate-400">
                           {columnLetter(i)}
                         </span>
-                        <span className="sr-only">, </span>
                         {heading || "(no heading)"}
                       </label>
                       {examples.length > 0 && (
                         <p className="truncate text-xs text-slate-500 dark:text-slate-400">e.g. {examples.join(", ")}</p>
                       )}
                     </div>
+                    {/* Named in full here: hidden words inside the label are read as their own block, with a stray space. */}
                     <select
                       id={selectId}
+                      aria-label={`Column ${columnLetter(i)}, ${heading || "(no heading)"}`}
                       value={choices.columns[i] ?? "ignore"}
                       onChange={(e) => setColumn(i, parseRole(e.target.value))}
                       className={inputClass}
