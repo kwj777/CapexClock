@@ -1079,13 +1079,15 @@ describe("a sheet in CapexClock's own columns", () => {
   describe("a row counted per unit with no quantity", () => {
     const waterHeaters = "Elm,12,1998,Water heater,,,unit,2016,,10,1400";
 
-    it("takes the unit count, as the calculator does, and says so", () => {
-      const [row] = preview(sheet(waterHeaters)).rows;
-      expect(row.status).toBe("changed");
-      expect(row.changes).toContain("No quantity, so used the unit count, since it's counted per unit");
-      expect(row.changes).not.toContain("No quantity, so counted as 1");
+    it("takes the unit count, as the calculator does, and is Ready, since that's what our format says", () => {
+      const [row] = preview(sheet(",12,1998,Tank water heater,,,unit,2016,,10,1400")).rows;
+      expect(row.status).toBe("ready");
+      expect(row.changes).toEqual([]);
       expect(row.row).toMatchObject({ unitLabel: "per_unit", quantity: "12", followsUnitCount: true });
       expect(detailsText(row.row, false)).toMatch(/^Qty 12, the unit count · /);
+      // A name it had to match still says so, and nothing about the quantity.
+      const [named] = preview(sheet(waterHeaters)).rows;
+      expect(named.changes.some((c) => /quantity|unit count|counted as 1/i.test(c))).toBe(false);
     });
 
     it("takes the list's unit count and follows it, in the calculator and on My properties", () => {

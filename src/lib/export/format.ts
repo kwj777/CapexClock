@@ -49,17 +49,39 @@ export function moneyColumn(values: number[]): (value: number) => string {
   return (value) => format.format(toCents(value));
 }
 
-/** Longest run of characters without a space that a PDF column is left to fit on one line. */
-export const LONG_WORD = 24;
+/**
+ * The most room one character can take in the PDF's font, in em: DejaVu Sans has no
+ * basic Latin or Latin-1 character wider than 1em, and nothing at all wider than 1.75em.
+ */
+function widestEm(character: string): number {
+  return (character.codePointAt(0) ?? 0) <= 0xff ? 1 : 1.75;
+}
 
 /**
- * Splits a run longer than LONG_WORD (a pasted link, say) into pieces the PDF can wrap
- * between, so it doesn't run off the page. Shorter words stay whole.
+ * Breaks a run of characters without a space (a pasted link, say) that's too long
+ * for one line into lines that fit, with line breaks between them, so the PDF wraps
+ * it without the hyphen it would add, which would change a link. `lineEms` is the
+ * line's width in em. Shorter words and the spaces and line breaks between words
+ * stay as they are, and characters are never split in half.
  */
-export function longWordParts(word: string): string[] {
-  const characters = Array.from(word);
-  if (characters.length <= LONG_WORD) return [word];
-  const parts: string[] = [];
-  for (let i = 0; i < characters.length; i += LONG_WORD) parts.push(characters.slice(i, i + LONG_WORD).join(""));
-  return parts;
+export function breakLongWords(text: string, lineEms: number): string {
+  return text
+    .split(/([ \n]+)/)
+    .map((word) => {
+      const characters = Array.from(word);
+      if (characters.reduce((sum, c) => sum + widestEm(c), 0) <= lineEms) return word;
+      let line = "";
+      let width = 0;
+      const lines: string[] = [];
+      for (const c of characters) {
+        if (line !== "" && width + widestEm(c) > lineEms) {
+          lines.push(line);
+          [line, width] = ["", 0];
+        }
+        line += c;
+        width += widestEm(c);
+      }
+      return [...lines, line].join("\n");
+    })
+    .join("");
 }

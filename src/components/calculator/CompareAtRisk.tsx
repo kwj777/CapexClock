@@ -30,6 +30,7 @@ import {
   togglePanel,
   totalChange,
   undoApplied,
+  viewedWhileOpen,
   withTick,
   type CompareAction,
   type CompareState,
@@ -123,6 +124,15 @@ export default function CompareAtRisk({
     if (step === "focus") target?.focus();
     focusNext.current = null;
   });
+
+  // Opened with nothing to compare, the panel sends compare_viewed once something comes up.
+  const items = comparison.items.length;
+  useEffect(() => {
+    const next = viewedWhileOpen(state, items);
+    if (!next) return;
+    setState(next.state);
+    void track("compare_viewed", next.event);
+  }, [state, items, setState]);
 
   function toggle() {
     const next = togglePanel(state, comparison.items.length);

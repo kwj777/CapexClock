@@ -50,7 +50,7 @@ export const FORMAT_COLUMNS: readonly FormatColumn[] = [
   {
     heading: "Quantity",
     field: "quantity",
-    what: "How many there are, or the square feet for flooring and paving. For something counted per unit, you can leave it blank to use the unit count.",
+    what: "How many there are, or the square feet for flooring and paving. For something counted per unit, leave it blank to use the unit count, as a downloaded component list does.",
     why: "The cost of a replacement is the quantity times the cost each.",
   },
   {

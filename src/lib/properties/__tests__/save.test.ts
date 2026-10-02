@@ -3,6 +3,7 @@ import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { toSaveInput } from "../convert";
 import {
   compareSaved,
+  detailsDropped,
   lacksUpdate0004,
   sameSave,
   saveFailure,
@@ -184,6 +185,57 @@ describe("telling whether condition and notes were saved", () => {
     expect(versionFromReadBack(input, back([{ ...after0004[0], notes: "Other tab" }, after0004[1]]))).toEqual({
       failure: "conflict",
     });
+  });
+});
+
+describe("telling dropped condition and notes from another tab's save", () => {
+  const propertyId = "a0000000-0000-4000-8000-000000000001";
+  const ids = ["c0000000-0000-4000-8000-000000000001", "c0000000-0000-4000-8000-000000000002"];
+  const base = exampleDraft();
+  // What this editor last saved: the first row was already fair, with a note.
+  const saved = {
+    ...base,
+    rows: [{ ...base.rows[0], id: ids[0], condition: "fair" as const, notes: "Old note" }, { ...base.rows[1], id: ids[1] }],
+  };
+  const lastSaved = toSaveInput("Maple Court", saved, 2026, propertyId);
+  type Details = { condition?: "good" | "fair" | "poor" | null; notes?: string | null; guess?: boolean };
+  const rows = (details: Details[]): ComponentRow[] =>
+    lastSaved.components.map((c, i) => ({
+      ...c,
+      id: ids[i],
+      property_id: propertyId,
+      created_at: "",
+      updated_at: "",
+      condition: details[i]?.condition ?? null,
+      notes: details[i]?.notes ?? null,
+      install_year_is_estimate: details[i]?.guess ?? false,
+    }));
+
+  it("says dropped when the database has no update 0004", () => {
+    const before0004 = rows([]).map((row) => {
+      const old: ComponentRow = { ...row };
+      delete old.install_year_is_estimate;
+      return old;
+    });
+    expect(detailsDropped(lastSaved, before0004)).toBe(true);
+  });
+
+  it("says dropped when the rows still hold what they had before the save (0002 run again after 0004)", () => {
+    expect(detailsDropped(lastSaved, rows([{ condition: "fair", notes: "Old note" }, {}]))).toBe(true);
+  });
+
+  it("says another tab saved when a row holds details nobody here sent or had", () => {
+    expect(detailsDropped(lastSaved, rows([{ condition: "fair", notes: "Other tab" }, {}]))).toBe(false);
+    expect(detailsDropped(lastSaved, rows([{ condition: "fair", notes: "Old note" }, { condition: "poor" }]))).toBe(false);
+    expect(detailsDropped(lastSaved, rows([{ condition: "fair", notes: "Old note" }, { guess: true }]))).toBe(false);
+  });
+
+  it("expects nothing on a row that's new since the last save", () => {
+    const fresh = rows([{ condition: "fair", notes: "Old note" }, {}]).map((row, i) =>
+      i === 1 ? { ...row, id: "c0000000-0000-4000-8000-000000000009" } : row,
+    );
+    expect(detailsDropped(lastSaved, fresh)).toBe(true);
+    expect(detailsDropped(lastSaved, fresh.map((row, i) => (i === 1 ? { ...row, notes: "Other tab" } : row)))).toBe(false);
   });
 });
 

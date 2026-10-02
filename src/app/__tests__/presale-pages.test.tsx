@@ -65,14 +65,14 @@ describe("/pricing", () => {
   it("says the offers aren't on sale until their links are set", async () => {
     const html = await renderPricing({});
     expect(html).not.toContain("Buy now");
-    expect(text(html).match(/Not on sale yet\./g)).toHaveLength(2);
+    expect(text(html).match(/Not on sale right now\./g)).toHaveLength(2);
   });
 
   it("shows Buy now for each offer whose link is set", async () => {
     const html = await renderPricing({ NEXT_PUBLIC_STRIPE_LINK_REPORT: SETTINGS.NEXT_PUBLIC_STRIPE_LINK_REPORT });
     expect(html).toContain(`href="${SETTINGS.NEXT_PUBLIC_STRIPE_LINK_REPORT}"`);
     expect(html.match(/>Buy now</g)).toHaveLength(1);
-    expect(text(html).match(/Not on sale yet\./g)).toHaveLength(1);
+    expect(text(html).match(/Not on sale right now\./g)).toHaveLength(1);
 
     const both = await renderPricing(SETTINGS);
     expect(both.match(/>Buy now</g)).toHaveLength(2);
@@ -110,7 +110,7 @@ describe("/pricing", () => {
       const html = await renderPricing(settings);
       expect(html).not.toContain("Buy now");
       expect(html).not.toContain(SETTINGS.NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP);
-      expect(text(html).match(/Not on sale yet\./g)).toHaveLength(2);
+      expect(text(html).match(/Not on sale right now\./g)).toHaveLength(2);
     }
   });
 
@@ -142,7 +142,7 @@ describe("/terms", () => {
     // What each offer includes.
     expect(page).toContain("An email from us before each replacement comes due");
     expect(page).toContain("A condition report on your building for lenders and buyers");
-    // Renewal and cancelling online.
+    // Renewal and canceling online.
     expect(page).toContain("It renews at $12 every month until you cancel.");
     expect(page).toContain("You can cancel any time online");
     // Refund, label, sharing, liability, the founding promise and contact.
@@ -294,6 +294,16 @@ describe("our own words (plan T5)", () => {
         .replace(/^\s*\/\/.*$/gm, "");
       expect([file, /lender-ready|accepted by lenders/i.test(source)]).toEqual([file, false]);
       expect([file, /normally \$19|locked for life|line-through|<s>|<del>/i.test(source)]).toEqual([file, false]);
+    }
+  });
+
+  it("never promise what we'll build next, since only the idea that wins gets built", () => {
+    for (const path of sourceFiles(join(root, "src"))) {
+      const file = relative(root, path);
+      const source = readFileSync(path, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect([file, /(we(&apos;|')re|we are) building|coming next|coming soon/i.test(source)]).toEqual([file, false]);
     }
   });
 });

@@ -9,6 +9,9 @@ import {
   PAID_INTEREST_FORM,
   paidIdeaEvent,
   paidInterestBody,
+  panelName,
+  PHOTO_OFFER,
+  photoOfferHref,
   testButtonsOn,
   UNIT_OPTIONS,
   validatePaidInterest,
@@ -105,6 +108,22 @@ describe("wording", () => {
       const text = `${PAID_IDEA_TEXT[idea].button} ${PAID_IDEA_TEXT[idea].pitch}`;
       expect(text).not.toMatch(/lender-ready|accepted by lenders|—/i);
     }
+  });
+
+  it("names each panel after its idea, so screen readers can tell them apart", () => {
+    expect(PAID_IDEAS.map(panelName)).toEqual([
+      "Email me before these are due: not built yet",
+      "Condition report for lenders and buyers: not built yet",
+      "Add from a photo of the label: not built yet",
+    ]);
+  });
+
+  it("offers to fill in rows from an emailed photo, free, with a subject line", () => {
+    expect(`${PHOTO_OFFER.before} support@capexclock.com ${PHOTO_OFFER.after}`).toBe(
+      "Want it now? Email a photo of the label to support@capexclock.com and we'll fill in the row for you, free.",
+    );
+    expect(photoOfferHref("support@capexclock.com")).toBe("mailto:support@capexclock.com?subject=Photo%20of%20a%20label");
+    expect(`${PHOTO_OFFER.before} ${PHOTO_OFFER.after}`).not.toMatch(/—/);
   });
 
   it("offers each idea, and something else, as a first pick", () => {
