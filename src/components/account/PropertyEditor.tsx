@@ -14,7 +14,6 @@ import {
   toSaveInput,
   type SaveInput,
 } from "@/lib/properties/convert";
-import { fetchAllRows } from "@/lib/properties/load";
 import {
   compareSaved,
   DETAILS_NOT_SAVED_TEXT,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
 import type { ComponentRow } from "@/lib/supabase/database.types";
+import { isSignedOut, readBack } from "./read-back";
 import {
   clearUnsaved,
   keepUnsaved,
@@ -82,37 +82,8 @@ export interface PropertyEditorProps {
   library: LibraryComponent[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
-}
-
-/** Reads a property and its components from the database; null if that fails. */
-async function readBack(id: string): Promise<ReadBack | null> {
-  const supabase = createClient();
-  try {
-    // The property (with its version) first, then its components. If another save
-    // lands in between, the older version goes with the newer components, so the
-    // next save is refused instead of overwriting that save.
-    const { data: property, error } = await supabase.from("properties").select("*").eq("id", id).maybeSingle();
-    if (error) return null;
-    if (!property) return { property: null, components: [] };
-    const components = await fetchAllRows((from, to) =>
-      supabase
-        .from("components")
-        .select("*", { count: "exact" })
-        .eq("property_id", id)
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    );
-    return { property, components };
-  } catch {
-    return null;
-  }
-}
-
-/** True only when the browser has definitely lost its session (not when it's offline). */
-async function isSignedOut(): Promise<boolean> {
-  const { data, error } = await createClient().auth.getSession();
-  return !error && !data.session;
+  /** The account's email, filled in on the paid-idea "tell me first" forms. */
+  userEmail?: string | null;
 }
 
 export default function PropertyEditor({
@@ -123,6 +94,7 @@ export default function PropertyEditor({
   importFromCalculator = false,
   library,
   userId,
+  userEmail,
 }: PropertyEditorProps) {
   const router = useRouter();
   const backupKey = unsavedKey(userId, propertyId, importFromCalculator);
@@ -208,10 +180,13 @@ export default function PropertyEditor({
       askToLeave(event);
     };
     // Forms that go to another page (Sign out) ask the same way, before signing out
-    // drops the kept copy.
+    // drops the kept copy. Forms marked data-keeps-edits (the paid-idea sign-ups) stay here.
     const confirmSubmit = (event: SubmitEvent) => {
       if (event.defaultPrevented) return;
-      if (event.target instanceof HTMLFormElement && event.target.hasAttribute("action")) askToLeave(event);
+      const form = event.target;
+      if (form instanceof HTMLFormElement && form.hasAttribute("action") && !form.hasAttribute("data-keeps-edits")) {
+        askToLeave(event);
+      }
     };
     window.addEventListener("beforeunload", warn);
     document.addEventListener("click", confirmLeave, true);
@@ -597,8 +572,13 @@ export default function PropertyEditor({
         setDraft={updateDraft}
         header={header}
         exportName={name.trim() || "My property"}
+        listName={name.trim()}
+        importWhere="editor"
+        accountsEnabled
         library={library}
         rowNotes={rowNotes}
+        where="property"
+        ownerEmail={userEmail}
       />
       {propertyId && (
         <div className="border-t border-slate-200 pt-6 dark:border-slate-800">

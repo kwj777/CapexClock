@@ -12,11 +12,15 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import ComponentListButton from "@/components/export/ComponentListButton";
 import ExportButtons from "@/components/export/ExportButtons";
+import PaidIdeaButton, { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
+import PaidIdeasProvider from "@/components/paid/PaidIdeas";
 import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import { moneyColumn } from "@/lib/export/format";
 import { guessedYear, installYearNote } from "@/lib/export/rows";
+import type { PaidWhere } from "@/lib/paid-ideas";
 import {
   COMPONENT_LIBRARY,
   UNIT_LABEL_TEXT,
@@ -32,22 +36,27 @@ import {
   editRow,
   exampleDraft,
   EMPTY_DRAFT,
+  clearImportUndo,
   hasEntries,
+  importReplaces,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
   MAX_NOTES_LENGTH,
   neighborRowId,
   notesLeftText,
   parseUnitCount,
+  peekImportUndo,
   problemFields,
   problemText,
   rowFromLibrary,
   rowTotal,
   saveDraft,
   toComponents,
+  withImport,
   withUnitCount,
   YEAR_BUILT_TEXT,
   type Draft,
+  type DraftImport,
   type DraftRow,
   type RowField,
 } from "./draft";
@@ -61,6 +70,12 @@ import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 const ForecastChart = dynamic(() => import("./ForecastChart"), {
   ssr: false,
   loading: () => <div className="h-72 w-full sm:h-80" />,
+});
+
+// The importer (and the CSV reader it loads) only once the owner opens it.
+const ImportPanel = dynamic(() => import("@/components/import/ImportPanel"), {
+  ssr: false,
+  loading: () => <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">Loading the importer…</p>,
 });
 
 const CUSTOM = "__custom__";
@@ -83,6 +98,8 @@ const rowGridClass =
   "lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_4.5rem_4.5rem]";
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
+const textButton =
+  "text-left text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300";
 
 /** The public calculator: work is kept in this browser until it's saved to an account. */
 export default function Calculator({
@@ -93,8 +110,16 @@ export default function Calculator({
   library?: LibraryComponent[];
 }) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
-  const [draft, setDraft] = useState<Draft>(loadDraft);
+  // An import on the template page that changed the list leaves a copy to undo.
+  const [start] = useState(() => {
+    const loaded = loadDraft();
+    const before = peekImportUndo(loaded, new Date().getFullYear());
+    return { draft: loaded, undo: before ? { before, after: loaded, action: "import" as const } : null };
+  });
+  const [draft, setDraft] = useState<Draft>(start.draft);
   useEffect(() => saveDraft(draft), [draft]);
+  // Offered once: a reload or a later visit doesn't offer it again.
+  useEffect(() => clearImportUndo(), []);
   // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
@@ -111,6 +136,9 @@ export default function Calculator({
       library={library}
       trackEvents
       showExample
+      accountsEnabled={accountsEnabled}
+      initialUndo={start.undo}
+      lookUpOwnerEmail={accountsEnabled}
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
     />
   );
@@ -144,6 +172,12 @@ export interface CalculatorViewProps {
   footer?: ReactNode;
   /** Title for exported files. */
   exportName?: string;
+  /** The property's name for the component list's Building column; blank in the public calculator. */
+  listName?: string;
+  /** Where the importer is, for its events and what it says about several buildings. */
+  importWhere?: "calculator" | "editor";
+  /** Accounts are on, so the importer can point a sheet of several buildings to My properties. */
+  accountsEnabled?: boolean;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
   /**
@@ -151,6 +185,21 @@ export interface CalculatorViewProps {
    * with the fields they're about (marked invalid and pointed at the note).
    */
   rowNotes?: Record<string, RowNote>;
+  /** An undo to offer from the start: an import on the template page that changed the list. */
+  initialUndo?: Undo | null;
+  /** The page, for the paid-idea buttons' events and sign-ups. */
+  where?: PaidWhere;
+  /** The signed-in owner's email, filled in on the paid-idea "tell me first" forms. */
+  ownerEmail?: string | null;
+  /** Look up a signed-in owner's email in this browser when a paid-idea panel opens. */
+  lookUpOwnerEmail?: boolean;
+}
+
+/** What Load an example, Clear or an import replaced, and the list it left. */
+interface Undo {
+  before: Draft;
+  after: Draft;
+  action: "clear" | "example" | "import";
 }
 
 /** A note shown under a row, and the row's fields it's about. */
@@ -160,6 +209,19 @@ export interface RowNote {
 }
 
 export function CalculatorView({
+  where = "calculator",
+  ownerEmail,
+  lookUpOwnerEmail = false,
+  ...props
+}: CalculatorViewProps) {
+  return (
+    <PaidIdeasProvider where={where} ownerEmail={ownerEmail} lookUpOwnerEmail={lookUpOwnerEmail}>
+      <CalculatorBody {...props} />
+    </PaidIdeasProvider>
+  );
+}
+
+function CalculatorBody({
   draft,
   setDraft,
   trackEvents = false,
@@ -167,9 +229,13 @@ export function CalculatorView({
   header,
   footer,
   exportName = "My property",
+  listName = "",
+  importWhere = "calculator",
+  accountsEnabled = false,
   library = COMPONENT_LIBRARY,
   rowNotes,
-}: CalculatorViewProps) {
+  initialUndo = null,
+}: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
@@ -179,12 +245,15 @@ export function CalculatorView({
   const unitsId = `${baseId}-units`;
   const addId = `${baseId}-add`;
   const undoId = `${baseId}-undo`;
+  const importButtonId = `${baseId}-import`;
+  const importPanelId = `${baseId}-import-panel`;
   const rowIdPrefix = (rowId: string) => `${baseId}-${rowId}`;
   const [editingYearBuilt, setEditingYearBuilt] = useState(false);
   const [picked, setPicked] = useState("");
-  // What Load an example or Clear replaced, offered back until the next edit.
-  const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" } | null>(null);
+  // What Load an example, Clear or an import replaced, offered back until the next edit.
+  const [undo, setUndo] = useState<Undo | null>(initialUndo);
   const [announcement, setAnnouncement] = useState("");
+  const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
   const focusNext = useRef<string | null>(null);
   // The replace-now comparison's panel, ticks and Undo. Kept here because the
@@ -250,6 +319,28 @@ export function CalculatorView({
     focusNext.current = item ? addId : `${rowIdPrefix(row.id)}-name`;
     announce(item ? `Added ${item.name}.` : "Added a custom component. Give it a name.");
     markStarted("add_component");
+  }
+
+  /**
+   * Rows from a spreadsheet go after the ones already there. A component list
+   * download also changes the rows its CapexClock IDs match, and can remove rows,
+   * so that kind of import can be undone.
+   */
+  function applyImport(change: DraftImport, said: string) {
+    const next = withImport(draft, change);
+    const replaces = importReplaces(change);
+    setUndo(replaces ? { before: draft, after: next, action: "import" } : null);
+    setDraft(next);
+    setImporting(false);
+    const firstAdded = next.rows[next.rows.length - change.add.length];
+    focusNext.current = change.add.length > 0 && firstAdded ? `${rowIdPrefix(firstAdded.id)}-name` : importButtonId;
+    announce(replaces ? `${said} Undo brings back your list as it was.` : said);
+    markStarted("import");
+  }
+
+  function closeImport() {
+    setImporting(false);
+    focusNext.current = importButtonId;
   }
 
   /** Load an example and Clear replace everything, so they offer an undo. */
@@ -371,7 +462,11 @@ export function CalculatorView({
         </div>
         {canUndo && (
           <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
-            {undo.action === "clear" ? "Your entries were cleared." : "The example replaced your entries."}{" "}
+            {undo.action === "clear"
+              ? "Your entries were cleared."
+              : undo.action === "import"
+                ? "The import changed your list."
+                : "The example replaced your entries."}{" "}
             <button
               id={undoId}
               type="button"
@@ -439,6 +534,49 @@ export function CalculatorView({
             </button>
           </div>
         </div>
+        {/* Import and the component list on the left, the photo idea's test button on the right. */}
+        <PaidIdeaDisclosure idea="photo">
+          {(photoButton, photoPanel) => (
+            <>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-x-5 gap-y-1">
+                  <button
+                    id={importButtonId}
+                    type="button"
+                    aria-expanded={importing}
+                    aria-controls={importing ? importPanelId : undefined}
+                    onClick={() => (importing ? closeImport() : setImporting(true))}
+                    className={textButton}
+                  >
+                    Import from a spreadsheet
+                  </button>
+                  {draft.rows.length > 0 && (
+                    <ComponentListButton
+                      name={exportName}
+                      building={listName}
+                      draft={draft}
+                      where="components"
+                      className={textButton}
+                    />
+                  )}
+                </div>
+                {photoButton}
+              </div>
+              {importing && (
+                <ImportPanel
+                  id={importPanelId}
+                  library={library}
+                  draft={draft}
+                  onApply={applyImport}
+                  onClose={closeImport}
+                  where={importWhere}
+                  accountsEnabled={accountsEnabled}
+                />
+              )}
+              {photoPanel && <div className="mt-3">{photoPanel}</div>}
+            </>
+          )}
+        </PaidIdeaDisclosure>
 
         {draft.rows.length === 0 ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
@@ -493,32 +631,45 @@ export function CalculatorView({
             Your {forecast.startYear}–{forecast.endYear} forecast
           </h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Monthly reserve" value={formatReserve(forecast.monthlyReserve)} emphasis />
-            <Stat
-              label="Per unit, per month"
-              value={
-                forecast.monthlyReservePerUnit === null
-                  ? "Add units"
-                  : formatReserve(forecast.monthlyReservePerUnit)
-              }
-              emphasis
-            />
-            <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
-            <Stat label="10-year total" value={formatMoney(forecast.total)} />
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            The monthly reserve is the smallest steady amount that has the cash ready for every
-            replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
-            {forecast.startYear} costs (overdue or due this year) are shown separately because
-            there&apos;s no time to save for them.
-          </p>
-          {incomplete > 0 && (
-            <p className="text-sm text-amber-800 dark:text-amber-300">
-              {incomplete} component{incomplete === 1 ? " isn't" : "s aren't"} included yet. See the
-              notes above.
-            </p>
-          )}
+          {/* The reminders panel opens below the cards and what they mean, at full width. */}
+          <PaidIdeaDisclosure idea="reminders" tone="dark">
+            {(button, panel) => (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Stat
+                    label="Monthly reserve"
+                    value={formatReserve(forecast.monthlyReserve)}
+                    emphasis
+                    action={button}
+                  />
+                  <Stat
+                    label="Per unit, per month"
+                    value={
+                      forecast.monthlyReservePerUnit === null
+                        ? "Add units"
+                        : formatReserve(forecast.monthlyReservePerUnit)
+                    }
+                    emphasis
+                  />
+                  <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
+                  <Stat label="10-year total" value={formatMoney(forecast.total)} />
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  The monthly reserve is the smallest steady amount that has the cash ready for every
+                  replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
+                  {forecast.startYear} costs (overdue or due this year) are shown separately because
+                  there&apos;s no time to save for them.
+                </p>
+                {incomplete > 0 && (
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    {incomplete} component{incomplete === 1 ? " isn't" : "s aren't"} included yet. See the
+                    notes above.
+                  </p>
+                )}
+                {panel}
+              </>
+            )}
+          </PaidIdeaDisclosure>
 
           <div className={cardClass}>
             <h3 className="text-base font-semibold text-slate-950 dark:text-white">
@@ -563,6 +714,7 @@ export function CalculatorView({
             forecast={forecast}
             components={components}
             rows={draft.rows}
+            list={{ draft, building: listName }}
           />
         </section>
       )}
@@ -817,7 +969,18 @@ function CostNote({ row }: { row: DraftRow }) {
   );
 }
 
-function Stat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
+function Stat({
+  label,
+  value,
+  emphasis = false,
+  action,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  /** A button under the number. */
+  action?: ReactNode;
+}) {
   return (
     <div
       className={`rounded-2xl p-5 ${
@@ -830,6 +993,7 @@ function Stat({ label, value, emphasis = false }: { label: string; value: string
       <p className={`mt-1 text-3xl font-semibold tabular-nums ${emphasis ? "" : "text-slate-950 dark:text-white"}`}>
         {value}
       </p>
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }
@@ -926,6 +1090,7 @@ function AtRisk({ forecast, rows, children }: { forecast: Forecast; rows: RowsBy
         </ul>
       )}
       {forecast.atRisk.length > 0 && children}
+      {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" className="mt-5" />}
     </div>
   );
 }

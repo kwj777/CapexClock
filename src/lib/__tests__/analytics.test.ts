@@ -1,5 +1,6 @@
 import type { CaptureResult } from "posthog-js";
 import {
+  captureOptions,
   daysSinceLastVisit,
   DEFAULT_POSTHOG_HOST,
   identifyPerson,
@@ -18,6 +19,16 @@ describe("posthogHost", () => {
 
   it("keeps a host that is set", () => {
     expect(posthogHost("https://eu.i.posthog.com")).toBe("https://eu.i.posthog.com");
+  });
+});
+
+describe("captureOptions", () => {
+  it("batches ordinary events as PostHog normally does", () => {
+    expect(captureOptions(false)).toBeUndefined();
+  });
+
+  it("sends a click that leaves the page at once, as a beacon PostHog won't send twice", () => {
+    expect(captureOptions(true)).toEqual({ send_instantly: true, transport: "sendBeacon" });
   });
 });
 
