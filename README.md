@@ -351,7 +351,10 @@ preferences**). Then for each order:
    the payment → Refund**. For a member, also cancel the subscription (**Customers → the customer
    → the subscription → Cancel**, immediately). If reminders aren't built after the check-in,
    cancel every membership and refund every payment, as /terms promises.
-5. Delete files people emailed you 30 days after you deliver, as /privacy says.
+5. **Photos (the free photo offer):** forward each photo of a label to the thread. Claude drafts
+   the row from it; you check it and reply to that one person. Delete the photo within 30 days of
+   replying. See [The photo offer](#paid-idea-test-buttons).
+6. Delete files people emailed you 30 days after you deliver, as /privacy says.
 
 The sample report is made from the calculator's example building by a script. After changing the
 report's layout or the example (or in a new year, so its dates stay current), run
