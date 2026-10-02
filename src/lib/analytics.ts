@@ -1,14 +1,27 @@
 import type { CaptureOptions, CaptureResult, PostHog } from "posthog-js";
 
-export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+/**
+ * Where PostHog sends from the browser by default: this site, which passes it on to
+ * PostHog (netlify/edge-functions/posthog-relay.ts), so tracker blockers that block
+ * PostHog's own domains don't drop visits. Must match RELAY_PREFIX there.
+ */
+export const RELAY_PATH = "/clockwork";
 
-/** A blank setting (as in .env.example) means the default host, not this site's own origin. */
-export function posthogHost(value: string | undefined): string {
-  return value?.trim() || DEFAULT_POSTHOG_HOST;
+/** PostHog's app, for links back to it (the toolbar). It can't be worked out from the relay. */
+export const POSTHOG_UI_HOST = "https://us.posthog.com";
+
+/**
+ * PostHog's hosts. A blank setting (as in .env.example) means the relay. A host that is
+ * set is used as it is, such as https://us.i.posthog.com when running the site without
+ * Netlify, where the relay doesn't exist.
+ */
+export function posthogHosts(value: string | undefined): { api_host: string; ui_host?: string } {
+  const host = value?.trim();
+  return host ? { api_host: host } : { api_host: RELAY_PATH, ui_host: POSTHOG_UI_HOST };
 }
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-const HOST = posthogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
+const HOSTS = posthogHosts(process.env.NEXT_PUBLIC_POSTHOG_HOST);
 
 const LAST_VISIT_KEY = "capexclock:last-visit:v1";
 
@@ -20,7 +33,7 @@ export function initAnalytics(): Promise<PostHog | null> {
   client ??= import("posthog-js")
     .then(({ default: posthog }) => {
       posthog.init(KEY, {
-        api_host: HOST,
+        ...HOSTS,
         defaults: "2025-05-24",
         person_profiles: "identified_only",
         // Property names are often street addresses. Clicks are recorded
