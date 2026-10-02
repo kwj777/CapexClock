@@ -315,6 +315,63 @@ export function headingTiming(heading: string): Timing {
   return have.has("age") || have.has("old") ? "age" : "installYear";
 }
 
+/** A component heading without its timing words: "Water heater 2 installed" is "water heater 2". */
+function itemWords(heading: string): string {
+  return words(heading)
+    .split(" ")
+    .filter((w) => !TIMING_WORDS.has(w))
+    .join(" ");
+}
+
+/** Two install-year columns whose names differ by a number, like "Fridge 1" and "Fridge 2", are separate items. */
+function separateItems(a: string, b: string): boolean {
+  if (headingTiming(a) !== "installYear" || headingTiming(b) !== "installYear") return false;
+  const [x, y] = [itemWords(a), itemWords(b)];
+  return x !== y && /\d/.test(`${x} ${y}`);
+}
+
+/**
+ * Two columns about one item, like "Water heater installed" and "Water heater age",
+ * would count it twice for each apartment. One is kept, an install year over an age,
+ * else the first, and the others are set to Ignore, where the owner can change them.
+ */
+function keepOneColumnPerItem(heads: readonly string[], roles: ColumnRole[]) {
+  const kept = new Map<string, number[]>();
+  roles.forEach((role, i) => {
+    const slug = componentSlug(role);
+    if (!slug) return;
+    const others = kept.get(slug) ?? [];
+    const same = others.find((k) => !separateItems(heads[k], heads[i]));
+    if (same === undefined) {
+      kept.set(slug, [...others, i]);
+    } else if (headingTiming(heads[same]) === "age" && headingTiming(heads[i]) === "installYear") {
+      roles[same] = "ignore";
+      kept.set(slug, others.map((k) => (k === same ? i : k)));
+    } else {
+      roles[i] = "ignore";
+    }
+  });
+}
+
+/**
+ * Columns left out because another column gives the same item for each apartment,
+ * for the preview to name. `kept` is that other column.
+ */
+export function sameItemColumns(
+  heads: readonly string[],
+  columns: readonly ColumnRole[],
+  match: NameMatcher,
+): { column: number; kept: number; slug: string }[] {
+  const found: { column: number; kept: number; slug: string }[] = [];
+  columns.forEach((role, column) => {
+    if (role !== "ignore") return;
+    const slug = headingItem(heads[column] ?? "", match);
+    const kept = slug ? columns.indexOf(`component:${slug}`) : -1;
+    if (slug && kept >= 0) found.push({ column, kept, slug });
+  });
+  return found;
+}
+
 /** The library item a heading names, if sure: "Water heater installed" is Tank water heater. */
 export function headingItem(heading: string, match: NameMatcher): string | null {
   const all = words(heading).split(" ");
@@ -461,6 +518,7 @@ export function guessColumns(
       const at = heads.findIndex((h, i) => roles[i] === "ignore" && doubtfulQuantity(h) === "number");
       if (at >= 0) roles[at] = "location";
     }
+    keepOneColumnPerItem(heads, roles);
     return roles;
   }
 

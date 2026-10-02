@@ -184,6 +184,51 @@ describe("a sheet with one row per apartment and a column per item", () => {
   });
 });
 
+describe("two columns about the same item, one row per apartment", () => {
+  const sheet = ["Apt,Water heater installed,Water heater age,Furnace installed", "101,2014,12,2012", "102,2016,10,2012", "103,2014,12,2010"].join("\n");
+
+  it("counts each apartment's item once, from the install year column", () => {
+    const opened = open(sheet);
+    expect(opened.layout).toBe("columns");
+    expect(opened.columns).toEqual(["location", "component:tank-water-heater", "ignore", "component:gas-furnace"]);
+    const p = preview(sheet);
+    const heaters = p.rows.filter((r) => r.row.librarySlug === "tank-water-heater");
+    expect(heaters.map((r) => [r.row.installYear, r.row.installYearIsGuess, r.row.quantity])).toEqual([
+      ["2014", false, "2"],
+      ["2016", false, "1"],
+    ]);
+    // Only the install years are read, so the sheet's year isn't asked for.
+    expect(p.usesSheetYear).toBe(false);
+    expect(p.sameItems).toEqual([{ column: 2, heading: "Water heater age", kept: 1, name: "Tank water heater" }]);
+  });
+
+  it("adds 3 water heaters to a 3-unit building, not 6", () => {
+    const rows = preview(sheet).rows.map((r) => r.row);
+    const draft = withImportedRows({ unitCount: "3", yearBuilt: "1985", rows: [] }, rows);
+    const heaters = draft.rows.filter((r) => r.librarySlug === "tank-water-heater");
+    expect(heaters.reduce((sum, r) => sum + Number(r.quantity), 0)).toBe(3);
+  });
+
+  it("uses the age column when it's the only one, wherever it is", () => {
+    const ageFirst = ["Apt,WH age,Water heater installed", "101,12,2014"].join("\n");
+    expect(open(ageFirst).columns).toEqual(["location", "ignore", "component:tank-water-heater"]);
+    const p = preview(ageFirst);
+    expect(p.sameItems).toEqual([{ column: 1, heading: "WH age", kept: 2, name: "Tank water heater" }]);
+  });
+
+  it("counts both when the owner says they're separate items", () => {
+    const both = preview(sheet, { columns: ["location", "component:tank-water-heater", "component:tank-water-heater", "component:gas-furnace"] });
+    expect(both.sameItems).toEqual([]);
+    expect(both.rows.filter((r) => r.row.librarySlug === "tank-water-heater").reduce((n, r) => n + Number(r.row.quantity), 0)).toBe(6);
+  });
+
+  it("keeps numbered columns as separate items", () => {
+    const two = ["Apt,Fridge 1,Fridge 2,Water heater installed", "101,2014,2019,2016"].join("\n");
+    expect(open(two).columns).toEqual(["location", "component:refrigerator", "component:refrigerator", "component:tank-water-heater"]);
+    expect(preview(two).sameItems).toEqual([]);
+  });
+});
+
 describe("a sheet with ages", () => {
   it("counts back from the year the sheet was last updated, marking guesses", () => {
     const p = preview(AGE_ROWS, { sheetYear: 2024 });

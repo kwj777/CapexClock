@@ -11,6 +11,7 @@ import {
   headingSaysSqFt,
   headingTiming,
   quantityQuestionColumn,
+  sameItemColumns,
   type ColumnRole,
   type FieldKind,
   type Layout,
@@ -120,6 +121,12 @@ export interface Preview {
   noYearColumn: boolean;
   /** Year columns whose headings could mean something else, like "Date" or "Replacement year". */
   doubtfulYears: { column: number; heading: string; role: "installYear" | "replaceBy" }[];
+  /**
+   * Each column is a component: columns left out because another column (`kept`)
+   * already gives that item for each apartment, like "Water heater age" beside
+   * "Water heater installed".
+   */
+  sameItems: { column: number; heading: string; kept: number; name: string }[];
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
   counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
@@ -864,6 +871,15 @@ export function buildPreview(
     quantityQuestion: doubt && { ...doubt, heading: heads[doubt.column], answer: quantityAnswer },
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
+    sameItems:
+      layout === "columns"
+        ? sameItemColumns(heads, columns, match).map(({ column, kept, slug }) => ({
+            column,
+            heading: heads[column],
+            kept,
+            name: libraryBySlug.get(slug)?.name ?? slug,
+          }))
+        : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
     counts: {
       rows: rows.length,

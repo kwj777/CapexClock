@@ -142,6 +142,11 @@ export function previewHints(preview: Preview): string[] {
         : `We read ${named}, as the year to replace each item by. If it's when each item was last replaced, choose Install year for it above.`,
     );
   }
+  for (const { column, heading, kept, name } of preview.sameItems) {
+    hints.push(
+      `We left out column ${columnLetter(column)}, ${quote(heading)}, since column ${columnLetter(kept)} already gives each apartment's ${name}. If they're separate items, choose ${name} for column ${columnLetter(column)} above.`,
+    );
+  }
   if (preview.withoutCost > 0) {
     hints.push(
       `${plural(preview.withoutCost, "row has", "rows have")} no cost yet. Add costs after importing to include ${

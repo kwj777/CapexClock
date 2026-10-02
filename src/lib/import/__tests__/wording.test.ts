@@ -134,6 +134,7 @@ describe("import wording", () => {
       quantityQuestion: null,
       noYearColumn: false,
       doubtfulYears: [],
+      sameItems: [],
       withoutCost: 0,
       counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
     };
@@ -150,6 +151,9 @@ describe("import wording", () => {
     ]);
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",
+    ]);
+    expect(previewHints({ ...base, sameItems: [{ column: 2, heading: "Water heater age", kept: 1, name: "Tank water heater" }] })).toEqual([
+      'We left out column C, "Water heater age", since column B already gives each apartment\'s Tank water heater. If they\'re separate items, choose Tank water heater for column C above.',
     ]);
     expect(previewHints({ ...base, noYearColumn: true })).toEqual([
       "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above.",
