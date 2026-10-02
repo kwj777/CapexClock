@@ -24,6 +24,7 @@ import {
   planProperty,
   plannedProblems,
   plannedSave,
+  propertyFieldProblems,
   withEdits,
   type CreateResult,
   type PlannedProperty,
@@ -271,13 +272,14 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
       },
     );
     const created = run.filter((r) => r.status === "created");
-    void track("import_completed", {
+    // A retry finishes the same import again, so it has its own event and the
+    // import finish rate (import_completed ÷ import_started) counts each import once.
+    void track(retry ? "import_retried" : "import_completed", {
       rows_added: created.reduce((n, r) => n + (r.status === "created" ? r.components : 0), 0),
       properties_created: created.length,
       properties_failed: run.length - created.length,
       source: read?.source ?? "file",
       where: "portfolio",
-      retry,
     });
     setProgress("");
     setRunning(false);
@@ -443,8 +445,12 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 const showLines = on && !created && lines.length > 0 && (showProblems || lines.some((l) => l !== NO_UNITS_TEXT && l !== NO_NAME_TEXT));
                 const problemId = `${baseId}-${i}-problems`;
                 const field = (name: keyof PropertyEdits) => `${baseId}-${i}-${name}`;
-                const unitsBad = showLines && lines.includes(NO_UNITS_TEXT);
-                const nameBad = showLines && lines.includes(NO_NAME_TEXT);
+                const badFields = new Set(propertyFieldProblems(p, currentYear).map((f) => f.field));
+                const nameBad = showLines && badFields.has("name");
+                const unitsBad = showLines && badFields.has("unitCount");
+                const yearBad = showLines && badFields.has("yearBuilt");
+                // Said with each field, so moving between properties says whose field it is.
+                const whose = p.name.trim() || `property ${i + 1}`;
                 const locked = created || running || !on;
                 return (
                   <li key={p.id} className="rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -466,6 +472,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       <div>
                         <label htmlFor={field("name")} className={labelClass}>
                           Property name
+                          {planned.length > 1 && <span className="sr-only">, {i + 1} of {planned.length}</span>}
                         </label>
                         <input
                           id={field("name")}
@@ -480,7 +487,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       </div>
                       <div>
                         <label htmlFor={field("unitCount")} className={labelClass}>
-                          Rental units
+                          Rental units<span className="sr-only"> for {whose}</span>
                         </label>
                         <input
                           id={field("unitCount")}
@@ -495,7 +502,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       </div>
                       <div>
                         <label htmlFor={field("yearBuilt")} className={labelClass}>
-                          Year built
+                          Year built<span className="sr-only"> for {whose}</span>
                         </label>
                         <input
                           id={field("yearBuilt")}
@@ -503,6 +510,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           inputMode="numeric"
                           placeholder="Optional"
                           readOnly={locked}
+                          aria-invalid={yearBad || undefined}
                           aria-describedby={showLines ? problemId : undefined}
                           onChange={(e) => edit(p, "yearBuilt", e.target.value)}
                           className={`${inputClass} ${lockedClass} mt-1 tabular-nums`}

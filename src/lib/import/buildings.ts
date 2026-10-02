@@ -77,6 +77,27 @@ export function plannedSave(property: PlannedProperty, currentYear: number): Sav
 export const NO_NAME_TEXT = "Give the property a name.";
 export const NO_UNITS_TEXT = "Type how many rental units it has.";
 
+/** The property's own fields, which the owner checks before it's created. */
+export type PropertyField = "name" | "unitCount" | "yearBuilt";
+
+/** Each of the property's own fields that stops it being created, with what to do. */
+export function propertyFieldProblems(
+  property: Pick<PlannedProperty, "name" | "unitCount" | "yearBuilt">,
+  currentYear: number,
+): { field: PropertyField; text: string }[] {
+  const found: { field: PropertyField; text: string }[] = [];
+  if (property.name.trim() === "") found.push({ field: "name", text: NO_NAME_TEXT });
+  // Checked one at a time, so a bad unit count doesn't hide a bad year built.
+  const check = (unitCount: string, yearBuilt: string) =>
+    toSaveInput(property.name, { ...EMPTY_DRAFT, unitCount, yearBuilt }, currentYear).problems.property;
+  const units = property.unitCount.trim();
+  // The editor saves a blank unit count as 0, but a new property needs one for its per-unit amount.
+  if (/^0*$/.test(units)) found.push({ field: "unitCount", text: NO_UNITS_TEXT });
+  else if (check(units, "") === "unit_count") found.push({ field: "unitCount", text: SAVE_PROBLEM_TEXT.unit_count });
+  if (check("1", property.yearBuilt.trim()) === "year_built") found.push({ field: "yearBuilt", text: SAVE_PROBLEM_TEXT.year_built });
+  return found;
+}
+
 /**
  * Why a property can't be created yet, in the owner's words, or [] when it can:
  * its name, unit count or year built, then rows that need fixing, by name.
@@ -84,11 +105,7 @@ export const NO_UNITS_TEXT = "Type how many rental units it has.";
 export function plannedProblems(property: PlannedProperty, currentYear: number): string[] {
   const draft = plannedDraft(property);
   const { problems } = toSaveInput(property.name, draft, currentYear);
-  const lines: string[] = [];
-  if (property.name.trim() === "") lines.push(NO_NAME_TEXT);
-  // The editor saves a blank unit count as 0, but a new property needs one for its per-unit amount.
-  if (/^0*$/.test(property.unitCount.trim())) lines.push(NO_UNITS_TEXT);
-  else if (problems.property) lines.push(SAVE_PROBLEM_TEXT[problems.property]);
+  const lines = propertyFieldProblems(property, currentYear).map((p) => p.text);
   const bad = draft.rows.filter((r) => problems[r.id]);
   if (bad.length > 0) {
     const names = bad.map((r) => r.name.trim() || "a row with no name");
