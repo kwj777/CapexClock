@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Bar,
   BarChart,
@@ -47,7 +48,8 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
  * The stacked bar chart. It's hidden from screen readers, which get the same
  * numbers as a table next to it (ForecastTable), so it takes no keyboard focus.
  */
-export default function ForecastChart({ forecast }: { forecast: Forecast }) {
+// Redrawn only when the forecast changes, not on every key press in the list above it.
+export default memo(function ForecastChart({ forecast }: { forecast: Forecast }) {
   const { rows, present } = toChartRows(forecast);
 
   return (
@@ -102,4 +104,4 @@ export default function ForecastChart({ forecast }: { forecast: Forecast }) {
       </ResponsiveContainer>
     </div>
   );
-}
+});

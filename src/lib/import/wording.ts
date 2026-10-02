@@ -168,15 +168,18 @@ export function previewHints(preview: Preview): string[] {
   return hints;
 }
 
-/** The calculator re-draws every row as you type, so past this many rows it starts to lag. */
-export const SLOW_ROWS = 300;
+/**
+ * Past this many rows, typing in the calculator can lag on a slower computer: it
+ * redraws only the row being edited, but the forecast still works through every row.
+ */
+export const SLOW_ROWS = 1000;
 
 /** The warning above Add when the list would get long enough to slow the calculator, or "" when it won't. */
 export function longListText(rowsNow: number, adding: number): string {
   const total = rowsNow + adding;
   if (adding === 0 || total <= SLOW_ROWS) return "";
   const makes = rowsNow > 0 ? `Adding these makes ${plural(total, "row")} in your list` : `That's ${plural(total, "row")}`;
-  return `${makes}, and the calculator gets slow past about ${SLOW_ROWS}. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.`;
+  return `${makes}, and the calculator gets slow past about ${SLOW_ROWS.toLocaleString("en-US")}. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.`;
 }
 
 /**

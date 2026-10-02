@@ -3,6 +3,9 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
+  memo,
+  useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -55,6 +58,7 @@ import {
   type Draft,
   type DraftRow,
   type RowField,
+  type RowProblem,
 } from "./draft";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
@@ -87,6 +91,9 @@ function groupByCategory(library: LibraryComponent[]): Record<string, LibraryCom
 const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
+/** Lets the browser skip drawing a row that's out of view, sized as it last looked. */
+const offscreenClass =
+  "[content-visibility:auto] [contain-intrinsic-block-size:auto_400px] sm:[contain-intrinsic-block-size:auto_288px] lg:[contain-intrinsic-block-size:auto_64px]";
 // Shared by the column headings and every row so they line up on wide screens.
 const rowGridClass =
   "lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_4.5rem_4.5rem]";
@@ -220,10 +227,13 @@ function CalculatorBody({
   // Element to focus once the next render is on screen (after removing a row, say).
   const focusNext = useRef<string | null>(null);
 
-  const { components, problems } = useMemo(() => toComponents(draft, startYear), [draft, startYear]);
+  // The forecast and the notes under rows follow typing a moment later, so in a long
+  // list each key press shows straight away and the forecast catches up after.
+  const forecastDraft = useDeferredValue(draft);
+  const { components, problems } = useMemo(() => toComponents(forecastDraft, startYear), [forecastDraft, startYear]);
   // Condition and the guess flag for the lists under the forecast.
-  const rowsById = useMemo(() => new Map(draft.rows.map((r) => [r.id, r])), [draft.rows]);
-  const unitCount = parseUnitCount(draft.unitCount);
+  const rowsById = useMemo(() => new Map(forecastDraft.rows.map((r) => [r.id, r])), [forecastDraft.rows]);
+  const unitCount = parseUnitCount(forecastDraft.unitCount);
   const forecast = useMemo(
     () => computeForecast({ startYear, unitCount, components }),
     [startYear, unitCount, components],
@@ -251,22 +261,33 @@ function CalculatorBody({
     setDraft((d) => ({ ...d, ...patch }));
   }
 
-  function updateRow(id: string, patch: Partial<DraftRow>) {
-    setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? editRow(r, patch, d.unitCount) : r)) }));
-  }
+  // Row edits and removals keep the same functions from render to render, so in a
+  // long list (an import can add 2,000 rows) only the row that changed is redrawn.
+  const latest = useRef({ draft, setDraft });
+  useEffect(() => {
+    latest.current = { draft, setDraft };
+  });
 
-  function announce(message: string) {
+  const updateRow = useCallback((id: string, patch: Partial<DraftRow>) => {
+    latest.current.setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? editRow(r, patch, d.unitCount) : r)) }));
+  }, []);
+
+  const announce = useCallback((message: string) => {
     // A repeat of the same words wouldn't be read again, so vary it invisibly.
     setAnnouncement((current) => (current === message ? `${message}\u00a0` : message));
-  }
+  }, []);
 
-  function removeRow(id: string) {
-    const removed = draft.rows.find((r) => r.id === id);
-    const next = neighborRowId(draft.rows, id);
-    focusNext.current = next ? `${rowIdPrefix(next)}-name` : addId;
-    setDraft((d) => ({ ...d, rows: d.rows.filter((r) => r.id !== id) }));
-    announce(`Removed ${removed?.name.trim() || "the component"}.`);
-  }
+  const removeRow = useCallback(
+    (id: string) => {
+      const { rows } = latest.current.draft;
+      const removed = rows.find((r) => r.id === id);
+      const next = neighborRowId(rows, id);
+      focusNext.current = next ? `${baseId}-${next}-name` : addId;
+      latest.current.setDraft((d) => ({ ...d, rows: d.rows.filter((r) => r.id !== id) }));
+      announce(`Removed ${removed?.name.trim() || "the component"}.`);
+    },
+    [baseId, addId, announce],
+  );
 
   // Adding takes a pick and a press of Add, so arrowing through the list adds nothing.
   function addComponent() {
@@ -533,24 +554,19 @@ function CalculatorBody({
               ))}
             </div>
             <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-              {draft.rows.map((row) => {
-                const problem = problems[row.id];
-                return (
-                  <ComponentRow
-                    key={row.id}
-                    row={row}
-                    idPrefix={rowIdPrefix(row.id)}
-                    yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
-                    lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
-                    problem={
-                      rowNotes?.[row.id] ??
-                      (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)
-                    }
-                    onChange={(patch) => updateRow(row.id, patch)}
-                    onRemove={() => removeRow(row.id)}
-                  />
-                );
-              })}
+              {draft.rows.map((row) => (
+                <ListedRow
+                  key={row.id}
+                  row={row}
+                  idPrefix={rowIdPrefix(row.id)}
+                  yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
+                  lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
+                  note={rowNotes?.[row.id]}
+                  problem={problems[row.id]}
+                  onRowChange={updateRow}
+                  onRowRemove={removeRow}
+                />
+              ))}
             </ul>
             <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
               Tick {REPLACE_LABEL} to plan a replacement in {startYear}, even if it isn&apos;t worn
@@ -639,7 +655,7 @@ function CalculatorBody({
             unitCount={unitCount}
             forecast={forecast}
             components={components}
-            rows={draft.rows}
+            rows={forecastDraft.rows}
           />
         </section>
       )}
@@ -647,6 +663,39 @@ function CalculatorBody({
     </div>
   );
 }
+
+/**
+ * A row in the list, redrawn only when its own props change. Its note is worked out
+ * here from the row's problem, so a new note object each render doesn't redraw it.
+ */
+const ListedRow = memo(function ListedRow({
+  row,
+  note,
+  problem,
+  onRowChange,
+  onRowRemove,
+  ...props
+}: {
+  row: DraftRow;
+  idPrefix: string;
+  yearBuilt: string;
+  lib: LibraryComponent | undefined;
+  /** A note from the page, e.g. why the row can't be saved; it replaces the forecast's. */
+  note: RowNote | undefined;
+  problem: RowProblem | undefined;
+  onRowChange: (id: string, patch: Partial<DraftRow>) => void;
+  onRowRemove: (id: string) => void;
+}) {
+  return (
+    <ComponentRow
+      {...props}
+      row={row}
+      problem={note ?? (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)}
+      onChange={(patch) => onRowChange(row.id, patch)}
+      onRemove={() => onRowRemove(row.id)}
+    />
+  );
+});
 
 function ComponentRow({
   row,
@@ -686,7 +735,9 @@ function ComponentRow({
 
   return (
     <li className="py-4">
-      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${rowGridClass} lg:items-center`}>
+      {/* Rows out of view skip drawing, which keeps typing quick in a long list. The
+          padding leaves room for focus outlines, since a skipped box clips what it holds. */}
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${rowGridClass} -m-1 p-1 ${offscreenClass} lg:items-center`}>
         <label className="col-span-2 block sm:col-span-3 lg:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>Component</span>
           <input
@@ -985,7 +1036,9 @@ function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate:
   );
 }
 
-function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
+// The lists under the forecast can run to thousands of rows, so they're redrawn only
+// when the forecast changes, not on every key press in the list of components.
+const AtRisk = memo(function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
@@ -1018,9 +1071,9 @@ function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
       {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" className="mt-5" />}
     </div>
   );
-}
+});
 
-function DueTable({ forecast, rows: formRows }: { forecast: Forecast; rows: RowsById }) {
+const DueTable = memo(function DueTable({ forecast, rows: formRows }: { forecast: Forecast; rows: RowsById }) {
   const rows = forecast.years.flatMap((y) => y.replacements);
   // Every row shows cents once any row has them, so the rows add up.
   const money = moneyColumn(rows.map((r) => r.cost));
@@ -1083,4 +1136,4 @@ function DueTable({ forecast, rows: formRows }: { forecast: Forecast; rows: Rows
       )}
     </div>
   );
-}
+});
