@@ -53,3 +53,15 @@ export function listText(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? "";
   return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
+
+/** A spreadsheet's column letter: 0 is A, 25 is Z, 26 is AA. */
+export function columnLetter(index: number): string {
+  let n = index + 1;
+  let letters = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}

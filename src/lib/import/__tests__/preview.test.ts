@@ -607,3 +607,56 @@ describe("items the library counts in square feet", () => {
     expect([carpet.followsUnitCount, costLabel(carpet)]).toEqual([false, "Cost each"]);
   });
 });
+
+describe("a Units column with the same number on every row", () => {
+  const sheet = ["Item,Units,Year,Cost", "Water heater,12,2016,1400", "Fridge,12,2018,900", "Stove,12,2015,800"].join("\n");
+
+  it("asks once whether it's the quantity, and holds the rows until it's answered", () => {
+    const p = preview(sheet);
+    expect(open(sheet).columns).toEqual(["item", "ignore", "installYear", "cost"]);
+    expect(p.unitsQuestion).toEqual({ column: 1, heading: "Units", value: "12", answer: null });
+    expect(p.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+      ["1", "needs_you"],
+      ["1", "needs_you"],
+      ["1", "needs_you"],
+    ]);
+    expect(byName(p, "Refrigerator").issues).toEqual([
+      { field: "quantity", text: "Answer the question about column B above, or type the quantity." },
+    ]);
+  });
+
+  it("uses it as the quantity when the owner says so", () => {
+    const p = preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], unitsAnswered: true });
+    expect(p.unitsQuestion?.answer).toBe("quantity");
+    expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
+      ["12", []],
+      ["12", []],
+      ["12", []],
+    ]);
+    expect(p.doubtfulQuantity).toBeNull();
+  });
+
+  it("counts each row as one when it's the building's unit count", () => {
+    const p = preview(sheet, { unitsAnswered: true });
+    expect(p.unitsQuestion?.answer).toBe("building");
+    expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
+      ["1", []],
+      ["1", []],
+      ["1", []],
+    ]);
+  });
+
+  it("doesn't hold a row whose quantity was typed or worked out from its total", () => {
+    const typed = preview(sheet, { fixes: { r2: { quantity: "12" } } });
+    expect(byName(typed, "Refrigerator")).toMatchObject({ issues: [], row: { quantity: "12" } });
+    const totals = preview(["Item,Units,Unit cost,Total", "Water heater,12,1400,16800"].join("\n"));
+    expect(totals.unitsQuestion).not.toBeNull();
+    expect(byName(totals, "Tank water heater")).toMatchObject({ issues: [], row: { quantity: "12" } });
+  });
+
+  it("isn't asked when it says 1, or when another column is the quantity", () => {
+    expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).unitsQuestion).toBeNull();
+    expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).unitsQuestion).toBeNull();
+    expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).unitsQuestion).toBeNull();
+  });
+});

@@ -50,7 +50,7 @@ export function columnsFor(opened: OpenedSheet, match: NameMatcher, layout: Layo
 
 /** The choices a newly opened sheet starts with: the guesses, and this year as the sheet's year. */
 export function startingChoices(opened: OpenedSheet, currentYear: number): ImportChoices {
-  return { layout: opened.layout, columns: opened.columns, sheetYear: currentYear, answers: {}, fixes: {} };
+  return { layout: opened.layout, columns: opened.columns, sheetYear: currentYear, answers: {}, fixes: {}, unitsAnswered: false };
 }
 
 /** The sheet's year as typed: a 4-digit year from 1900 to this year, or null. */

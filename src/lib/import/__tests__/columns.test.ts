@@ -15,6 +15,7 @@ import {
   isCounting,
   offersColumnLayout,
   parseRole,
+  sameUnitsColumn,
   samples,
   yearsHavePassed,
 } from "../columns";
@@ -354,6 +355,19 @@ describe("guessing the layout and every column", () => {
       { column: 2, heading: "Replacement year", role: "replaceBy" },
     ]);
     expect(doubtfulYearColumns(heads, ["item", "ignore", "ignore", "installYear"])).toEqual([]);
+  });
+
+  it("finds a Units column with the same number on every row, which could be the building's unit count", () => {
+    const values = (cells: Record<number, string[]>) => (c: number) => cells[c] ?? [];
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["12", "12", "12"] }))).toEqual({ column: 1, value: "12" });
+    // Asked again after the owner chose Quantity, so the answer shows.
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "quantity"], values({ 1: ["12", "12"] }))).toEqual({ column: 1, value: "12" });
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["12", "6"] }))).toBeNull();
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["1", "1"] }))).toBeNull();
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["twelve"] }))).toBeNull();
+    expect(sameUnitsColumn(["Item", "Units", "Qty"], ["item", "ignore", "quantity"], values({ 1: ["12"] }))).toBeNull();
+    expect(sameUnitsColumn(["Item", "Units"], ["item", "notes"], values({ 1: ["12"] }))).toBeNull();
+    expect(sameUnitsColumn(["Item", "Qty"], ["item", "quantity"], values({ 1: ["12"] }))).toBeNull();
   });
 
   it("reads a dropdown's value back as a role", () => {

@@ -4,17 +4,19 @@ import type { UnitLabel } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
+  columnValues,
   componentSlug,
   doubtfulQuantityColumn,
   doubtfulYearColumns,
   headings,
   headingTiming,
+  sameUnitsColumn,
   type ColumnRole,
   type FieldKind,
   type Layout,
 } from "./columns";
 import { nameKey, type NameMatcher } from "./names";
-import { cellText, clip, isBlankRow, listText, quote, type Cell, type Grid } from "./text";
+import { cellText, clip, columnLetter, isBlankRow, listText, quote, type Cell, type Grid } from "./text";
 import {
   readAge,
   readCondition,
@@ -109,6 +111,11 @@ export interface Preview {
   quantityFromTotals: boolean;
   /** The quantity comes from a column whose heading only might mean one ("#", "No.", "Units"). */
   doubtfulQuantity: { column: number; heading: string } | null;
+  /**
+   * A "Units" column with the same number on every row: how many of each item, or
+   * the building's unit count? Null for the answer until the owner says.
+   */
+  unitsQuestion: { column: number; heading: string; value: string; answer: "quantity" | "building" | null } | null;
   /** No column gives install years (or ages, years left or replace-by years), so each row uses the year built. */
   noYearColumn: boolean;
   /** Year columns whose headings could mean something else, like "Date" or "Replacement year". */
@@ -130,6 +137,8 @@ export interface ImportChoices {
   answers: Readonly<Record<string, string>>;
   /** What the owner typed to fix a record, by record key. */
   fixes: Readonly<Record<string, Partial<Record<FixField, string>>>>;
+  /** The owner answered what a "Units" column with the same number on every row is. */
+  unitsAnswered: boolean;
 }
 
 export interface Sheet {
@@ -202,6 +211,8 @@ interface Context {
   match: NameMatcher;
   choices: ImportChoices;
   currentYear: number;
+  /** A "Units" column the owner hasn't said is the quantity or not, so rows counted as one ask. */
+  unitsPending: number | null;
 }
 
 /** The first column with this role that has something in this row (or the first with the role). */
@@ -460,6 +471,11 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   if (!quantityGiven && record.quantity === 1) {
     if (costPerSqFt) {
       record.issues.push({ field: "quantity", text: "The cost is per sq ft. Type the square feet." });
+    } else if (ctx.unitsPending !== null) {
+      record.issues.push({
+        field: "quantity",
+        text: `Answer the question about column ${columnLetter(ctx.unitsPending)} above, or type the quantity.`,
+      });
     }
   }
 
@@ -703,9 +719,17 @@ export function buildPreview(
   currentYear: number,
 ): Preview {
   const { grid, headerRow } = sheet;
-  const ctx: Context = { library: new Map(library.map((c) => [c.slug, c])), match, choices, currentYear };
   const heads = headings(grid, headerRow);
   const { columns, layout } = choices;
+  const units = layout === "rows" ? sameUnitsColumn(heads, columns, columnValues(grid, headerRow)) : null;
+  const unitsAnswer = !units ? null : columns[units.column] === "quantity" ? "quantity" : choices.unitsAnswered ? "building" : null;
+  const ctx: Context = {
+    library: new Map(library.map((c) => [c.slug, c])),
+    match,
+    choices,
+    currentYear,
+    unitsPending: units && unitsAnswer === null ? units.column : null,
+  };
   const skipped: Skipped[] = [];
   const records: Record_[] = [];
   for (let i = 0; i < headerRow; i++) if (!isBlankRow(grid[i])) skipped.push({ sheetRow: i + 1, reason: "above_headings" });
@@ -765,7 +789,8 @@ export function buildPreview(
       ? columns.some((role, c) => componentSlug(role) !== null && headingTiming(heads[c]) === "age")
       : used.has("age") || used.has("remaining") || used.has("replaceBy");
   const count = (status: RowStatus) => rows.filter((r) => r.status === status).length;
-  const doubtful = layout === "rows" ? doubtfulQuantityColumn(heads, columns) : null;
+  // The units question already says what a "Units" column is.
+  const doubtful = layout === "rows" && !units ? doubtfulQuantityColumn(heads, columns) : null;
   return {
     rows,
     skipped,
@@ -775,6 +800,7 @@ export function buildPreview(
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
     quantityFromTotals: layout === "rows" && !used.has("quantity") && used.has("total") && used.has("cost"),
     doubtfulQuantity: doubtful === null ? null : { column: doubtful, heading: heads[doubtful] },
+    unitsQuestion: units && { column: units.column, heading: heads[units.column], value: units.value, answer: unitsAnswer },
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,

@@ -395,6 +395,9 @@ export function yearsHavePassed(values: readonly string[], currentYear: number):
   return found;
 }
 
+/** Numbers only, like "12" or "1,200". */
+const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
+
 /**
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
@@ -447,8 +450,8 @@ export function guessColumns(
       const kind = doubtfulQuantity(h);
       if (roles[i] !== "ignore" || kind === null) return false;
       const cells = values(i);
-      if (cells.length === 0 || !cells.every((v) => /^\d[\d,]*(?:\.\d+)?$/.test(v)) || isCounting(cells)) return false;
-      // The same number on every row is the building's unit count.
+      if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || isCounting(cells)) return false;
+      // The same number on every row may be the building's unit count: the preview asks.
       return kind === "number" || new Set(cells).size > 1;
     });
     if (at >= 0) roles[at] = "quantity";
@@ -476,6 +479,25 @@ export function guessColumns(
 export function doubtfulQuantityColumn(heads: readonly string[], columns: readonly ColumnRole[]): number | null {
   const at = columns.indexOf("quantity");
   return at >= 0 && guessField(heads[at] ?? "") === null && doubtfulQuantity(heads[at] ?? "") !== null ? at : null;
+}
+
+/**
+ * A "Units" column with the same number (not 1) on every row, when no other column
+ * is the quantity. It could be how many of each item there are, or the building's
+ * unit count, so the preview asks which.
+ */
+export function sameUnitsColumn(
+  heads: readonly string[],
+  columns: readonly ColumnRole[],
+  values: ColumnValues,
+): { column: number; value: string } | null {
+  const column = heads.findIndex(
+    (h, i) => doubtfulQuantity(h) === "units" && (columns[i] === "ignore" || columns[i] === "quantity"),
+  );
+  if (column < 0 || columns.some((r, i) => r === "quantity" && i !== column)) return null;
+  const cells = values(column);
+  if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || new Set(cells).size > 1) return null;
+  return Number(cells[0].replace(/,/g, "")) === 1 ? null : { column, value: cells[0] };
 }
 
 /** Install-year and replace-by columns whose headings could mean something else, for the preview to name. */

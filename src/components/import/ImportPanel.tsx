@@ -39,6 +39,7 @@ import {
   duplicateText,
   previewHints,
   previewSummary,
+  unitsQuestionText,
 } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
 import { loadCsvParser } from "./csv";
@@ -189,12 +190,24 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
   function setLayout(layout: Layout) {
     if (!opened) return;
     // Fixes were for the other layout's rows, so they start again.
-    setChoices((c) => c && { ...c, layout, columns: columnsFor(opened, match, layout, currentYear), fixes: {} });
+    setChoices((c) => c && { ...c, layout, columns: columnsFor(opened, match, layout, currentYear), fixes: {}, unitsAnswered: false });
   }
 
   function setSheetYear(value: string) {
     setSheetYearText(value);
     setChoices((c) => c && { ...c, sheetYear: parseSheetYear(value, currentYear) });
+  }
+
+  /** "quantity": the Units column is how many of each item; "building": it's the unit count. */
+  function answerUnits(column: number, value: "quantity" | "building") {
+    setChoices(
+      (c) =>
+        c && {
+          ...c,
+          unitsAnswered: true,
+          columns: c.columns.map((r, i) => (i === column ? (value === "quantity" ? "quantity" : "ignore") : r)),
+        },
+    );
   }
 
   function answer(key: string, value: string) {
@@ -225,7 +238,9 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
         .map((heading, i) => ({ heading, i, examples: samples(opened.sheet.grid, opened.sheet.headerRow, i) }))
         .filter((c) => c.heading !== "" || c.examples.length > 0)
     : [];
-  const unanswered = preview?.questions.filter((q) => choices?.answers[q.key] === undefined).length ?? 0;
+  const unanswered =
+    (preview?.questions.filter((q) => choices?.answers[q.key] === undefined).length ?? 0) +
+    (preview?.unitsQuestion?.answer === null ? 1 : 0);
 
   return (
     <section
@@ -398,6 +413,32 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
                 </p>
               )}
             </div>
+          )}
+
+          {preview.unitsQuestion && (
+            <fieldset>
+              <legend className={`${headingClass} wrap-anywhere`}>{unitsQuestionText(preview.unitsQuestion)}</legend>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {(
+                  [
+                    ["quantity", "How many of each item there are"],
+                    ["building", "The number of units in the building, so each row counts as one"],
+                  ] as const
+                ).map(([value, text]) => (
+                  <label key={value} className="flex items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
+                    <input
+                      type="radio"
+                      name={`${baseId}-units`}
+                      value={value}
+                      checked={preview.unitsQuestion?.answer === value}
+                      onChange={() => preview.unitsQuestion && answerUnits(preview.unitsQuestion.column, value)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+                    />
+                    {text}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
 
           {preview.questions.length > 0 && (
