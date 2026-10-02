@@ -95,7 +95,7 @@ export default function QuickEstimate({
     if (shownSystems === null || sent.current) return;
     const timer = window.setTimeout(() => {
       sent.current = true;
-      void track("quick_estimate_shown", { systems: String(shownSystems) });
+      void track("quick_estimate_shown", { systems: shownSystems });
     }, 2000);
     return () => window.clearTimeout(timer);
   }, [summary, shownSystems]);
