@@ -9,6 +9,7 @@ import {
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
   eitherWayVariants,
+  focusStep,
   ifYouWait,
   itemDetail,
   leadVariants,
@@ -208,6 +209,23 @@ describe("Apply and Undo in the panel", () => {
     expect(undoApplied(applied, after, false)!.focus).toBe("toggle");
     expect(undoApplied(applied, { ...after, unitCount: "13" }, true)).toBeNull();
     expect(undoApplied(null, after, true)).toBeNull();
+  });
+});
+
+describe("focus after Apply or Undo", () => {
+  it("moves to a control that can take it", () => {
+    expect(focusStep({ disabled: false }, false)).toBe("focus");
+    expect(focusStep({ disabled: false }, true)).toBe("focus");
+  });
+
+  it("waits while Apply is still disabled from before Undo and the forecast hasn't caught up", () => {
+    expect(focusStep({ disabled: true }, true)).toBe("wait");
+    expect(focusStep(null, true)).toBe("wait");
+  });
+
+  it("gives up once the forecast has caught up, so it never jumps there later", () => {
+    expect(focusStep({ disabled: true }, false)).toBe("drop");
+    expect(focusStep(null, false)).toBe("drop");
   });
 });
 

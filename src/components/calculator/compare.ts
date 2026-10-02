@@ -279,6 +279,17 @@ export function undoApplied(applied: AppliedChange | null, draft: Draft, panelOp
   };
 }
 
+/**
+ * Whether the control an Apply or Undo picked gets focus now, a render later, or not
+ * at all. The calculator works out the forecast a moment after the draft changes, so
+ * right after Undo the figures, and so Apply, can still be from before: Apply is
+ * disabled until the forecast catches up. Focus waits for that instead of being lost.
+ */
+export function focusStep(target: { disabled: boolean } | null, forecastPending: boolean): "focus" | "wait" | "drop" {
+  if (target && !target.disabled) return "focus";
+  return forecastPending ? "wait" : "drop";
+}
+
 /** For screen readers, once ticking items or the emergency box changes the figures. */
 export function compareSummary(comparison: ReplaceNowComparison, startYear: number): string {
   const { asPlanned, replaceNow, chosen, items } = comparison;
