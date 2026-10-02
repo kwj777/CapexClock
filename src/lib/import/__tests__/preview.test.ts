@@ -41,7 +41,7 @@ describe("a sheet with one row per item, a title block and a totals row", () => 
       { sheetRow: 10, reason: "blank" },
       { sheetRow: 13, reason: "total" },
     ]);
-    expect(p.counts).toEqual({ rows: 7, ready: 1, changed: 4, needsYou: 2, skipped: 4 });
+    expect(p.counts).toEqual({ rows: 7, ready: 1, changed: 4, needsYou: 2, skipped: 4, otherBuildings: 0 });
   });
 
   it("asks which roof it is instead of guessing, and keeps it as its own item until answered", () => {
@@ -750,6 +750,20 @@ describe("a sheet in CapexClock's own columns", () => {
     expect(p.rows[0].capexclockId).toBe("row-1");
     // Without the list, the same name is matched to the library's item.
     expect(preview(sheet(",,,Water heater,Plumbing,12,unit,2016,,10,1400,,,,row-1")).rows[0].row.librarySlug).toBe("tank-water-heater");
+  });
+
+  it("skips blank and total rows only for the building they're in, and never another building's rows", () => {
+    const text = sheet(
+      "Elm,12,1998,Refrigerator,Appliances,12,unit,2019,,13,900,,,,",
+      ",,,,,,,,,,,,,,",
+      "Oak,6,1985,Refrigerator,Appliances,6,unit,2018,,13,900,,,,",
+      ",,,Total,,,,,,,5400,,,,",
+    );
+    const elm = preview(text, { building: "elm" });
+    expect(elm.skipped.map((s) => s.reason)).toEqual(["blank"]);
+    expect(elm.counts).toMatchObject({ rows: 1, skipped: 1, otherBuildings: 1 });
+    expect(preview(text, { building: "oak" }).skipped.map((s) => s.reason)).toEqual(["total"]);
+    expect(preview(text).counts).toMatchObject({ rows: 2, skipped: 2, otherBuildings: 0 });
   });
 
   it("never merges rows with different CapexClock IDs", () => {

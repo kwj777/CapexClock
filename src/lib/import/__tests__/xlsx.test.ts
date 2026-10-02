@@ -318,11 +318,14 @@ describe("one tab with a Building column", () => {
     expect(p.rows.map((r) => r.building)).toEqual(["12 elm st", "12 elm st", "40 birch ave", "40 birch ave", "40 birch ave", "12 elm st"]);
   });
 
-  it("shows one building at a time in the calculator, skipping the others' rows", async () => {
+  it("shows one building at a time in the calculator, without calling the others' rows skipped", async () => {
     const [tab] = await read([BUILDING_COLUMN]);
     const p = previewOf(tab, { building: "40 birch ave" });
     expect(p.rows.map((r) => r.row.name)).toEqual(["Asphalt shingle roof", "Refrigerator", "Dishwasher"]);
-    expect(p.skipped.filter((s) => s.reason === "other_building").map((s) => s.sheetRow)).toEqual([2, 3, 7]);
+    // 12 Elm St's rows 2, 3 and 7 aren't shown, but they aren't skipped either.
+    expect(p.skipped).toEqual([]);
+    expect(p.counts).toMatchObject({ rows: 3, otherBuildings: 1 });
+    expect(previewOf(tab).counts.otherBuildings).toBe(0);
     // Every building is still listed, so the owner can choose another.
     expect(p.buildings.map((b) => b.name)).toEqual(["12 Elm St", "40 Birch Ave"]);
   });

@@ -92,8 +92,7 @@ export type SkipReason =
   | "section"
   | "no_name"
   | "zero_quantity"
-  | "nothing_listed"
-  | "other_building";
+  | "nothing_listed";
 
 export interface Skipped {
   sheetRow: number;
@@ -155,7 +154,11 @@ export interface Preview {
   buildings: BuildingInfo[];
   /** The sheet has a CapexClock ID column, so it came from a component list download. */
   idColumn: boolean;
-  counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
+  /**
+   * Rows to add by mark, and rows skipped. otherBuildings counts the buildings whose
+   * rows aren't shown, when one building is chosen; their rows aren't skipped.
+   */
+  counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number; otherBuildings: number };
 }
 
 /** The answer that keeps a name as the owner's own item. */
@@ -883,7 +886,10 @@ export function buildPreview(
   const only = choices.building ?? null;
   for (let i = headerRow + 1; i <= last; i++) {
     const row = grid[i] ?? [];
-    const skip = (reason: SkipReason) => skipped.push({ sheetRow: i + 1, reason });
+    // Rows of a building that isn't shown aren't skipped, just not shown: the summary says so.
+    const skip = (reason: SkipReason) => {
+      if (only === null || building.key === only) skipped.push({ sheetRow: i + 1, reason });
+    };
     if (isBlankRow(row)) {
       skip("blank");
       continue;
@@ -917,10 +923,7 @@ export function buildPreview(
       }
       continue;
     }
-    if (only !== null && building.key !== only) {
-      skip("other_building");
-      continue;
-    }
+    if (only !== null && building.key !== only) continue;
     for (const r of result) r.building = building.key;
     records.push(...result);
   }
@@ -944,6 +947,7 @@ export function buildPreview(
       ? columns.some((role, c) => componentSlug(role) !== null && headingTiming(heads[c]) === "age")
       : used.has("age") || used.has("remaining") || used.has("replaceBy");
   const count = (status: RowStatus) => rows.filter((r) => r.status === status).length;
+  const named = [...buildings.values()].filter((b) => b.records > 0);
   // The units question already says what a "Units" column is.
   const doubtful = layout === "rows" && !units ? doubtfulQuantityColumn(heads, columns) : null;
   return {
@@ -959,7 +963,7 @@ export function buildPreview(
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
-    buildings: [...buildings.values()].filter((b) => b.records > 0),
+    buildings: named,
     idColumn: used.has("id"),
     counts: {
       rows: rows.length,
@@ -967,6 +971,7 @@ export function buildPreview(
       changed: count("changed"),
       needsYou: count("needs_you"),
       skipped: skipped.length,
+      otherBuildings: only === null ? 0 : named.filter((b) => b.key !== only).length,
     },
   };
 }

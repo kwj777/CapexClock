@@ -68,14 +68,23 @@ describe("import wording", () => {
   });
 
   it("sums up the preview for the live region", () => {
-    expect(previewSummary({ rows: 23, ready: 15, changed: 5, needsYou: 3, skipped: 2 })).toBe(
+    expect(previewSummary({ rows: 23, ready: 15, changed: 5, needsYou: 3, skipped: 2, otherBuildings: 0 })).toBe(
       "23 rows to add: 15 ready, 5 changed, 3 need you. 2 rows skipped.",
     );
-    expect(previewSummary({ rows: 1, ready: 0, changed: 0, needsYou: 1, skipped: 1 })).toBe(
+    expect(previewSummary({ rows: 1, ready: 0, changed: 0, needsYou: 1, skipped: 1, otherBuildings: 0 })).toBe(
       "1 row to add: 1 needs you. 1 row skipped.",
     );
-    expect(previewSummary({ rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 4 })).toBe("No rows to add. 4 rows skipped.");
-    expect(previewSummary({ rows: 2000, ready: 2000, changed: 0, needsYou: 0, skipped: 0 })).toBe("2,000 rows to add: 2,000 ready.");
+    expect(previewSummary({ rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 4, otherBuildings: 0 })).toBe("No rows to add. 4 rows skipped.");
+    expect(previewSummary({ rows: 2000, ready: 2000, changed: 0, needsYou: 0, skipped: 0, otherBuildings: 0 })).toBe("2,000 rows to add: 2,000 ready.");
+  });
+
+  it("says rows of other buildings aren't shown, without calling them skipped", () => {
+    expect(previewSummary({ rows: 75, ready: 0, changed: 0, needsYou: 75, skipped: 0, otherBuildings: 19 })).toBe(
+      "75 rows to add: 75 need you. Rows for 19 other buildings aren't shown.",
+    );
+    expect(previewSummary({ rows: 3, ready: 3, changed: 0, needsYou: 0, skipped: 1, otherBuildings: 1 })).toBe(
+      "3 rows to add: 3 ready. 1 row skipped. Rows for another building aren't shown.",
+    );
   });
 
   it("labels the Add button with the count", () => {
@@ -140,7 +149,7 @@ describe("import wording", () => {
       withoutCost: 0,
       buildings: [],
       idColumn: false,
-      counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
+      counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0, otherBuildings: 0 },
     };
     expect(previewHints(base)).toEqual([]);
     expect(previewHints({ ...base, missingItemColumn: true, noQuantityColumn: true })).toEqual([

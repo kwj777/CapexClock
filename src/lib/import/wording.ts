@@ -20,7 +20,6 @@ export const SKIP_TEXT: Record<SkipReason, string> = {
   no_name: "no item name or numbers",
   zero_quantity: "quantity 0",
   nothing_listed: "no items listed",
-  other_building: "another building",
 };
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -62,9 +61,16 @@ export function statusText(counts: Preview["counts"]): string {
   return parts.join(", ");
 }
 
-/** " 2 rows skipped." after a summary, or "". */
+/**
+ * " 2 rows skipped." after a summary, or "". Rows of other buildings, when one is
+ * shown, aren't skipped: " Rows for 19 other buildings aren't shown."
+ */
 export function skippedText(counts: Preview["counts"]): string {
-  return counts.skipped > 0 ? ` ${plural(counts.skipped, "row")} skipped.` : "";
+  const skipped = counts.skipped > 0 ? ` ${plural(counts.skipped, "row")} skipped.` : "";
+  const others = counts.otherBuildings;
+  const hidden =
+    others > 0 ? ` Rows for ${others === 1 ? "another building" : plural(others, "other building")} aren't shown.` : "";
+  return `${skipped}${hidden}`;
 }
 
 /** "23 rows to add: 15 ready, 5 changed, 3 need you. 2 rows skipped." */

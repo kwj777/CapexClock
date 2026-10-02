@@ -145,6 +145,7 @@ describe("planning an import against the list", () => {
       changed: 0,
       needsYou: 0,
       skipped: 0,
+      otherBuildings: 0,
       ...more,
     });
     // One install year changed in a list of three: nothing is added.
