@@ -358,7 +358,11 @@ export interface BuyNowClick {
   leaving: boolean;
   /** presale_checkout_clicked already went for this offer since the page was last shown. */
   counted: boolean;
-  /** A middle, Ctrl, Cmd, Shift or Alt click, which opens Stripe in a new tab or window. */
+  /**
+   * A middle, Ctrl, Cmd, Shift or Alt click, which opens Stripe in a new tab or window
+   * (BuyNow hears a middle click as auxclick). "Open in new tab" from the right-click
+   * menu sends no event, so it isn't counted.
+   */
   newTab: boolean;
 }
 

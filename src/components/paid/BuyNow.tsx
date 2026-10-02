@@ -71,12 +71,18 @@ export default function BuyNow({ offer, link }: { offer: Offer; link: string }) 
       });
   }
 
+  // A middle click opens a new tab and fires auxclick, not click, in current browsers.
+  function onAuxClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button === 1) onClick(event);
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <a
           href={link}
           onClick={onClick}
+          onAuxClick={onAuxClick}
           // Starts with the visible words, so "click Buy now" works by voice, and
           // says which offer, since a page can have two.
           aria-label={`Buy now: ${name}`}

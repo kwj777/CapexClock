@@ -434,7 +434,8 @@ steps (import, the comparison and the quick estimate) add their own tiles; each 
 says what to add.
 
 On the **Buy now** tile, `presale_checkout_clicked` counts trips to Stripe: once per click that
-leaves for Stripe (a double click is one), and once per Buy now opened in a new tab. One click can
+leaves for Stripe (a double click is one), and once per Buy now opened in a new tab with a middle,
+Ctrl, Cmd or Shift click. Opening it from the right-click menu isn't counted. One click can
 count without a trip: in the property editor with unsaved changes, the browser asks "Leave site?"
 first, and the click counts even if the owner stays. `presale_completed` counts the thank-you
 pages, once per visit. Stripe is the real count of sales; these only rank the two offers.
