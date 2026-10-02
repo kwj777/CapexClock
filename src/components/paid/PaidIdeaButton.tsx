@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefOb
 import { track } from "@/lib/analytics";
 import {
   NOT_BUILT_TEXT,
+  offerForIdea,
   PAID_IDEA_TEXT,
   paidIdeaEvent,
   panelName,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/paid-ideas";
 import { CONTACT_EMAIL } from "@/lib/site";
 import { usePaidIdeas } from "./PaidIdeas";
+import PresaleOffer from "./PresaleOffer";
 import TellMeFirstForm from "./TellMeFirstForm";
 
 /** "dark" for a button on the dark reserve card. */
@@ -128,7 +130,10 @@ export default function PaidIdeaButton({ idea, className }: { idea: PaidIdea; cl
   );
 }
 
-/** What the first click shows: it isn't built, and a "tell me first" list. */
+/**
+ * What the first click shows: it isn't built, and a "tell me first" list, or
+ * Buy now once the idea's Stripe link is set (never for the photo idea).
+ */
 function PaidIdeaPanel({
   id,
   panelRef,
@@ -140,7 +145,9 @@ function PaidIdeaPanel({
   idea: PaidIdea;
   onClose: () => void;
 }) {
-  const { where, ownerEmail, signedUp, markSignedUp } = usePaidIdeas();
+  const { where, ownerEmail, signedUp, markSignedUp, offerLinks } = usePaidIdeas();
+  const offer = offerForIdea(idea);
+  const buyLink = offer && offerLinks[offer];
   // Signed up from this panel just now (not from another button for the same idea).
   const [justSignedUp, setJustSignedUp] = useState(false);
   const thanks = useRef<HTMLParagraphElement>(null);
@@ -176,32 +183,38 @@ function PaidIdeaPanel({
           <span aria-hidden="true">✕</span>
         </button>
       </div>
-      <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-        {PAID_IDEA_TEXT[idea].pitch} Want to hear first if we build it?
-      </p>
-      {idea === "photo" && <PhotoOffer where={where} />}
-      {/* Always in the panel, so screen readers announce the message when it appears. */}
-      <div role="status">
-        {signedUp.has(idea) && (
-          <p
-            ref={thanks}
-            tabIndex={-1}
-            className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200 focus:outline-none dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30"
-          >
-            You&apos;re on the list. We&apos;ll email you first if we build it.
+      {offer && buyLink ? (
+        <PresaleOffer offer={offer} link={buyLink} />
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+            {PAID_IDEA_TEXT[idea].pitch} Want to hear first if we build it?
           </p>
-        )}
-      </div>
-      {!signedUp.has(idea) && (
-        <TellMeFirstForm
-          idea={idea}
-          where={where}
-          defaultEmail={ownerEmail}
-          onSignedUp={() => {
-            markSignedUp(idea);
-            setJustSignedUp(true);
-          }}
-        />
+          {idea === "photo" && <PhotoOffer where={where} />}
+          {/* Always in the panel, so screen readers announce the message when it appears. */}
+          <div role="status">
+            {signedUp.has(idea) && (
+              <p
+                ref={thanks}
+                tabIndex={-1}
+                className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200 focus:outline-none dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30"
+              >
+                You&apos;re on the list. We&apos;ll email you first if we build it.
+              </p>
+            )}
+          </div>
+          {!signedUp.has(idea) && (
+            <TellMeFirstForm
+              idea={idea}
+              where={where}
+              defaultEmail={ownerEmail}
+              onSignedUp={() => {
+                markSignedUp(idea);
+                setJustSignedUp(true);
+              }}
+            />
+          )}
+        </>
       )}
     </section>
   );

@@ -2,10 +2,21 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { track } from "@/lib/analytics";
-import { firstTimeEach, paidIdeaEvent, testButtonsOn, type PaidIdea, type PaidWhere } from "@/lib/paid-ideas";
+import {
+  firstTimeEach,
+  paidIdeaEvent,
+  presaleLinksFromEnv,
+  testButtonsOn,
+  type PaidIdea,
+  type PaidWhere,
+  type PresaleLinks,
+} from "@/lib/paid-ideas";
 
 // Baked in at build time. Netlify setting NEXT_PUBLIC_TEST_BUTTONS=off hides every button.
 const ENABLED = testButtonsOn(process.env.NEXT_PUBLIC_TEST_BUTTONS);
+// Also baked in: the Stripe Payment Links. An offer without one keeps the "tell me first" form.
+const OFFER_LINKS = presaleLinksFromEnv().offers;
+const NO_LINKS: PresaleLinks["offers"] = { membership: null, report: null };
 
 interface PaidIdeasContext {
   enabled: boolean;
@@ -21,6 +32,8 @@ interface PaidIdeasContext {
   /** Ideas signed up for on this page, so every button for that idea shows it. */
   signedUp: ReadonlySet<PaidIdea>;
   markSignedUp: (idea: PaidIdea) => void;
+  /** Stripe Payment Link for each offer; null when not set. */
+  offerLinks: PresaleLinks["offers"];
 }
 
 // Without a provider the buttons stay hidden.
@@ -33,6 +46,7 @@ const Context = createContext<PaidIdeasContext>({
   clicked: () => {},
   signedUp: new Set(),
   markSignedUp: () => {},
+  offerLinks: NO_LINKS,
 });
 
 export function usePaidIdeas(): PaidIdeasContext {
@@ -89,6 +103,7 @@ export default function PaidIdeasProvider({
       },
       signedUp,
       markSignedUp: (idea) => setSignedUp((s) => new Set(s).add(idea)),
+      offerLinks: OFFER_LINKS,
     }),
     [where, ownerEmail, foundEmail, wantOwnerEmail, firstSeen, firstClick, signedUp],
   );

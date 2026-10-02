@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "sample-report": "ts-node --project scripts/tsconfig.json scripts/sample-report.tsx"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

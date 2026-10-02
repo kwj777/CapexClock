@@ -1,18 +1,44 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { PAID_IDEAS, type PaidIdea, type PaidWhere } from "@/lib/paid-ideas";
 import PaidIdeaButton from "../PaidIdeaButton";
-import PaidIdeasProvider from "../PaidIdeas";
 import TellMeFirstForm from "../TellMeFirstForm";
 
 // The first render only: opening a panel, sending the form and the events are
 // checked in the browser.
 
 describe("paid idea buttons", () => {
-  it("show the idea's words, marked as an idea, closed", () => {
-    const html = renderToStaticMarkup(
-      <PaidIdeasProvider where="calculator">
-        <PaidIdeaButton idea="photo" />
-      </PaidIdeasProvider>,
-    );
+  /**
+   * Renders with NEXT_PUBLIC_TEST_BUTTONS set to `setting` (or unset), using a
+   * fresh copy of the modules (React included), since the setting is read when
+   * the module loads. That way a Netlify setting can't change what's tested.
+   */
+  async function renderWith(setting: string | undefined, ideas: readonly PaidIdea[], where: PaidWhere = "property") {
+    const before = process.env.NEXT_PUBLIC_TEST_BUTTONS;
+    if (setting === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
+    else process.env.NEXT_PUBLIC_TEST_BUTTONS = setting;
+    let html = "";
+    try {
+      await jest.isolateModulesAsync(async () => {
+        const { renderToStaticMarkup: render } = await import("react-dom/server");
+        const { default: Provider } = await import("../PaidIdeas");
+        const { default: Button } = await import("../PaidIdeaButton");
+        html = render(
+          <Provider where={where}>
+            {ideas.map((idea) => (
+              <Button key={idea} idea={idea} />
+            ))}
+          </Provider>,
+        );
+      });
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
+      else process.env.NEXT_PUBLIC_TEST_BUTTONS = before;
+    }
+    return html;
+  }
+
+  it("show the idea's words, marked as an idea, closed", async () => {
+    const html = await renderWith(undefined, ["photo"], "calculator");
     expect(html).toContain('type="button"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("<span>Add from a photo of the label</span>");
@@ -26,32 +52,8 @@ describe("paid idea buttons", () => {
   });
 
   it("all go when NEXT_PUBLIC_TEST_BUTTONS is off", async () => {
-    const before = process.env.NEXT_PUBLIC_TEST_BUTTONS;
-    // A fresh copy of the modules (React included), so the setting is read again.
-    async function renderWith(setting: string) {
-      process.env.NEXT_PUBLIC_TEST_BUTTONS = setting;
-      let html = "";
-      await jest.isolateModulesAsync(async () => {
-        const { renderToStaticMarkup: render } = await import("react-dom/server");
-        const { default: Provider } = await import("../PaidIdeas");
-        const { default: Button } = await import("../PaidIdeaButton");
-        html = render(
-          <Provider where="property">
-            <Button idea="reminders" />
-            <Button idea="report" />
-            <Button idea="photo" />
-          </Provider>,
-        );
-      });
-      return html;
-    }
-    try {
-      expect(await renderWith("off")).toBe("");
-      expect((await renderWith("on")).match(/>Idea<\/span>/g)).toHaveLength(3);
-    } finally {
-      if (before === undefined) delete process.env.NEXT_PUBLIC_TEST_BUTTONS;
-      else process.env.NEXT_PUBLIC_TEST_BUTTONS = before;
-    }
+    expect(await renderWith("off", PAID_IDEAS)).toBe("");
+    expect((await renderWith("on", PAID_IDEAS)).match(/>Idea<\/span>/g)).toHaveLength(3);
   });
 });
 
@@ -90,5 +92,60 @@ describe("the tell me first form", () => {
       <TellMeFirstForm idea="photo" where="calculator" defaultEmail="" onSignedUp={() => {}} />,
     );
     expect(empty).toContain('name="email" value=""/>');
+  });
+});
+
+describe("the Stripe links the panels get", () => {
+  const SETTINGS = [
+    "NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP",
+    "NEXT_PUBLIC_STRIPE_LINK_REPORT",
+    "NEXT_PUBLIC_STRIPE_PORTAL_LINK",
+  ] as const;
+
+  /** The links a panel gets with these settings (and only these), read the way a build reads them. */
+  async function panelLinks(settings: Partial<Record<(typeof SETTINGS)[number], string>>): Promise<unknown> {
+    const env = process.env as Record<string, string | undefined>;
+    const before = { ...env };
+    for (const key of SETTINGS) delete env[key];
+    Object.assign(env, settings);
+    try {
+      let html = "";
+      // A fresh copy of the modules (React included), so the settings are read again.
+      await jest.isolateModulesAsync(async () => {
+        const { renderToStaticMarkup: render } = await import("react-dom/server");
+        const { default: Provider, usePaidIdeas } = await import("../PaidIdeas");
+        function Links() {
+          return <>{JSON.stringify(usePaidIdeas().offerLinks)}</>;
+        }
+        html = render(
+          <Provider where="calculator">
+            <Links />
+          </Provider>,
+        );
+      });
+      return JSON.parse(html.replace(/&quot;/g, '"'));
+    } finally {
+      for (const key of Object.keys(env)) if (!(key in before)) delete env[key];
+      Object.assign(env, before);
+    }
+  }
+
+  it("are read from the Netlify settings, and only valid ones count", async () => {
+    expect(
+      await panelLinks({
+        NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: "https://buy.stripe.com/test_m",
+        NEXT_PUBLIC_STRIPE_LINK_REPORT: "https://example.com/r",
+        NEXT_PUBLIC_STRIPE_PORTAL_LINK: "https://billing.stripe.com/p/login/test_p",
+      }),
+    ).toEqual({ membership: "https://buy.stripe.com/test_m", report: null });
+  });
+
+  it("leave the reminders panel's email form until the portal link is set too", async () => {
+    expect(
+      await panelLinks({
+        NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP: "https://buy.stripe.com/test_m",
+        NEXT_PUBLIC_STRIPE_LINK_REPORT: "https://buy.stripe.com/test_r",
+      }),
+    ).toEqual({ membership: null, report: "https://buy.stripe.com/test_r" });
   });
 });
