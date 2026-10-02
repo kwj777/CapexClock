@@ -13,6 +13,7 @@ import {
   changedCount,
   doneText,
   fillText,
+  importSummary,
   knownRows,
   listNotes,
   planImport,
@@ -20,7 +21,7 @@ import {
   removeText,
   sheetDetails,
 } from "@/lib/import/reimport";
-import { duplicates, duplicateText, longListText, previewSummary } from "@/lib/import/wording";
+import { duplicates, duplicateText, longListText } from "@/lib/import/wording";
 import { tooWide } from "@/lib/import/xlsx";
 import type { LibraryComponent } from "@/lib/library/components";
 import SheetReview, { type SheetState } from "./SheetReview";
@@ -118,8 +119,9 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     void track("import_previewed", { rows, ready, flagged: changed + needsYou, skipped, source: read.source });
   }, [openedSheet, preview, read]);
 
-  // Screen readers hear the summary once choices settle, not on every key press.
-  const summary = preview ? previewSummary(preview.counts) : "";
+  // Screen readers hear the summary once choices settle, not on every key press. A
+  // component list download's says what it updates, adds and removes.
+  const summary = preview && plan ? importSummary(preview.counts, plan, removeMissing) : "";
   useEffect(() => {
     if (!summary) return;
     const timer = window.setTimeout(

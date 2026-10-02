@@ -5,6 +5,7 @@ import {
   askText,
   doneText,
   fillText,
+  importSummary,
   listNote,
   listNotes,
   planImport,
@@ -125,7 +126,7 @@ describe("planning an import against the list", () => {
       { id: "c", name: "Carpet" },
     ]);
     expect(planSummary(plan)).toEqual([
-      "Matched 1 row of your list by CapexClock ID: 1 changed.",
+      "Matched 1 row of your list by CapexClock ID: 1 to update.",
       "2 new rows to add.",
       "1 row has a CapexClock ID that isn't in your list or is on another row too, so it's added as new.",
       "2 rows in your list aren't in this file.",
@@ -135,6 +136,39 @@ describe("planning an import against the list", () => {
     expect(doneText(plan, 2)).toBe("Updated 1 row, added 2 and removed 2 from your spreadsheet.");
     expect(listNote(plan, first.id)).toBe("Changes your list: Install year from 2016 to 2019.");
     expect(listNote(plan, fresh.id)).toBe("New: added to your list.");
+  });
+
+  it("sums up what a component list download does, for the preview and the live region", () => {
+    const counts = (rows: number, more: Partial<{ ready: number; changed: number; needsYou: number; skipped: number }> = {}) => ({
+      rows,
+      ready: rows,
+      changed: 0,
+      needsYou: 0,
+      skipped: 0,
+      ...more,
+    });
+    // One install year changed in a list of three: nothing is added.
+    const one = planImport(
+      [previewRow("a", sheetRow({ installYear: "2019" })), previewRow("b", sheetRow({ name: "Furnace" })), previewRow("c", sheetRow({ name: "Carpet" }))],
+      list,
+    );
+    expect(importSummary(counts(3), one, false)).toBe("3 rows: 1 to update and 2 the same. 3 ready.");
+    expect(applyLabel(one, false)).toBe("Update 1 row");
+
+    const mixed = planImport([previewRow("a", sheetRow({ installYear: "2019" })), previewRow(null, sheetRow({ name: "Boiler" }))], list);
+    expect(importSummary(counts(2, { ready: 1, needsYou: 1, skipped: 1 }), mixed, false)).toBe(
+      "2 rows: 1 to update and 1 to add. 1 ready, 1 needs you. 2 rows in your list aren't in this file and will stay. 1 row skipped.",
+    );
+    expect(importSummary(counts(2, { ready: 1, needsYou: 1 }), mixed, true)).toBe(
+      "2 rows: 1 to update and 1 to add. 1 ready, 1 needs you. 2 rows in your list aren't in this file and will be removed.",
+    );
+
+    const same = planImport([previewRow("a"), previewRow("b", sheetRow({ name: "Furnace" })), previewRow("c", sheetRow({ name: "Carpet" }))], list);
+    expect(importSummary(counts(3), same, false)).toBe("3 rows: 3 the same. 3 ready.");
+
+    // A file without IDs only adds, as before.
+    const fresh = planImport([previewRow(null)], list);
+    expect(importSummary(counts(1, { skipped: 2 }), fresh, false)).toBe("1 row to add: 1 ready. 2 rows skipped.");
   });
 
   it("can only remove when that's all there is to do", () => {

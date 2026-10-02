@@ -122,7 +122,7 @@ describe("downloading the component list and importing it again", () => {
       }),
     ]);
     expect(applyLabel(plan, false)).toBe("Update 1 row");
-    expect(planSummary(plan)[0]).toBe(`Matched ${draft.rows.length} rows of your list by CapexClock ID: 1 changed and ${draft.rows.length - 1} the same.`);
+    expect(planSummary(plan)[0]).toBe(`Matched ${draft.rows.length} rows of your list by CapexClock ID: 1 to update and ${draft.rows.length - 1} the same.`);
     expect(next.rows[1]).toMatchObject({ id: draft.rows[1].id, installYear: String(Number(draft.rows[1].installYear) + 2) });
     expect(next.rows.filter((r, i) => shown(r).installYear !== shown(draft.rows[i]).installYear)).toHaveLength(1);
   });

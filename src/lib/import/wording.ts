@@ -53,15 +53,24 @@ export function skippedLines(skipped: readonly Skipped[]): string[] {
   return [...byReason.entries()].map(([reason, rows]) => `${rowNumbers(rows)}: ${SKIP_TEXT[reason]}`);
 }
 
-/** "23 rows to add: 15 ready, 5 changed, 3 need you. 2 rows skipped." */
-export function previewSummary(counts: Preview["counts"]): string {
+/** How the rows read, by their marks in the preview: "15 ready, 5 changed, 3 need you". */
+export function statusText(counts: Preview["counts"]): string {
   const parts: string[] = [];
   if (counts.ready > 0) parts.push(`${counts.ready.toLocaleString("en-US")} ready`);
   if (counts.changed > 0) parts.push(`${counts.changed.toLocaleString("en-US")} changed`);
   if (counts.needsYou > 0) parts.push(`${counts.needsYou.toLocaleString("en-US")} ${counts.needsYou === 1 ? "needs" : "need"} you`);
-  const toAdd = counts.rows > 0 ? `${plural(counts.rows, "row")} to add: ${parts.join(", ")}.` : "No rows to add.";
-  const skipped = counts.skipped > 0 ? ` ${plural(counts.skipped, "row")} skipped.` : "";
-  return `${toAdd}${skipped}`;
+  return parts.join(", ");
+}
+
+/** " 2 rows skipped." after a summary, or "". */
+export function skippedText(counts: Preview["counts"]): string {
+  return counts.skipped > 0 ? ` ${plural(counts.skipped, "row")} skipped.` : "";
+}
+
+/** "23 rows to add: 15 ready, 5 changed, 3 need you. 2 rows skipped." */
+export function previewSummary(counts: Preview["counts"]): string {
+  const toAdd = counts.rows > 0 ? `${plural(counts.rows, "row")} to add: ${statusText(counts)}.` : "No rows to add.";
+  return `${toAdd}${skippedText(counts)}`;
 }
 
 export function addLabel(rows: number): string {

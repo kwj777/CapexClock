@@ -1,8 +1,9 @@
 import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
 import { COUNTED_PER_TEXT } from "./format";
-import type { BuildingInfo, ImportedRow, KnownRow, PreviewRow } from "./preview";
+import type { BuildingInfo, ImportedRow, KnownRow, Preview, PreviewRow } from "./preview";
 import { listText, quote } from "./text";
+import { previewSummary, skippedText, statusText } from "./wording";
 
 /**
  * What an import does to the list. A file without CapexClock IDs only adds rows.
@@ -161,7 +162,7 @@ export function planSummary(plan: ImportPlan): string[] {
   }
   const changed = changedCount(plan);
   const same = plan.update.length - changed;
-  const parts = [changed > 0 ? `${changed.toLocaleString("en-US")} changed` : "", same > 0 ? `${same.toLocaleString("en-US")} the same` : ""];
+  const parts = [changed > 0 ? `${changed.toLocaleString("en-US")} to update` : "", same > 0 ? `${same.toLocaleString("en-US")} the same` : ""];
   const lines = [`Matched ${plural(plan.update.length, "row")} of your list by CapexClock ID: ${listText(parts.filter(Boolean))}.`];
   if (plan.add.length > 0) lines.push(`${plural(plan.add.length, "new row")} to add.`);
   const fresh = plan.unknownIds + plan.repeatedIds;
@@ -176,6 +177,33 @@ export function planSummary(plan: ImportPlan): string[] {
     lines.push(`${plural(plan.missing.length, "row")} in your list ${plan.missing.length === 1 ? "isn't" : "aren't"} in this file.`);
   }
   return lines;
+}
+
+/**
+ * The preview's summary, which the live region reads out. A file without
+ * CapexClock IDs only adds: "23 rows to add: 15 ready, 8 changed." A component
+ * list download says what it does to the list, removals included:
+ * "7 rows: 1 to update, 1 to add and 5 the same. 7 ready. 1 row in your list isn't in this file and will stay."
+ */
+export function importSummary(counts: Preview["counts"], plan: ImportPlan, removeMissing: boolean): string {
+  if (!plan.matched) return previewSummary(counts);
+  const changed = changedCount(plan);
+  const same = plan.update.length - changed;
+  const parts: string[] = [];
+  if (changed > 0) parts.push(`${changed.toLocaleString("en-US")} to update`);
+  if (plan.add.length > 0) parts.push(`${plan.add.length.toLocaleString("en-US")} to add`);
+  if (same > 0) parts.push(`${same.toLocaleString("en-US")} the same`);
+  const rows = plan.update.length + plan.add.length;
+  const lines = [`${plural(rows, "row")}: ${listText(parts)}.`];
+  const status = statusText(counts);
+  if (status) lines.push(`${status.charAt(0).toUpperCase()}${status.slice(1)}.`);
+  const missing = plan.missing.length;
+  if (missing > 0) {
+    lines.push(
+      `${plural(missing, "row")} in your list ${missing === 1 ? "isn't" : "aren't"} in this file and will ${removeMissing ? "be removed" : "stay"}.`,
+    );
+  }
+  return `${lines.join(" ")}${skippedText(counts)}`;
 }
 
 /** The choice to remove rows the file doesn't have: "Remove Boiler, Carpet and 1 more from my list". */
