@@ -449,7 +449,8 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 const nameBad = showLines && badFields.has("name");
                 const unitsBad = showLines && badFields.has("unitCount");
                 const yearBad = showLines && badFields.has("yearBuilt");
-                // Said with each field, so moving between properties says whose field it is.
+                // Each field's name says whose it is, so moving between properties is clear. Each
+                // starts with its visible label, so voice control finds it too.
                 const whose = p.name.trim() || `property ${i + 1}`;
                 const locked = created || running || !on;
                 return (
@@ -460,22 +461,21 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           type="checkbox"
                           checked={on}
                           disabled={created || running || (started && !on)}
+                          aria-label={`Create this property: ${p.name.trim() || "no name yet"}`}
                           onChange={(e) => setIncluded((s) => ({ ...s, [p.id]: e.target.checked }))}
                           className="h-4 w-4 accent-amber-500"
                         />
-                        <span>
-                          Create this property<span className="sr-only">: {p.name || "no name yet"}</span>
-                        </span>
+                        <span>Create this property</span>
                       </label>
                     )}
                     <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                       <div>
                         <label htmlFor={field("name")} className={labelClass}>
                           Property name
-                          {planned.length > 1 && <span className="sr-only">, {i + 1} of {planned.length}</span>}
                         </label>
                         <input
                           id={field("name")}
+                          aria-label={planned.length > 1 ? `Property name, ${i + 1} of ${planned.length}` : undefined}
                           value={p.name}
                           maxLength={200}
                           readOnly={locked}
@@ -487,10 +487,11 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       </div>
                       <div>
                         <label htmlFor={field("unitCount")} className={labelClass}>
-                          Rental units<span className="sr-only"> for {whose}</span>
+                          Rental units
                         </label>
                         <input
                           id={field("unitCount")}
+                          aria-label={`Rental units for ${whose}`}
                           value={p.unitCount}
                           inputMode="numeric"
                           readOnly={locked}
@@ -502,10 +503,11 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       </div>
                       <div>
                         <label htmlFor={field("yearBuilt")} className={labelClass}>
-                          Year built<span className="sr-only"> for {whose}</span>
+                          Year built
                         </label>
                         <input
                           id={field("yearBuilt")}
+                          aria-label={`Year built for ${whose}`}
                           value={p.yearBuilt}
                           inputMode="numeric"
                           placeholder="Optional"
