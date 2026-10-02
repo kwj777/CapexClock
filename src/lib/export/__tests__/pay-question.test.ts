@@ -1,4 +1,4 @@
-import { alreadyAsked, nextStep, PAY_ANSWERS, PAY_QUESTION_VERSION, remember, versioned } from "../pay-question";
+import { alreadyAsked, nextStep, PAY_ANSWERS, PAY_QUESTION_VERSION, remember, versioned, waitsForAnswer } from "../pay-question";
 
 function memoryStore() {
   const items = new Map<string, string>();
@@ -76,5 +76,16 @@ describe("what the pay question shows next", () => {
 
   it("offers the same three answers as before", () => {
     expect(PAY_ANSWERS).toEqual(["Yes", "Maybe", "No"]);
+  });
+});
+
+describe("waiting for an answer", () => {
+  it("is true while a question is on screen, and false once it's answered or dismissed", () => {
+    expect(waitsForAnswer(nextStep(null, null))).toBe(true);
+    expect(waitsForAnswer(nextStep("Yes", null))).toBe(true);
+    expect(waitsForAnswer(nextStep("Maybe", null))).toBe(true);
+    expect(waitsForAnswer(nextStep("No", null))).toBe(false);
+    expect(waitsForAnswer(nextStep("Yes", "skipped"))).toBe(false);
+    expect(waitsForAnswer(nextStep("dismissed", null))).toBe(false);
   });
 });

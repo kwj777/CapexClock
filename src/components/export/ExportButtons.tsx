@@ -24,6 +24,7 @@ export default function ExportButtons({
   components,
   rows,
   list,
+  onPayQuestionChange,
 }: {
   name: string;
   unitCount: number;
@@ -33,6 +34,8 @@ export default function ExportButtons({
   rows: ExportFormRow[];
   /** The whole list, for the component list download, and the name for its Building column. */
   list?: { draft: Pick<Draft, "rows" | "unitCount" | "yearBuilt">; building: string };
+  /** Told while the pay question waits for an answer. */
+  onPayQuestionChange?: (asking: boolean) => void;
 }) {
   const [busy, setBusy] = useState<Format | null>(null);
   const [exported, setExported] = useState<Format | null>(null);
@@ -104,7 +107,11 @@ export default function ExportButtons({
             )}
           </div>
           {reportPanel && <div className="mt-3">{reportPanel}</div>}
-          <PayQuestion trigger={exported} onDismiss={() => exported && buttons.current[exported]?.focus()} />
+          <PayQuestion
+            trigger={exported}
+            onDismiss={() => exported && buttons.current[exported]?.focus()}
+            onAskingChange={onPayQuestionChange}
+          />
         </div>
       )}
     </PaidIdeaDisclosure>

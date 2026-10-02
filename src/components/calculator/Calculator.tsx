@@ -132,6 +132,8 @@ export default function Calculator({
     return { draft: loaded, undo: before ? { before, after: loaded, action: "import" as const } : null };
   });
   const [draft, setDraft] = useState<Draft>(start.draft);
+  // The Save box steps back while the pay question is asked, so the question isn't lost next to it.
+  const [askingPay, setAskingPay] = useState(false);
   useEffect(() => saveDraft(draft), [draft]);
   // Offered once: a reload or a later visit doesn't offer it again.
   useEffect(() => clearImportUndo(), []);
@@ -155,21 +157,33 @@ export default function Calculator({
       accountsEnabled={accountsEnabled}
       initialUndo={start.undo}
       lookUpOwnerEmail={accountsEnabled}
-      footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
+      onPayQuestionChange={setAskingPay}
+      footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount quiet={askingPay} /> : null}
     />
   );
 }
 
-function SaveToAccount() {
+/** Quiet while another question on the page waits for an answer: still there, but not competing with it. */
+function SaveToAccount({ quiet = false }: { quiet?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
+    <div
+      className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5 ring-1 ${
+        quiet
+          ? "bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+          : "bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30"
+      }`}
+    >
       <p className="text-sm text-slate-700 dark:text-slate-200">
         Save this property to a free account to keep it, add more buildings and see your whole
         portfolio.
       </p>
       <Link
         href="/app/properties/new?from=calculator"
-        className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+        className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+          quiet
+            ? "bg-white text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800"
+            : "bg-amber-500 text-slate-950 hover:bg-amber-400"
+        }`}
       >
         Save to my account
       </Link>
@@ -198,6 +212,8 @@ export interface CalculatorViewProps {
   library?: LibraryComponent[];
   /** Typical costs shown as hints under the cost fields; defaults to the built-in list. */
   typicalCosts?: TypicalCost[];
+  /** Told while the pay question after a download waits for an answer. */
+  onPayQuestionChange?: (asking: boolean) => void;
   /**
    * Notes by row id that replace the row's forecast note, e.g. why it can't be saved,
    * with the fields they're about (marked invalid and pointed at the note).
@@ -254,6 +270,7 @@ function CalculatorBody({
   typicalCosts = TYPICAL_COSTS,
   rowNotes,
   initialUndo = null,
+  onPayQuestionChange,
 }: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const typicalBySlug = useMemo(() => new Map(typicalCosts.map((c) => [c.slug, c])), [typicalCosts]);
@@ -746,6 +763,7 @@ function CalculatorBody({
             components={components}
             rows={forecastDraft.rows}
             list={{ draft, building: listName }}
+            onPayQuestionChange={onPayQuestionChange}
           />
         </section>
       )}

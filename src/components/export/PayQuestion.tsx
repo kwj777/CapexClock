@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
-import { alreadyAsked, nextStep, PAY_ANSWERS, remember, versioned, type PayAnswer } from "@/lib/export/pay-question";
+import { alreadyAsked, nextStep, PAY_ANSWERS, remember, versioned, waitsForAnswer, type PayAnswer } from "@/lib/export/pay-question";
 import { FIRST_PICK_QUESTION, FIRST_PICKS, type FirstPick } from "@/lib/paid-ideas";
 
 export const PAY_QUESTION =
@@ -17,11 +17,14 @@ export const PAY_QUESTION =
 export default function PayQuestion({
   trigger,
   onDismiss,
+  onAskingChange,
 }: {
   /** The export that just finished; null until there has been one. */
   trigger: "csv" | "pdf" | null;
   /** Called on dismiss, to put keyboard focus back where it was. */
   onDismiss?: () => void;
+  /** Told when a question starts or stops waiting for an answer, so the page can quiet other prompts. */
+  onAskingChange?: (asking: boolean) => void;
 }) {
   const [askedBefore] = useState(() => alreadyAsked());
   const [answer, setAnswer] = useState<PayAnswer | "dismissed" | null>(null);
@@ -34,6 +37,13 @@ export default function PayQuestion({
   const step = nextStep(answer, pick);
   const asksFirstPick = step === "first_pick";
   const thanked = step === "thanks";
+  const asking = open && waitsForAnswer(step);
+
+  useEffect(() => {
+    if (!asking) return;
+    onAskingChange?.(true);
+    return () => onAskingChange?.(false);
+  }, [asking, onAskingChange]);
 
   useEffect(() => {
     if (!open || shown.current) return;
@@ -70,15 +80,24 @@ export default function PayQuestion({
   }
 
   const card = "mt-4 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800";
+  // Questions stand out from the page around them, so they're seen right after a download.
+  const askCard =
+    "mt-4 rounded-2xl bg-white p-5 shadow-md ring-2 ring-amber-400 sm:p-6 dark:bg-slate-900 dark:ring-amber-500/70";
+  const eyebrow = "text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400";
+  const answerButton =
+    "rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:hover:ring-amber-500";
 
   return (
     <>
       {/* Always in the page, so screen readers announce the question when it appears. */}
       <div aria-live="polite">
         {open && step === "question" && (
-          <div className={card}>
+          <div className={askCard}>
             <div className="flex items-start justify-between gap-4">
-              <p className="text-sm font-medium text-slate-900 dark:text-white">{PAY_QUESTION}</p>
+              <div>
+                <p className={eyebrow}>One quick question</p>
+                <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">{PAY_QUESTION}</p>
+              </div>
               <button
                 type="button"
                 onClick={dismiss}
@@ -88,13 +107,13 @@ export default function PayQuestion({
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {PAY_ANSWERS.map((a) => (
                 <button
                   key={a}
                   type="button"
                   onClick={() => choose(a)}
-                  className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:hover:ring-amber-500"
+                  className={answerButton}
                 >
                   {a}
                 </button>
@@ -105,22 +124,22 @@ export default function PayQuestion({
       </div>
       {/* Outside the live region: these get focus instead, so they're read once. */}
       {open && asksFirstPick && (
-        <div className={card}>
+        <div className={askCard}>
           <p
             ref={followUp}
             id={followUpId}
             tabIndex={-1}
-            className="text-sm font-medium text-slate-900 focus:outline-none dark:text-white"
+            className="text-base font-semibold text-slate-900 focus:outline-none dark:text-white"
           >
             {FIRST_PICK_QUESTION}
           </p>
-          <div role="group" aria-labelledby={followUpId} className="mt-3 flex flex-wrap gap-2">
+          <div role="group" aria-labelledby={followUpId} className="mt-4 flex flex-wrap gap-2">
             {FIRST_PICKS.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 onClick={() => choosePick(p.value)}
-                className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:hover:ring-amber-500"
+                className={answerButton}
               >
                 {p.label}
               </button>
