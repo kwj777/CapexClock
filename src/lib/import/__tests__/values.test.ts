@@ -7,6 +7,7 @@ import {
   readQuantity,
   readRemaining,
   readReplaceBy,
+  saysPerSqFt,
 } from "../values";
 
 const NOW = 2026;
@@ -276,6 +277,7 @@ describe("money", () => {
     ["$1400/unit", 1400],
     ["$1,400 per unit", 1400],
     ["$4 per sq ft", 4],
+    ["$4 / sq. ft.", 4],
     ["$0.25/sf", 0.25],
     ["$0", 0],
   ])("reads %p as %p", (cell, value) => {
@@ -360,5 +362,15 @@ describe("condition", () => {
       note: 'Put the condition "leaks a little" in the notes',
     });
     expect(readCondition("")).toEqual({ value: null });
+  });
+});
+
+describe("costs per square foot", () => {
+  it.each(["$4 per sq ft", "4/sf", "$3.50 psf", "$4 / sq. ft.", "5 a square foot", "$4 sqft", "4/ft2"])("knows %p is per sq ft", (cell) => {
+    expect(saysPerSqFt(cell)).toBe(true);
+  });
+
+  it.each(["$4", "$1,400 ea", "4", 4, "", "Soft carpet", "$4 per unit"])("knows %p isn't", (cell) => {
+    expect(saysPerSqFt(cell)).toBe(false);
   });
 });

@@ -344,7 +344,14 @@ export function readLife(cell: Cell): Reading<number> {
 }
 
 const MONEY_SUFFIX =
-  /\s*(?:\/|per\s+|a\s+)?(?:ea\.?|each|apiece|unit|apt|apartment|door|piece|pc|item|installed|inst\.?|sq\.?\s*ft\.?|square\s+(?:foot|feet)|sf|sqft|psf|ft)\s*$/i;
+  /\s*(?:\/\s*|per\s+|a\s+)?(?:ea\.?|each|apiece|unit|apt|apartment|door|piece|pc|item|installed|inst\.?|sq\.?\s*ft\.?|square\s+(?:foot|feet)|sf|sqft|psf|ft)\s*$/i;
+const PER_SQ_FT = /(?:\/\s*|\bper\s+|\ba\s+|\d\s*)(?:sq\.?\s*ft\.?|square\s+(?:foot|feet)|sf|sqft|ft2|ft²)\s*$|\d\s*psf\s*$/i;
+
+/** A cost that says it's per square foot: "$4 per sq ft", "4/sf", "$3.50 psf". */
+export function saysPerSqFt(cell: Cell): boolean {
+  return typeof cell === "string" && PER_SQ_FT.test(cellText(cell));
+}
+
 const AMOUNT = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*(k|m|mm)?`;
 
 function amount(text: string): number | null {

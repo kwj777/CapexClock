@@ -1,4 +1,4 @@
-import { MAX_NOTES_LENGTH } from "@/components/calculator/draft";
+import { costLabel, MAX_NOTES_LENGTH, withImportedRows } from "@/components/calculator/draft";
 import { isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
 import {
   AGE_ROWS,
@@ -11,6 +11,7 @@ import {
   REPLACE_BY_ROWS,
   STUDY_ROWS,
 } from "../__fixtures__/sheets";
+import { detailsText } from "../wording";
 
 function byName(p: Preview, name: string): PreviewRow {
   const row = p.rows.find((r) => r.row.name === name);
@@ -549,5 +550,60 @@ describe("service, inspection and replacement dates", () => {
     const p = preview(["Item,Qty,Date,Cost", "Fridge,12,6/12/2018,900"].join("\n"));
     expect(byName(p, "Refrigerator").row.installYear).toBe("2018");
     expect(p.doubtfulYears).toEqual([{ column: 2, heading: "Date", role: "installYear" }]);
+  });
+});
+
+describe("items the library counts in square feet", () => {
+  it("keeps a count as a count, priced each, and says so", () => {
+    const p = preview(["Item,Qty,Year,Cost each", "Carpet,12,2020,2500", "Parking lot resurface,1,2010,60000"].join("\n"));
+    const carpet = byName(p, "Carpet");
+    expect(carpet.status).toBe("changed");
+    expect(carpet.row).toMatchObject({ quantity: "12", unitLabel: "per_building", costEach: "2500" });
+    expect(carpet.changes).toContain("Kept the quantity as a count, not sq ft, so the cost is for each one");
+    expect(detailsText(carpet.row, carpet.lifeIsTypical)).toBe("Qty 12 · Installed 2020 · Life 8 yrs (typical) · $2,500 each");
+    expect(byName(p, "Parking lot resurface").row).toMatchObject({ quantity: "1", unitLabel: "per_building" });
+  });
+
+  it("counts square feet when the quantity or the cost says so", () => {
+    const p = preview(["Item,Qty,Cost", "Carpet,9600 sf,$4", "Luxury vinyl plank,4000,$5 per sq ft", "Hallway tile,800 sq ft,$9"].join("\n"));
+    expect(byName(p, "Carpet")).toMatchObject({ status: "ready", row: { quantity: "9600", unitLabel: "per_sq_ft" } });
+    const lvp = byName(p, "Luxury vinyl plank");
+    expect(lvp.row).toMatchObject({ quantity: "4000", unitLabel: "per_sq_ft", costEach: "5" });
+    expect(lvp.changes).toEqual(["Read the quantity as square feet, since the cost is per sq ft"]);
+    expect(byName(p, "Hallway tile").row).toMatchObject({ quantity: "800", unitLabel: "per_sq_ft" });
+  });
+
+  it("asks for the square feet when the cost is per sq ft but there's no quantity", () => {
+    const p = preview(["Item,Cost", "Carpet,$4/sf"].join("\n"));
+    const carpet = byName(p, "Carpet");
+    expect(carpet.status).toBe("needs_you");
+    expect(carpet.issues).toEqual([{ field: "quantity", text: "The cost is per sq ft. Type the square feet." }]);
+    const fixed = byName(preview(["Item,Cost", "Carpet,$4/sf"].join("\n"), { fixes: { r1: { quantity: "900 sq ft" } } }), "Carpet");
+    expect(fixed.issues).toEqual([]);
+    expect(fixed.row).toMatchObject({ quantity: "900", unitLabel: "per_sq_ft" });
+  });
+
+  it("counts apartments in a sheet with a column per item", () => {
+    const sheet = ["Apt,Water heater installed,Carpet,LVP", "101,2014,2019,", "102,2014,2019,2021", "103,2016,,2021"].join("\n");
+    const p = preview(sheet);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.unitLabel])).toEqual([
+      ["Tank water heater", "2", "per_unit"],
+      ["Carpet", "2", "per_unit"],
+      ["Luxury vinyl plank", "2", "per_unit"],
+      ["Tank water heater", "1", "per_unit"],
+    ]);
+    expect(byName(p, "Carpet").changes).toContain("Counted apartments, not sq ft, so the cost is for each apartment");
+  });
+
+  it("go through the draft's rules: only a per-unit count at the unit count follows it", () => {
+    const rows = preview(["Apt,Water heater installed,Carpet", ...["101", "102", "103"].map((a) => `${a},2014,2019`)].join("\n")).rows;
+    const draft = withImportedRows({ unitCount: "3", yearBuilt: "1985", rows: [] }, rows.map((r) => r.row));
+    expect(draft.rows.map((r) => [r.name, r.followsUnitCount, costLabel(r)])).toEqual([
+      ["Tank water heater", true, "Cost per apartment"],
+      ["Carpet", true, "Cost per apartment"],
+    ]);
+    const counted = preview(["Item,Qty,Cost", "Carpet,3,2500"].join("\n")).rows.map((r) => r.row);
+    const [carpet] = withImportedRows({ unitCount: "3", yearBuilt: "1985", rows: [] }, counted).rows;
+    expect([carpet.followsUnitCount, costLabel(carpet)]).toEqual([false, "Cost each"]);
   });
 });

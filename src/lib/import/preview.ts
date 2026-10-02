@@ -24,6 +24,7 @@ import {
   readQuantity,
   readRemaining,
   readReplaceBy,
+  saysPerSqFt,
   type Reading,
 } from "./values";
 
@@ -165,6 +166,8 @@ const ABSENT = /^(?:no|n|none|n\/a|na|not present|-+|–|—|0)$/i;
 const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
 const NO_QUANTITY = "No quantity, so counted as 1";
+const COUNTED_EACH = "Kept the quantity as a count, not sq ft, so the cost is for each one";
+const COUNTED_APARTMENTS = "Counted apartments, not sq ft, so the cost is for each apartment";
 
 /** Cuts a value read from a number to a plain string: 1400, 0.25, never 1.4e+3. */
 function numberText(value: number): string {
@@ -340,7 +343,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     if (original.endsWith(":") || SECTION_NAMES.has(plain)) return "section";
   }
 
-  // Quantity, kept as given. Square feet count per sq ft.
+  // Quantity, kept as given.
   const quantityFix = fixed(ctx, key, "quantity");
   const quantityCell = quantityFix ?? cell("quantity");
   let squareFeet = false;
@@ -378,9 +381,20 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       record.row.category = category || section || "Other";
     }
   }
-  if (squareFeet && record.row.unitLabel !== "per_sq_ft") {
+  // Square feet, in the quantity or the cost, are counted per sq ft. Anything else is
+  // a count priced each, even for an item the library counts in square feet.
+  const costFix = fixed(ctx, key, "costEach");
+  const costCell = costFix ?? cell("cost");
+  const costPerSqFt = saysPerSqFt(costCell);
+  if (squareFeet || costPerSqFt) {
+    if (squareFeet && record.row.librarySlug && record.row.unitLabel !== "per_sq_ft") {
+      record.changes.push("Counted in square feet, as the sheet does");
+    }
+    if (!squareFeet && quantityGiven) record.changes.push("Read the quantity as square feet, since the cost is per sq ft");
     record.row.unitLabel = "per_sq_ft";
-    if (record.row.librarySlug) record.changes.push("Counted in square feet, as the sheet does");
+  } else if (record.row.unitLabel === "per_sq_ft") {
+    record.row.unitLabel = "per_building";
+    record.changes.push(COUNTED_EACH);
   }
 
   // Useful life: the sheet's, else the library's typical one.
@@ -407,8 +421,6 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   applyTiming(record, readTiming(ctx, key, timing, life));
 
   // Cost each, or a total divided by the quantity.
-  const costFix = fixed(ctx, key, "costEach");
-  const costCell = costFix ?? cell("cost");
   const totalCell = cell("total");
   if (costFix !== undefined || cellText(costCell) !== "") {
     const c = readMoney(costCell);
@@ -441,6 +453,13 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       }
     } else if (t.note) {
       record.changes.push(t.note.replace("the cost", "the total"));
+    }
+  }
+
+  // Nothing gave a quantity, so the row counts as one.
+  if (!quantityGiven && record.quantity === 1) {
+    if (costPerSqFt) {
+      record.issues.push({ field: "quantity", text: "The cost is per sq ft. Type the square feet." });
     }
   }
 
@@ -513,6 +532,8 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
     if (!item || text === "" || ABSENT.test(text)) return;
     const key = `r${index}c${c}`;
     const life = defaultLife(item);
+    // Each cell is one apartment's, so the quantity counts apartments, never square feet.
+    const sqFt = item.unitLabel === "per_sq_ft";
     const record: Record_ = {
       key,
       sheetRow: index + 1,
@@ -522,7 +543,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
         category: item.category,
         name: item.name,
         quantity: "1",
-        unitLabel: item.unitLabel,
+        unitLabel: sqFt ? "per_unit" : item.unitLabel,
         installYear: "",
         installYearIsGuess: false,
         usefulLife: String(life),
@@ -530,7 +551,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
         condition: null,
         notes: "",
       },
-      changes: [],
+      changes: sqFt ? [COUNTED_APARTMENTS] : [],
       issues: [],
       asked: null,
       pending: false,
