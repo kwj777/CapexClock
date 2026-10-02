@@ -116,6 +116,19 @@ export function wasDropped(event: Pick<StorageEvent, "key" | "newValue">, key: s
   return key !== null && event.newValue === null && (event.key === null || event.key === PREFIX + key);
 }
 
+/**
+ * True for a link that opens another app (email, a phone call or a text), so this
+ * page stays where it is. Chrome still fires beforeunload for one, which would ask
+ * "Leave site?" though nothing is lost.
+ */
+export function opensAnotherApp(href: string): boolean {
+  try {
+    return ["mailto:", "tel:", "sms:"].includes(new URL(href).protocol);
+  } catch {
+    return false;
+  }
+}
+
 /** Drops every account's kept edits from `storage`, so the next person on this browser can't see them. */
 export function clearAllUnsaved(storage: KeyStore & Pick<Storage, "removeItem">): void {
   for (const key of storedKeys(storage)) storage.removeItem(key);

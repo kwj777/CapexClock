@@ -214,8 +214,8 @@ function PhotoOffer({ where }: { where: PaidWhere }) {
       {PHOTO_OFFER.before}{" "}
       <a
         href={photoOfferHref(CONTACT_EMAIL)}
-        // Opens the mail app; the page stays, so the property editor needn't ask about unsaved edits.
-        data-keeps-edits
+        // Opens the mail app and the page stays. The property editor lets mail links
+        // through without asking about unsaved edits (see opensAnotherApp).
         onClick={() => void track("photo_offer_clicked", paidIdeaEvent("photo", where))}
         className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
       >

@@ -4,6 +4,7 @@ import {
   KEEP_UNSAVED_MS,
   keptPropertyIds,
   nothingToRestore,
+  opensAnotherApp,
   parseUnsaved,
   unsavedKey,
   wasDropped,
@@ -138,5 +139,21 @@ describe("deciding whether kept edits need bringing back", () => {
     expect(nothingToRestore({ name: "Old half typed", draft: EMPTY_DRAFT }, "", EMPTY_DRAFT, 2026)).toBe(false);
     const unfinished = { ...draft, rows: [...draft.rows, { ...draft.rows[0], id: "row-y", quantity: "" }] };
     expect(nothingToRestore({ name: "Maple Court", draft: unfinished }, "Maple Court", draft, 2026)).toBe(false);
+  });
+});
+
+describe("opensAnotherApp", () => {
+  it("is true for links that open the mail app, a call or a text", () => {
+    expect(opensAnotherApp("mailto:support@capexclock.com?subject=Photo%20of%20a%20label")).toBe(true);
+    expect(opensAnotherApp("mailto:support@capexclock.com")).toBe(true);
+    expect(opensAnotherApp("tel:+15555550100")).toBe(true);
+    expect(opensAnotherApp("sms:+15555550100")).toBe(true);
+  });
+
+  it("is false for pages, here or elsewhere, and for anything it can't read", () => {
+    expect(opensAnotherApp("http://localhost:3000/app")).toBe(false);
+    expect(opensAnotherApp("https://buy.stripe.com/test_m")).toBe(false);
+    expect(opensAnotherApp("/app")).toBe(false);
+    expect(opensAnotherApp("")).toBe(false);
   });
 });
