@@ -597,6 +597,9 @@ export default function PropertyEditor({
         setDraft={updateDraft}
         header={header}
         exportName={name.trim() || "My property"}
+        listName={name.trim()}
+        importWhere="editor"
+        accountsEnabled
         library={library}
         rowNotes={rowNotes}
       />

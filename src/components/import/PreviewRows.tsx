@@ -34,13 +34,15 @@ export interface PreviewRowsProps {
   preview: Preview;
   /** Rows whose item is already in the draft. */
   duplicateIds: ReadonlySet<string>;
+  /** What each row does to the list, for a component list download, by preview row id. */
+  listNotes?: ReadonlyMap<string, string>;
   /** Where focus goes when the last row that needed fixing is fixed. */
   fallbackFocusId: string;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
 }
 
 /** The preview's rows by status, Needs you first, then the skipped rows. */
-function PreviewRows({ preview, duplicateIds, fallbackFocusId, onFix }: PreviewRowsProps) {
+function PreviewRows({ preview, duplicateIds, listNotes, fallbackFocusId, onFix }: PreviewRowsProps) {
   const baseId = useId();
   const formId = (rowId: string) => `${baseId}-${rowId}-fix`;
   // After a fix, focus stays with the row if it still needs something, else moves to the next one.
@@ -73,7 +75,14 @@ function PreviewRows({ preview, duplicateIds, fallbackFocusId, onFix }: PreviewR
           <RowSection key={status} title={STATUS_TEXT[status]} count={rows.length} blurb={blurb} badge={badge}>
             {(shown) =>
               rows.slice(0, shown).map((r) => (
-                <Row key={r.id} row={r} duplicate={duplicateIds.has(r.id)} formId={formId(r.id)} onFix={fix} />
+                <Row
+                  key={r.id}
+                  row={r}
+                  duplicate={duplicateIds.has(r.id)}
+                  listNote={listNotes?.get(r.id)}
+                  formId={formId(r.id)}
+                  onFix={fix}
+                />
               ))
             }
           </RowSection>
@@ -138,11 +147,13 @@ function RowSection({
 function Row({
   row,
   duplicate,
+  listNote,
   formId,
   onFix,
 }: {
   row: PreviewRow;
   duplicate: boolean;
+  listNote: string | undefined;
   formId: string;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
 }) {
@@ -164,6 +175,9 @@ function Row({
         <p className="text-xs text-slate-500 dark:text-slate-400">{rowNumbers(row.sheetRows)}</p>
       </div>
       <p className="mt-0.5 text-sm wrap-anywhere text-slate-600 dark:text-slate-300">{detailsText(row.row, row.lifeIsTypical)}</p>
+      {listNote && (
+        <p className="mt-0.5 text-sm font-medium wrap-anywhere text-emerald-800 dark:text-emerald-300">{listNote}</p>
+      )}
       {notes && (
         <p className="mt-0.5 text-xs whitespace-pre-line wrap-anywhere text-slate-500 dark:text-slate-400">
           Notes: {clip(notes, 300)}

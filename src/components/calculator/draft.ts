@@ -255,7 +255,7 @@ export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Dr
     installYear: r.installYear,
     usefulLife: r.usefulLife,
     costEach: r.costEach,
-    scenario: "run_to_failure",
+    scenario: r.replaceNow ? "replace_now" : "run_to_failure",
     followsUnitCount: quantityMatchesUnits(r, draft.unitCount),
     condition: r.condition,
     notes: r.notes,
@@ -263,6 +263,55 @@ export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Dr
   }));
   // A draft with nothing in it yet starts a new forecast in the calculator.
   return { ...draft, forecastTracked: draft.rows.length > 0 && draft.forecastTracked, rows: [...draft.rows, ...added] };
+}
+
+/** What an import changes: see planImport in src/lib/import/reimport.ts. */
+export interface DraftImport {
+  add: readonly ImportedRow[];
+  /** Rows of the draft to change in place, by id. Their ids stay, so saved history stays attached. */
+  update: readonly { id: string; row: ImportedRow }[];
+  /** Rows of the draft to remove; only ones the owner chose to. */
+  remove: readonly string[];
+  /** The building's unit count and year built from the sheet, when the owner chose to use them. */
+  unitCount?: string;
+  yearBuilt?: string;
+}
+
+/**
+ * Applies an import: the building's details first, then the rows the sheet changes
+ * (in place, keeping their ids), then the removals, then the new rows after the
+ * rest. Rows from the sheet take its quantities, and a per-unit one follows later
+ * unit-count changes only when its quantity is the unit count.
+ */
+export function withImport(draft: Draft, change: DraftImport): Draft {
+  let next = change.unitCount !== undefined ? withUnitCount(draft, change.unitCount) : draft;
+  if (change.yearBuilt !== undefined) next = { ...next, yearBuilt: change.yearBuilt };
+  const updates = new Map(change.update.map((u) => [u.id, u.row]));
+  const removed = new Set(change.remove);
+  const unitCount = next.unitCount;
+  const rows = next.rows
+    .filter((r) => !removed.has(r.id))
+    .map((r): DraftRow => {
+      const row = updates.get(r.id);
+      if (!row) return r;
+      return {
+        ...r,
+        librarySlug: row.librarySlug,
+        category: row.category,
+        name: row.name,
+        quantity: row.quantity,
+        unitLabel: row.unitLabel,
+        installYear: row.installYear,
+        usefulLife: row.usefulLife,
+        costEach: row.costEach,
+        scenario: row.replaceNow ? "replace_now" : "run_to_failure",
+        followsUnitCount: quantityMatchesUnits(row, unitCount),
+        condition: row.condition,
+        notes: row.notes,
+        installYearIsGuess: row.installYearIsGuess,
+      };
+    });
+  return withImportedRows({ ...next, rows }, change.add);
 }
 
 /**
