@@ -35,6 +35,30 @@ export const PAID_IDEA_TEXT: Record<PaidIdea, PaidIdeaText> = {
 
 export const NOT_BUILT_TEXT = "Not built yet. We're deciding what to build next.";
 
+/**
+ * A panel's name for screen readers: which idea it's for, then that it isn't built,
+ * so the reminders, report and photo panels can be told apart.
+ */
+export function panelName(idea: PaidIdea): string {
+  return `${PAID_IDEA_TEXT[idea].button}: not built yet`;
+}
+
+/**
+ * The photo idea's own test (plan section 2): until it's built, we fill in rows by
+ * hand, free, from photos people email us. The photo panel says so around a mailto
+ * link to our address.
+ */
+export const PHOTO_OFFER = {
+  before: "Want it now? Email a photo of the label to",
+  after: "and we'll fill in the row for you, free.",
+  subject: "Photo of a label",
+} as const;
+
+/** The photo offer's mailto link, with the subject filled in. */
+export function photoOfferHref(email: string): string {
+  return `mailto:${email}?subject=${encodeURIComponent(PHOTO_OFFER.subject)}`;
+}
+
 /** NEXT_PUBLIC_TEST_BUTTONS=off (or false, no, 0) hides every button. Anything else, or nothing, shows them. */
 export function testButtonsOn(setting: string | undefined): boolean {
   return !["off", "false", "no", "0"].includes(setting?.trim().toLowerCase() ?? "");
