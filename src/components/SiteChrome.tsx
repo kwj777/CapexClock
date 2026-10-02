@@ -64,6 +64,9 @@ export function SiteFooter() {
           <Link href="/lifespan" className="hover:text-slate-900 dark:hover:text-white">
             Component lifespans
           </Link>
+          <Link href="/capex-spreadsheet-template" className="hover:text-slate-900 dark:hover:text-white">
+            CapEx spreadsheet template
+          </Link>
         </nav>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">

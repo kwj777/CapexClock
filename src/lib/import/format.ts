@@ -56,7 +56,7 @@ export const FORMAT_COLUMNS: readonly FormatColumn[] = [
   {
     heading: "Counted per",
     field: "countedPer",
-    what: "unit, building or sq ft.",
+    what: "One of unit, building or sq ft.",
     why: "Says what one cost pays for: one apartment's worth, the whole building, or one square foot.",
   },
   {
@@ -68,7 +68,7 @@ export const FORMAT_COLUMNS: readonly FormatColumn[] = [
   {
     heading: "Install year is a guess",
     field: "guess",
-    what: "yes if the install year is your best guess, otherwise blank.",
+    what: "Put yes if the install year is your best guess. Otherwise leave it blank.",
     why: "Guesses are marked, so you know which dates to check first.",
   },
   {
@@ -92,7 +92,7 @@ export const FORMAT_COLUMNS: readonly FormatColumn[] = [
   {
     heading: "Replace now",
     field: "replaceNow",
-    what: "yes to plan its replacement this year, even if it still works.",
+    what: "Put yes to plan its replacement this year, even if it still works.",
     why: "Puts the cost in this year and starts its cycle again from now.",
   },
   {
