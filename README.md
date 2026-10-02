@@ -493,5 +493,5 @@ Do this once, then check it once a month.
 
 Once a month, paste from **Performance → Search results** (last 28 days): total clicks, total
 impressions, and the top pages. **Indexing → Pages** shows how many pages Google has indexed.
-Also type `capex-spreadsheet-template` into the **Inspect any URL** box at the top: "URL is on
-Google" means the template page is in Google results.
+Also paste `https://capexclock.com/capex-spreadsheet-template` into the **Inspect any URL** box
+at the top: "URL is on Google" means the template page is in Google results.
