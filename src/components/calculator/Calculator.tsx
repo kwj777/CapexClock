@@ -68,6 +68,8 @@ import {
 } from "./draft";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
+import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
+import CompareAtRisk from "./CompareAtRisk";
 import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.
@@ -263,6 +265,9 @@ function CalculatorBody({
   const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
   const focusNext = useRef<string | null>(null);
+  // The replace-now comparison's panel, ticks and Undo. Kept here because the
+  // comparison goes away whenever nothing is at risk, and this lasts the page view.
+  const [compare, setCompare] = useState<CompareState>(NEW_COMPARE_STATE);
 
   // The forecast and the notes under rows follow typing a moment later, so in a long
   // list each key press shows straight away and the forecast catches up after.
@@ -706,7 +711,19 @@ function CalculatorBody({
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <AtRisk forecast={forecast} rows={rowsById} />
+            <AtRisk forecast={forecast} rows={rowsById}>
+              <CompareAtRisk
+                startYear={startYear}
+                unitCount={unitCount}
+                components={components}
+                rows={rowsById}
+                draft={draft}
+                setDraft={setDraft}
+                state={compare}
+                setState={setCompare}
+                forecastPending={forecastDraft !== draft}
+              />
+            </AtRisk>
             <DueTable forecast={forecast} rows={rowsById} />
           </div>
 
@@ -1108,40 +1125,45 @@ function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate:
   );
 }
 
-// The lists under the forecast can run to thousands of rows, so they're redrawn only
-// when the forecast changes, not on every key press in the list of components.
-const AtRisk = memo(function AtRisk({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
+/** The at-risk card; children (the replace-now comparison) show under the list when it isn't empty. */
+function AtRisk({ forecast, rows, children }: { forecast: Forecast; rows: RowsById; children?: ReactNode }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400">Past end of life or within 2 years of it.</p>
-      {forecast.atRisk.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Nothing is close to end of life.</p>
-      ) : (
-        <ul className="mt-4 space-y-3">
-          {forecast.atRisk.map((item) => (
-            <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
-              <span className="text-slate-900 dark:text-white">
-                {item.name}
-                <NameNotes row={rows.get(item.componentId)} isEstimate={item.installYearIsEstimate} />
-              </span>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                  item.status === "overdue"
-                    ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                    : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
-                }`}
-              >
-                {item.status === "overdue"
-                  ? `Past due since ${item.endOfLifeYear}`
-                  : `Due ${item.endOfLifeYear}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AtRiskList forecast={forecast} rows={rows} />
+      {forecast.atRisk.length > 0 && children}
       {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" className="mt-5" />}
     </div>
+  );
+}
+
+// The lists under the forecast can run to thousands of rows, so they're redrawn only
+// when the forecast changes, not on every key press in the list of components. The
+// comparison under this one isn't memoized, because Apply and Undo need the latest draft.
+const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
+  return forecast.atRisk.length === 0 ? (
+    <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Nothing is close to end of life.</p>
+  ) : (
+    <ul className="mt-4 space-y-3">
+      {forecast.atRisk.map((item) => (
+        <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
+          <span className="text-slate-900 dark:text-white">
+            {item.name}
+            <NameNotes row={rows.get(item.componentId)} isEstimate={item.installYearIsEstimate} />
+          </span>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+              item.status === "overdue"
+                ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+                : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
+            }`}
+          >
+            {riskText(item)}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 });
 

@@ -117,6 +117,27 @@ either form you can:
 On an older Netlify plan, going over 100 form entries a month (both forms together) turns on a
 paid add-on automatically. Check **Netlify → Billing** if sign-ups pick up.
 
+## Replace-now comparison
+
+Under **At risk**, in the calculator and the property editor, "What if we replace everything at
+risk now?" compares the forecast as it stands with replacing the ticked at-risk items this year.
+It shows the cash needed this year, the change in the 10-year total and the monthly reserve.
+Items whose install year is a guess are listed apart. Nothing changes until the owner clicks
+**Apply**, and Apply can be undone.
+
+PostHog events, with counts only: `compare_viewed` (`items`: how many items the panel lists;
+once per page view, the first time it opens) and `compare_applied` (`items`: how many items
+Apply turned on).
+
+**Dashboard tile.** The **Comparison** row of the [Monday numbers](#monday-numbers) dashboard.
+
+**Awaiting Kevin's answer:** the optional "Emergency replacements cost __% more" box adds the
+percent to the next replacement of every ticked item on the "if you wait" side, including items
+that are past end of life or due this year, which are paid this year either way. With 20% on
+the example property, the cash needed this year "if you wait" goes from $30,000 to $36,000. If
+the percent should only apply to items due in the next 2 years, tell Claude; it's a small
+change. The box is empty by default, so nothing changes until an owner types a percent.
+
 ## Accounts (Supabase)
 
 Accounts use Supabase magic-link sign-in. All data is protected by Row Level Security: each
@@ -442,6 +463,7 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Import problems | `import_failed` (Total count) | `reason` | Since step 4 |
 | Template page | `template_downloaded` (Total count) | `file` | Since step 5 |
 | Component list downloads | `component_list_exported` (Total count) | `where` | Since step 5 |
+| Comparison | `forecast_generated`, `compare_viewed`, `compare_applied` (Unique users), with the two compare events filtered to Path name = `/capex-calculator` | none | Since step 6 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
@@ -473,6 +495,11 @@ On **Template page**, `file` is `template` (the blank template) or `example` (th
 example). The page itself is checked in Search Console (below): it should show up in Google
 results by the check-in. **Component list downloads** counts "Download component list (CSV)";
 `where` is `downloads` (next to the forecast downloads) or `components` (next to Import).
+
+On **Comparison**, filter each compare series: click the filter icon on it, choose **Path name**,
+then **equals**, and type `/capex-calculator`. The filter matters because the comparison also
+runs in the property editor, while `forecast_generated` is only sent from the public calculator.
+The comparison is working when `compare_viewed` is at least a tenth of `forecast_generated`.
 
 ### Weekly Supabase query
 
