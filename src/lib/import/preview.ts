@@ -632,7 +632,8 @@ export function locationLine(label: string, locations: readonly string[], max: n
 
 /**
  * Notes for a row made from one or more records: where they are, then each one's
- * own notes, all within the notes limit.
+ * own notes, all within the notes limit. With notes to keep, the list of places
+ * takes at most half the room, so at least "…and 12 more notes" fits after it.
  */
 export function mergedNotes(label: string, members: readonly { location: string; details: string[] }[]): string {
   const locations = [...new Set(members.map((m) => m.location).filter(Boolean))];
@@ -645,7 +646,8 @@ export function mergedNotes(label: string, members: readonly { location: string;
     if (!lines.includes(line)) lines.push(line);
   }
   // Counted in UTF-16 units, as the notes box counts them, which is never fewer than the database's count.
-  const out = locations.length > 0 ? [locationLine(label, locations, MAX_NOTES_LENGTH)] : [];
+  const placesMax = lines.length > 0 ? Math.floor(MAX_NOTES_LENGTH / 2) : MAX_NOTES_LENGTH;
+  const out = locations.length > 0 ? [locationLine(label, locations, placesMax)] : [];
   let used = out[0]?.length ?? 0;
   for (const [i, line] of lines.entries()) {
     const room = MAX_NOTES_LENGTH - used - (out.length > 0 ? 1 : 0);

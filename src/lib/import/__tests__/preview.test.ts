@@ -625,6 +625,31 @@ describe("fitting notes", () => {
     expect(notes.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
     expect(notes).toMatch(/\n…and \d+ more notes$/);
   });
+
+  it("keeps room for the sheet's notes when the list of apartments is long", () => {
+    const many = Array.from({ length: 400 }, (_, i) => ({ location: `${1000 + i}`, details: [`Note for ${1000 + i}`] }));
+    const notes = mergedNotes("Apt", many);
+    expect(notes.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+    const [places, ...rest] = notes.split("\n");
+    expect(places.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH / 2);
+    expect(places).toMatch(/^Apt: 1000, 1001, .* …and \d+ more$/);
+    expect(rest[0]).toBe("1000: Note for 1000");
+    expect(rest.at(-1)).toMatch(/^…and \d+ more notes$/);
+    // Without notes, the list of apartments can use all the room.
+    const plain = mergedNotes("Apt", many.map((m) => ({ ...m, details: [] })));
+    expect(plain.length).toBeGreaterThan(MAX_NOTES_LENGTH / 2);
+    expect(plain.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+  });
+
+  it("never cuts an emoji in half, which the database would refuse", () => {
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    // A long last note is cut to fit, and with an odd limit the cut lands inside an emoji.
+    const long = mergedNotes("Apt", [{ location: "", details: ["🚿".repeat(1500)] }]);
+    expect(long.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+    expect(long).not.toMatch(lone);
+    const places = mergedNotes("Apt", Array.from({ length: 900 }, (_, i) => ({ location: `🏠${i}`, details: [] })));
+    expect(places).not.toMatch(lone);
+  });
 });
 
 describe("service, inspection and replacement dates", () => {
