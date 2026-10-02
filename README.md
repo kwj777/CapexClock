@@ -458,6 +458,7 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Template page | `template_downloaded` (Total count) | `file` | Since step 5 |
 | Component list downloads | `component_list_exported` (Total count) | `where` | Since step 5 |
 | Comparison | `forecast_generated`, `compare_viewed`, `compare_applied` (Unique users), with the two compare events filtered to Path name = `/capex-calculator` | none | Since step 6 |
+| Quick estimate | A **Funnels** insight (not Trends): step 1 `quick_estimate_shown`, step 2 `$pageview` filtered to Path name = `/capex-calculator` (Unique users, conversion window 1 hour) | none | Since step 7 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
@@ -490,6 +491,14 @@ On **Comparison**, filter each compare series: click the filter icon on it, choo
 then **equals**, and type `/capex-calculator`. The filter matters because the comparison also
 runs in the property editor, while `forecast_generated` is only sent from the public calculator.
 The comparison is working when `compare_viewed` is at least a tenth of `forecast_generated`.
+
+**Quick estimate** shows how many people who got a quick estimate on /reserve-calculator went on
+to the CapEx calculator in the same visit. In **New insight**, pick **Funnels** instead of
+Trends. Add `quick_estimate_shown` as step 1 and `$pageview` as step 2, then filter step 2 to
+**Path name** equals `/capex-calculator`. Under the steps, set **Conversion window limit** to
+**1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
+`quick_estimate_shown` goes once per page view, after an estimate has been on screen for 2
+seconds, and carries only `systems`, how many systems were ticked.
 
 ### Weekly Supabase query
 
