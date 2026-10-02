@@ -104,10 +104,11 @@ const inputClass =
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 /** Lets the browser skip drawing a row that's out of view, sized as it last looked. */
 const offscreenClass =
-  "[content-visibility:auto] [contain-intrinsic-block-size:auto_400px] sm:[contain-intrinsic-block-size:auto_288px] lg:[contain-intrinsic-block-size:auto_64px]";
-// Shared by the column headings and every row so they line up on wide screens.
+  "[content-visibility:auto] [contain-intrinsic-block-size:auto_400px] sm:[contain-intrinsic-block-size:auto_288px] lg:[contain-intrinsic-block-size:auto_96px]";
+// Shared by the column headings and every row so they line up on wide screens. Cost is the
+// widest number column, since its note ("Typical $2,500–$5,000, use your quote") is longest.
 const rowGridClass =
-  "lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_4.5rem_4.5rem]";
+  "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.9fr)_6.5rem_4.5rem]";
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 const textButton =
@@ -838,7 +839,7 @@ function ComponentRow({
     <li className="py-4">
       {/* Rows out of view skip drawing, which keeps typing quick in a long list. The
           padding leaves room for focus outlines, since a skipped box clips what it holds. */}
-      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${rowGridClass} -m-1 p-1 ${offscreenClass} lg:items-center`}>
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${rowGridClass} -m-1 p-1 ${offscreenClass} lg:items-start`}>
         <label className="col-span-2 block sm:col-span-3 lg:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>Component</span>
           <input
@@ -854,7 +855,8 @@ function ComponentRow({
         </label>
         <label className="col-span-2 block sm:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>Quantity</span>
-          <div className="mt-1 flex items-center gap-2 lg:mt-0">
+          {/* On wide screens the unit goes under the number, like the notes under the other fields. */}
+          <div className="mt-1 flex items-center gap-2 lg:mt-0 lg:flex-col lg:items-start lg:gap-0">
             <input
               className={inputClass}
               inputMode="decimal"
@@ -868,7 +870,7 @@ function ComponentRow({
               value={row.unitLabel}
               aria-label={`How ${label} is counted`}
               onChange={(e) => onChange({ unitLabel: e.target.value as DraftRow["unitLabel"] })}
-              className="rounded-md border-0 bg-transparent py-1 text-xs text-slate-600 focus:ring-2 focus:ring-amber-500/30 dark:text-slate-400"
+              className="shrink-0 cursor-pointer rounded-md border-0 bg-transparent py-1 text-xs text-slate-600 hover:text-slate-900 focus:ring-2 focus:ring-amber-500/30 lg:field-sizing-content dark:text-slate-400 dark:hover:text-white"
             >
               {Object.entries(UNIT_LABEL_TEXT).map(([value, text]) => (
                 <option key={value} value={value}>
@@ -893,7 +895,7 @@ function ComponentRow({
             />
           </label>
           {/* 24px tall with the padding, so it's an easy target right under the year. */}
-          <label className="mt-0.5 flex w-fit items-center gap-1.5 py-1 text-xs text-slate-600 dark:text-slate-400">
+          <label className="flex w-fit items-center gap-1.5 py-1 text-xs text-slate-600 dark:text-slate-400">
             <input
               type="checkbox"
               checked={row.installYearIsGuess === true}
@@ -939,12 +941,13 @@ function ComponentRow({
           </div>
           <CostNote row={row} />
           {hint && (
-            <span id={hintId} className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+            <span id={hintId} className="mt-0.5 block text-xs text-pretty text-slate-500 dark:text-slate-400">
               {hint}
             </span>
           )}
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700 lg:justify-center dark:text-slate-300">
+        {/* As tall as a field and pushed down past a label's line, so the box sits on the fields' line. */}
+        <label className="mt-7 flex min-h-[2.375rem] items-center gap-2 self-start text-sm text-slate-700 lg:mt-0 lg:justify-center dark:text-slate-300">
           <input
             type="checkbox"
             checked={row.scenario === "replace_now"}
@@ -955,7 +958,7 @@ function ComponentRow({
           <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
         {/* More comes last, so the fields it shows are next in the tab order. */}
-        <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:justify-end">
+        <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:mt-7 sm:min-h-[2.375rem] sm:justify-end sm:self-start lg:mt-0">
           <button
             type="button"
             onClick={onRemove}
@@ -985,13 +988,14 @@ function ComponentRow({
         id={detailsId}
         className={`${showDetails ? "grid" : "hidden"} mt-3 grid-cols-1 gap-3 sm:grid-cols-3 lg:grid ${rowGridClass}`}
       >
-        <label className="block lg:flex lg:items-center lg:gap-2">
+        {/* Labels sit above, so these fields start at the same edges as the fields above them. */}
+        <label className="block">
           <span className={labelClass}>Condition</span>
           <select
             value={row.condition ?? ""}
             aria-label={`Condition, ${label}`}
             onChange={(e) => onChange({ condition: CONDITIONS.find((c) => c === e.target.value) ?? null })}
-            className={`${inputClass} mt-1 lg:mt-0 lg:min-w-0 lg:flex-1`}
+            className={`${inputClass} mt-1`}
           >
             <option value="">Not set</option>
             {CONDITIONS.map((c) => (
@@ -1002,8 +1006,8 @@ function ComponentRow({
           </select>
         </label>
         <div className="sm:col-span-2 lg:col-span-6">
-          <label className="block lg:flex lg:items-start lg:gap-2">
-            <span className={`${labelClass} lg:pt-2.5`}>Notes</span>
+          <label className="block">
+            <span className={labelClass}>Notes</span>
             <textarea
               value={notes}
               maxLength={MAX_NOTES_LENGTH}
@@ -1015,7 +1019,7 @@ function ComponentRow({
               // Opened for a problem, it stays open once that's fixed, rather than closing mid-edit.
               onFocus={() => setOpen(true)}
               onChange={(e) => onChange({ notes: e.target.value })}
-              className={`${inputClass} mt-1 max-h-48 min-h-[4.5rem] field-sizing-content lg:mt-0 lg:min-h-[2.375rem] lg:flex-1`}
+              className={`${inputClass} mt-1 max-h-48 min-h-[4.5rem] field-sizing-content lg:min-h-[2.375rem]`}
             />
           </label>
           {notesLeft && (
