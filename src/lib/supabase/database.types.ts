@@ -1,5 +1,5 @@
-// Hand-written to match supabase/migrations (0001_init.sql, 0002_safer_saves.sql), in the shape
-// `supabase gen types typescript` produces. Only the tables the app uses so far.
+// Hand-written to match supabase/migrations (0001_init.sql to 0004_condition_notes.sql), in the
+// shape `supabase gen types typescript` produces. Only the tables the app uses so far.
 
 export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
 export type ReplacementScenario = "run_to_failure" | "replace_now";
@@ -31,6 +31,11 @@ export type ComponentRow = {
   replacement_cost_each: number | null;
   condition: ComponentCondition | null;
   notes: string | null;
+  /**
+   * The owner ticked "guess" next to the install year. Added by 0004, so it's missing
+   * from rows read from a database that hasn't had that update yet.
+   */
+  install_year_is_estimate?: boolean;
   scenario: ReplacementScenario;
   sort_order: number;
   created_at: string;
@@ -64,6 +69,13 @@ export type SaveComponentInput = {
   install_year: number | null;
   useful_life_years: number;
   replacement_cost_each: number | null;
+  /**
+   * 0004: these three are stored only once that update has run. Earlier databases
+   * drop them without an error, which the editor's read-back check catches.
+   */
+  condition: ComponentCondition | null;
+  notes: string | null;
+  install_year_is_estimate: boolean;
   scenario: ReplacementScenario;
   sort_order: number;
 };

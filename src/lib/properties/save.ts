@@ -14,6 +14,9 @@ export const SAVE_FAILURE_TEXT: Record<SaveFailure, string> = {
   network: "Couldn't save. Check your connection and try again.",
 };
 
+/** Shown in place of "Saved" when the database dropped condition, notes or "guess" flags. */
+export const DETAILS_NOT_SAVED_TEXT = "Your database needs update 0004. Condition and notes weren't saved.";
+
 /** PostgREST's answer when a function signature doesn't exist (migration 0002 not run yet). */
 export const FUNCTION_NOT_FOUND = "PGRST202";
 
@@ -48,24 +51,29 @@ export function withSavedIds(draft: Draft, sent: Draft, savedIds: string[]): Dra
 }
 
 /**
- * True when the database holds exactly what was just saved. Anything else means
- * another save landed in between, so the editor can't trust its copy.
+ * How what the database holds compares with what was just saved:
+ * - "same": exactly what was sent.
+ * - "without_details": the same, except some condition, notes or "guess" flags. A database
+ *   without update 0004 saves everything else and drops those without an error.
+ * - "different": another save landed in between, so the editor can't trust its copy.
  */
-export function matchesSaved(
+export type SavedMatch = "same" | "without_details" | "different";
+
+export function compareSaved(
   sent: Pick<SaveInput, "property" | "components">,
   property: Pick<PropertyRow, "name" | "unit_count" | "year_built">,
   components: ComponentRow[],
-): boolean {
+): SavedMatch {
   if (
     property.name !== sent.property.name ||
     property.unit_count !== sent.property.unit_count ||
     property.year_built !== sent.property.year_built ||
     components.length !== sent.components.length
   ) {
-    return false;
+    return "different";
   }
   const rows = [...components].sort((a, b) => a.sort_order - b.sort_order);
-  return rows.every((row, i) => {
+  const sameRows = rows.every((row, i) => {
     const c = sent.components[i];
     return (
       row.sort_order === c.sort_order &&
@@ -81,6 +89,31 @@ export function matchesSaved(
       row.scenario === c.scenario
     );
   });
+  if (!sameRows) return "different";
+  const sameDetails = rows.every((row, i) => {
+    const c = sent.components[i];
+    return (
+      row.condition === c.condition &&
+      (row.notes ?? null) === c.notes &&
+      // Missing before update 0004, which reads as not a guess.
+      (row.install_year_is_estimate ?? false) === c.install_year_is_estimate
+    );
+  });
+  return sameDetails ? "same" : "without_details";
+}
+
+/** True when a save sends any condition, notes or "guess" flag worth checking for afterwards. */
+export function sendsDetails(input: Pick<SaveInput, "components">): boolean {
+  return input.components.some((c) => c.condition !== null || c.notes !== null || c.install_year_is_estimate);
+}
+
+/**
+ * True when rows read back come from a database that can't store condition, notes or
+ * the "guess" flag yet (update 0004 hasn't run), so their absence isn't someone
+ * else's save. Their column is missing from every row then.
+ */
+export function lacksUpdate0004(components: ComponentRow[]): boolean {
+  return components.some((c) => c.install_year_is_estimate === undefined);
 }
 
 /**
@@ -113,6 +146,10 @@ export function versionFromReadBack(
 ): { updatedAt: string } | { failure: "network" | "deleted" | "conflict" } {
   if (!back) return { failure: "network" };
   if (!back.property) return { failure: "deleted" };
-  if (!matchesSaved(lastSaved, back.property, back.components)) return { failure: "conflict" };
+  const match = compareSaved(lastSaved, back.property, back.components);
+  // Details a database without update 0004 dropped don't mean someone else saved.
+  if (match === "different" || (match === "without_details" && !lacksUpdate0004(back.components))) {
+    return { failure: "conflict" };
+  }
   return { updatedAt: back.property.updated_at };
 }

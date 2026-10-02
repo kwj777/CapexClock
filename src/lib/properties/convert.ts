@@ -1,5 +1,5 @@
 import type { Draft, DraftRow, RowField } from "@/components/calculator/draft";
-import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT } from "@/components/calculator/draft";
+import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT, MAX_NOTES_LENGTH } from "@/components/calculator/draft";
 import { computeForecast, validateComponent, type Forecast, type ForecastComponent } from "@/lib/forecast";
 import type {
   ComponentRow,
@@ -29,6 +29,10 @@ export function draftFromRows(property: PropertyRow, components: ComponentRow[])
           costEach: c.replacement_cost_each === null ? "" : String(c.replacement_cost_each),
           scenario: c.scenario,
           followsUnitCount: c.unit_label === "per_unit" && String(c.quantity) === String(property.unit_count),
+          condition: c.condition,
+          notes: c.notes ?? "",
+          // Missing until the database has update 0004.
+          installYearIsGuess: c.install_year_is_estimate === true,
         }),
       ),
   };
@@ -46,6 +50,7 @@ export type SaveProblem =
   | "life"
   | "install_year"
   | "cost"
+  | "notes_length"
   | "year_built"
   | "unit_count";
 
@@ -63,6 +68,7 @@ export const SAVE_PROBLEM_TEXT: Record<SaveProblem, string> = {
   life: "Useful life must be a whole number from 1 to 100.",
   install_year: `Install years must be 4-digit years from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
   cost: "Costs must be plain numbers like 1400, or blank.",
+  notes_length: `Notes can be up to ${MAX_NOTES_LENGTH.toLocaleString("en-US")} characters.`,
   year_built: `Year built must be a 4-digit year from ${EARLIEST_YEAR_BUILT} to this year, or blank.`,
   unit_count: "Rental units must be a whole number up to 100,000.",
 };
@@ -81,6 +87,8 @@ export function saveProblemFields(problem: SaveProblem): RowField[] {
       return ["installYear"];
     case "cost":
       return ["costEach"];
+    case "notes_length":
+      return ["notes"];
     case "year_built":
     case "unit_count":
       return [];
@@ -92,6 +100,11 @@ export interface SaveInput {
   components: SaveComponentInput[];
   /** Why the draft can't be saved yet, by row id ("property" for the property fields). */
   problems: Record<string, SaveProblem>;
+}
+
+/** Characters as the database counts them, so an emoji is one, not two. */
+function characterCount(text: string): number {
+  return Array.from(text).length;
 }
 
 function validYear(year: number | null, currentYear: number, earliest = EARLIEST_INSTALL_YEAR): boolean {
@@ -121,6 +134,7 @@ export function toSaveInput(
     const life = parse(row.usefulLife);
     const installYear = parse(row.installYear);
     const cost = parse(row.costEach);
+    const notes = (row.notes ?? "").trim();
     let problem: SaveProblem | null = null;
     if (!row.name.trim()) problem = "name";
     else if (row.name.trim().length > MAX_NAME_LENGTH) problem = "name_length";
@@ -128,6 +142,7 @@ export function toSaveInput(
     else if (life === null || !Number.isInteger(life) || life < 1 || life > 100) problem = "life";
     else if (!validYear(installYear, currentYear)) problem = "install_year";
     else if (cost !== null && !(cost >= 0 && cost < MAX_COST)) problem = "cost";
+    else if (characterCount(notes) > MAX_NOTES_LENGTH) problem = "notes_length";
     if (problem) {
       problems[row.id] = problem;
       return;
@@ -142,6 +157,10 @@ export function toSaveInput(
       install_year: installYear,
       useful_life_years: life as number,
       replacement_cost_each: cost,
+      // Always sent, so clearing one clears it in the database too.
+      condition: row.condition ?? null,
+      notes: notes === "" ? null : notes,
+      install_year_is_estimate: row.installYearIsGuess === true,
       scenario: row.scenario,
       sort_order: index,
     });
@@ -162,7 +181,8 @@ export function toSaveInput(
 /**
  * Forecast for a saved property. Rows without a cost or any install year are left
  * out, and so is any row the forecast can't use (such as a quantity that isn't a
- * finite number), so one bad row can't break the page.
+ * finite number), so one bad row can't break the page. An install year is an
+ * estimate when it's blank (year built stands in) or the owner marked it a guess.
  */
 export function forecastForProperty(
   property: PropertyRow,
@@ -179,7 +199,7 @@ export function forecastForProperty(
       name: c.name,
       quantity: Number(c.quantity),
       installYear,
-      installYearIsEstimate: c.install_year === null,
+      installYearIsEstimate: c.install_year === null || c.install_year_is_estimate === true,
       usefulLifeYears: c.useful_life_years,
       replacementCostEach: Number(c.replacement_cost_each),
       scenario: c.scenario,

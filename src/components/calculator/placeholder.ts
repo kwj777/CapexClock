@@ -28,7 +28,8 @@ export function placeholderHeight(saved: string | null, width: number): number |
   });
 
   // [cards without rows, each row, forecast section] at phone, tablet (640px+) and desktop (1024px+) widths.
-  const sizes = width >= 1024 ? [470, 110, 600] : width >= 640 ? [500, 300, 900] : [600, 420, 1150];
+  // On wide screens each row has a second line for condition and notes.
+  const sizes = width >= 1024 ? [502, 160, 600] : width >= 640 ? [532, 300, 900] : [632, 420, 1150];
   return sizes[0] + sizes[1] * rows.length + (showsForecast ? sizes[2] : 0);
 }
 

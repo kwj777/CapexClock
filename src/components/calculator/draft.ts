@@ -1,6 +1,8 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
+import type { ImportedRow } from "@/lib/import/preview";
 import { defaultLife, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
+import type { ComponentCondition } from "@/lib/supabase/database.types";
 import { formatCostRange } from "./format";
 
 // Form state keeps raw strings so inputs can be empty or mid-edit.
@@ -21,7 +23,22 @@ export interface DraftRow {
    * Not saved to the database; loading a property works it out again.
    */
   followsUnitCount?: boolean;
+  // Drafts saved before these three existed don't have them; missing means not set.
+  /** The owner's rating of the component; null or missing when not set. */
+  condition?: ComponentCondition | null;
+  /** Anything the owner wants to remember about it, up to MAX_NOTES_LENGTH characters. */
+  notes?: string;
+  /** The owner ticked "guess" next to the install year. */
+  installYearIsGuess?: boolean;
 }
+
+/** The condition choices, in the order the picker shows them. */
+export const CONDITIONS: readonly ComponentCondition[] = ["good", "fair", "poor"];
+
+export const CONDITION_TEXT: Record<ComponentCondition, string> = { good: "Good", fair: "Fair", poor: "Poor" };
+
+/** Longest notes the database keeps, in characters. */
+export const MAX_NOTES_LENGTH = 2000;
 
 export interface Draft {
   unitCount: string;
@@ -55,6 +72,54 @@ export function saveDraft(draft: Draft): void {
   }
 }
 
+/**
+ * The list before an import on the template page changed it, kept for this tab
+ * only, so the calculator it opens can offer Undo as it does after its own imports.
+ */
+export const IMPORT_UNDO_KEY = "capexclock:calculator:import-undo:v1";
+
+export function saveImportUndo(before: Draft, after: Draft): void {
+  try {
+    window.sessionStorage.setItem(IMPORT_UNDO_KEY, JSON.stringify({ before, after }));
+  } catch {
+    // Storage blocked: the import still works, without an undo.
+  }
+}
+
+/** The kept list, if `current` is still what the import left; read without removing it. */
+export function peekImportUndo(current: Draft, currentYear: number): Draft | null {
+  try {
+    const raw = window.sessionStorage.getItem(IMPORT_UNDO_KEY);
+    return raw ? importUndoFor(JSON.parse(raw), current, currentYear) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearImportUndo(): void {
+  try {
+    window.sessionStorage.removeItem(IMPORT_UNDO_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+function sameEntries(a: Draft, b: Draft): boolean {
+  const entries = (d: Draft) => JSON.stringify([d.unitCount, d.yearBuilt, d.rows]);
+  return entries(a) === entries(b);
+}
+
+/**
+ * The list to bring back from a kept copy: its "before", when its "after" is still
+ * the list (nothing changed it since, in this tab or another). Null otherwise.
+ */
+export function importUndoFor(stored: unknown, current: Draft, currentYear: number): Draft | null {
+  if (typeof stored !== "object" || stored === null) return null;
+  const { before, after } = stored as Record<string, unknown>;
+  if (!isDraft(before) || !isDraft(after)) return null;
+  return sameEntries(upgradeDraft(after, currentYear), current) ? upgradeDraft(before, currentYear) : null;
+}
+
 function isDraft(value: unknown): value is Draft {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -66,13 +131,17 @@ function isDraft(value: unknown): value is Draft {
   );
 }
 
-/** Fills in flags that drafts saved before they existed don't have. */
+/**
+ * Fills in flags that drafts saved before they existed don't have, and drops any
+ * condition, notes or guess flag the calculator can't use.
+ */
 export function upgradeDraft(draft: Draft, currentYear: number): Draft {
+  const rows = draft.rows.map(cleanDetails);
   return {
     ...draft,
     // An older draft that already shows a forecast has already been counted.
-    forecastTracked: draft.forecastTracked ?? toComponents(draft, currentYear).components.length > 0,
-    rows: draft.rows.map((r) =>
+    forecastTracked: draft.forecastTracked ?? toComponents({ ...draft, rows }, currentYear).components.length > 0,
+    rows: rows.map((r) =>
       r.followsUnitCount === undefined
         ? { ...r, followsUnitCount: quantityMatchesUnits(r, draft.unitCount) || blankPerUnit(r) }
         : r,
@@ -88,6 +157,29 @@ function blankPerUnit(row: Pick<DraftRow, "unitLabel" | "quantity">): boolean {
 /** A per-unit row whose quantity is the unit count is taken to follow it (used for loaded rows). */
 export function quantityMatchesUnits(row: Pick<DraftRow, "unitLabel" | "quantity">, unitCount: string): boolean {
   return row.unitLabel === "per_unit" && row.quantity === unitCount;
+}
+
+/**
+ * Drops a stored condition, notes or guess flag that isn't one the calculator could
+ * have written, so a damaged copy in this browser can't break the page or a save.
+ * A row with nothing to drop comes back as it was.
+ */
+export function cleanDetails(row: DraftRow): DraftRow {
+  const { condition, notes, installYearIsGuess } = row as {
+    condition?: unknown;
+    notes?: unknown;
+    installYearIsGuess?: unknown;
+  };
+  const badCondition =
+    condition !== undefined && condition !== null && !CONDITIONS.some((c) => c === condition);
+  const badNotes = notes !== undefined && typeof notes !== "string";
+  const badGuess = installYearIsGuess !== undefined && typeof installYearIsGuess !== "boolean";
+  if (!badCondition && !badNotes && !badGuess) return row;
+  const clean = { ...row };
+  if (badCondition) delete clean.condition;
+  if (badNotes) delete clean.notes;
+  if (badGuess) delete clean.installYearIsGuess;
+  return clean;
 }
 
 let idCounter = 0;
@@ -197,6 +289,95 @@ export function withLibraryItem(
 }
 
 /**
+ * An imported row's quantity in a list with this unit count. Quantities stay as the
+ * sheet gives them, and a per-unit row follows later unit-count changes only when
+ * its quantity is the unit count, or the sheet left it blank (see ImportedRow).
+ */
+function importedQuantity(row: ImportedRow, unitCount: string): Pick<DraftRow, "quantity" | "followsUnitCount"> {
+  if (row.followsUnitCount && row.unitLabel === "per_unit") return { quantity: unitCount, followsUnitCount: true };
+  return { quantity: row.quantity, followsUnitCount: quantityMatchesUnits(row, unitCount) };
+}
+
+/**
+ * Adds rows from an imported spreadsheet after the ones already there; it never
+ * replaces them. Quantities are kept as importedQuantity says.
+ */
+export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Draft {
+  const added = rows.map((r): DraftRow => ({
+    id: newRowId(),
+    librarySlug: r.librarySlug,
+    category: r.category,
+    name: r.name,
+    ...importedQuantity(r, draft.unitCount),
+    unitLabel: r.unitLabel,
+    installYear: r.installYear,
+    usefulLife: r.usefulLife,
+    costEach: r.costEach,
+    scenario: r.replaceNow ? "replace_now" : "run_to_failure",
+    condition: r.condition,
+    notes: r.notes,
+    installYearIsGuess: r.installYearIsGuess,
+  }));
+  // A draft with nothing in it yet starts a new forecast in the calculator.
+  return { ...draft, forecastTracked: draft.rows.length > 0 && draft.forecastTracked, rows: [...draft.rows, ...added] };
+}
+
+/** What an import changes: see planImport in src/lib/import/reimport.ts. */
+export interface DraftImport {
+  add: readonly ImportedRow[];
+  /** Rows of the draft to change in place, by id. Their ids stay, so saved history stays attached. */
+  update: readonly { id: string; row: ImportedRow }[];
+  /** Rows of the draft to remove; only ones the owner chose to. */
+  remove: readonly string[];
+  /** The building's unit count and year built from the sheet, when the owner chose to use them. */
+  unitCount?: string;
+  yearBuilt?: string;
+}
+
+/**
+ * Applies an import: the building's details first, then the rows the sheet changes
+ * (in place, keeping their ids), then the removals, then the new rows after the
+ * rest. Rows from the sheet take its quantities, as importedQuantity says.
+ */
+/**
+ * The import changes or removes rows, or the building's details, so it replaces
+ * something and can be undone. One that only adds rows can't lose anything.
+ */
+export function importReplaces(change: DraftImport): boolean {
+  return change.update.length > 0 || change.remove.length > 0 || change.unitCount !== undefined || change.yearBuilt !== undefined;
+}
+
+export function withImport(draft: Draft, change: DraftImport): Draft {
+  let next = change.unitCount !== undefined ? withUnitCount(draft, change.unitCount) : draft;
+  if (change.yearBuilt !== undefined) next = { ...next, yearBuilt: change.yearBuilt };
+  const updates = new Map(change.update.map((u) => [u.id, u.row]));
+  const removed = new Set(change.remove);
+  const unitCount = next.unitCount;
+  const rows = next.rows
+    .filter((r) => !removed.has(r.id))
+    .map((r): DraftRow => {
+      const row = updates.get(r.id);
+      if (!row) return r;
+      return {
+        ...r,
+        librarySlug: row.librarySlug,
+        category: row.category,
+        name: row.name,
+        ...importedQuantity(row, unitCount),
+        unitLabel: row.unitLabel,
+        installYear: row.installYear,
+        usefulLife: row.usefulLife,
+        costEach: row.costEach,
+        scenario: row.replaceNow ? "replace_now" : "run_to_failure",
+        condition: row.condition,
+        notes: row.notes,
+        installYearIsGuess: row.installYearIsGuess,
+      };
+    });
+  return withImportedRows({ ...next, rows }, change.add);
+}
+
+/**
  * The lifespan page asks for a cost each. With no count typed, a row following
  * the unit count would take that cost as per apartment (one window's price for
  * all of an apartment's windows), so its count is left blank for the owner.
@@ -268,6 +449,20 @@ export function costHint(
   if (!lib || !typical || LIBRARY_COST_BASIS[lib.unitLabel] !== typical.per) return null;
   if (costBasis(row) !== typical.per) return null;
   return `Typical ${formatCostRange(typical.low, typical.high)}, use your quote`;
+}
+
+/** How many more characters the notes can take, once that's 200 or fewer; null before then. */
+export function notesLeftText(notes: string): string | null {
+  const left = Math.max(0, MAX_NOTES_LENGTH - notes.length);
+  if (left > 200) return null;
+  return `${left.toLocaleString("en-US")} character${left === 1 ? "" : "s"} left`;
+}
+
+/** What a row's hidden condition and notes hold, e.g. "Fair, notes"; empty when nothing. */
+export function detailsSummary(row: Pick<DraftRow, "condition" | "notes">): string {
+  return [row.condition ? CONDITION_TEXT[row.condition] : "", (row.notes ?? "").trim() ? "notes" : ""]
+    .filter(Boolean)
+    .join(", ");
 }
 
 /** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
@@ -367,7 +562,8 @@ export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
       name: row.name.trim(),
       quantity: parseNumber(row.quantity) ?? NaN,
       installYear,
-      installYearIsEstimate: explicitYear === null,
+      // Year built standing in for a blank year, or a year the owner says is a guess.
+      installYearIsEstimate: explicitYear === null || row.installYearIsGuess === true,
       usefulLifeYears: parseNumber(row.usefulLife) ?? NaN,
       replacementCostEach: cost,
       scenario: row.scenario,
@@ -392,7 +588,7 @@ export const PROBLEM_TEXT: Record<RowProblem, string> = {
 };
 
 /** A row's fields that a problem can point at. */
-export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach";
+export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach" | "notes";
 
 type NumberField = "quantity" | "usefulLife" | "costEach";
 

@@ -65,6 +65,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
         // Keeps its own state after a save; a new mount only for another property.
         key={property.id}
         userId={account.id}
+        userEmail={account.email}
         propertyId={property.id}
         initialName={property.name}
         initialUpdatedAt={property.updated_at}

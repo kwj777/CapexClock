@@ -1,17 +1,40 @@
 import type { Forecast, ForecastComponent, UnitLabel } from "@/lib/forecast";
+import type { ComponentCondition } from "@/lib/supabase/database.types";
+
+/** What the owner noted about a component, as the exports show it. */
+export interface RowDetails {
+  condition: ComponentCondition | null;
+  /** Trimmed; empty when there are none. */
+  notes: string;
+  /** The owner typed an install year and marked it a guess. */
+  installYearIsGuess: boolean;
+}
 
 /** A form row the forecast leaves out because its details aren't complete. */
 export interface LeftOut {
   name: string;
   category: string;
+  condition?: ComponentCondition | null;
+  notes?: string;
+}
+
+/** A component with a condition or notes, for the PDF's list of them. */
+export interface ConditionNote {
+  name: string;
+  condition: ComponentCondition | null;
+  notes: string;
 }
 
 /** What the exports need beyond the forecast itself. */
 export interface ExportDetails {
   /** How each component is counted, by component id. Square-foot items print "sq ft". */
   unitLabels?: ReadonlyMap<string, UnitLabel>;
+  /** Each component's condition, notes and guess flag, by component id. */
+  rowDetails?: ReadonlyMap<string, RowDetails>;
   /** Rows left out of the forecast, so the export can say so. */
   leftOut?: LeftOut[];
+  /** Every row with a condition or notes, in the form's order. */
+  conditionNotes?: ConditionNote[];
 }
 
 /** A calculator form row, as far as the exports need it. */
@@ -20,11 +43,31 @@ export interface ExportFormRow {
   name: string;
   category: string;
   unitLabel: UnitLabel;
+  installYear?: string;
+  condition?: ComponentCondition | null;
+  notes?: string;
+  installYearIsGuess?: boolean;
 }
 
 /**
- * The units of every form row, and the rows the forecast left out because
- * their details aren't complete (the forecast only has the complete ones).
+ * True when the owner typed an install year and ticked "guess". With no year typed,
+ * year built stands in, and that's what the exports say instead.
+ */
+export function guessedYear(row: Pick<ExportFormRow, "installYear" | "installYearIsGuess">): boolean {
+  return row.installYearIsGuess === true && (row.installYear ?? "").trim() !== "";
+}
+
+function rowDetails(row: ExportFormRow): RowDetails {
+  return { condition: row.condition ?? null, notes: (row.notes ?? "").trim(), installYearIsGuess: guessedYear(row) };
+}
+
+function rowName(row: Pick<ExportFormRow, "name">): string {
+  return row.name.trim() || "Unnamed component";
+}
+
+/**
+ * The units and details of every form row, and the rows the forecast left out
+ * because their details aren't complete (the forecast only has the complete ones).
  */
 export function exportDetails(
   formRows: readonly ExportFormRow[],
@@ -33,9 +76,17 @@ export function exportDetails(
   const included = new Set(components.map((c) => c.id));
   return {
     unitLabels: new Map(formRows.map((r) => [r.id, r.unitLabel])),
+    rowDetails: new Map(formRows.map((r) => [r.id, rowDetails(r)])),
     leftOut: formRows
       .filter((r) => !included.has(r.id))
-      .map((r) => ({ name: r.name.trim() || "Unnamed component", category: r.category })),
+      .map((r) => {
+        const { condition, notes } = rowDetails(r);
+        return { name: rowName(r), category: r.category, condition, notes };
+      }),
+    conditionNotes: formRows
+      .map((r) => ({ name: rowName(r), ...rowDetails(r) }))
+      .filter((r) => r.condition !== null || r.notes !== "")
+      .map(({ name, condition, notes }) => ({ name, condition, notes })),
   };
 }
 
@@ -51,11 +102,25 @@ export interface ExportRow {
   costEach: number | null;
   /** Quantity × cost each, in dollars rounded to the cent. */
   total: number;
+  /** What the forecast says about this replacement, e.g. "Overdue". */
   notes: string[];
+  condition: ComponentCondition | null;
+  /** The owner's own notes on the component; empty when there are none. */
+  ownerNotes: string;
 }
 
 export const ESTIMATED_NOTE = "Install year estimated";
+export const GUESS_NOTE = "Install year is a guess";
 export const LEFT_OUT_NOTE = "Not included yet: details missing";
+
+/**
+ * Why a forecast's install year is an estimate: year built standing in for a blank
+ * year, or a year the owner marked as a guess. Empty when it isn't one.
+ */
+export function installYearNote(isEstimate: boolean, details: Pick<RowDetails, "installYearIsGuess"> | undefined): string {
+  if (!isEstimate) return "";
+  return details?.installYearIsGuess ? GUESS_NOTE : ESTIMATED_NOTE;
+}
 
 /** Rounds money to cents, which also clears float noise such as 956.9999999999999. */
 export function toCents(value: number): number {
@@ -72,11 +137,13 @@ export function exportRows(
   forecast: Forecast,
   components: ForecastComponent[],
   unitLabels: ReadonlyMap<string, UnitLabel> = new Map(),
+  details: ReadonlyMap<string, RowDetails> = new Map(),
 ): ExportRow[] {
   const byId = new Map(components.map((c) => [c.id, c]));
   return forecast.years.flatMap((y) =>
     y.replacements.map((r): ExportRow => {
       const c = byId.get(r.componentId);
+      const d = details.get(r.componentId);
       return {
         year: r.year,
         name: r.name,
@@ -85,7 +152,9 @@ export function exportRows(
         unit: unitLabels.get(r.componentId) === "per_sq_ft" ? "sq ft" : "each",
         costEach: c?.replacementCostEach ?? null,
         total: toCents(r.cost),
-        notes: [r.overdue ? "Overdue" : "", r.installYearIsEstimate ? ESTIMATED_NOTE : ""].filter(Boolean),
+        notes: [r.overdue ? "Overdue" : "", installYearNote(r.installYearIsEstimate, d)].filter(Boolean),
+        condition: d?.condition ?? null,
+        ownerNotes: d?.notes ?? "",
       };
     }),
   );

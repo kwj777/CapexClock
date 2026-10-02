@@ -8,16 +8,19 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "sample-report": "ts-node --project scripts/tsconfig.json scripts/sample-report.tsx"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.6",
+    "papaparse": "^5.7.0",
     "posthog-js": "^1.434.15",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "read-excel-file": "^9.3.10",
     "recharts": "^3.10.1"
   },
   "devDependencies": {
@@ -25,6 +28,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

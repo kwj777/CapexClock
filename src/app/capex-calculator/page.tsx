@@ -24,11 +24,15 @@ const FAQ = [
   },
   {
     q: "What if I don't know when something was installed?",
-    a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm.",
+    a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm. If you have a rough idea, enter your best guess and tick Guess under it. It's marked as an estimate the same way.",
   },
   {
     q: "What does Replace this year do?",
     a: "Tick it for anything you plan to replace this year, even if it still works. Its cost is added to this year's costs and its replacement cycle starts again from this year. If you already replaced something, don't tick it. Enter the year you replaced it as the install year instead.",
+  },
+  {
+    q: "Should I replace everything at risk now?",
+    a: "Open \"What if we replace everything at risk now?\" under At risk to compare. It shows the cash you'd need this year, how the 10-year total changes and what happens to the monthly reserve. If waiting until something breaks costs more, such as rush fees, you can add that as a percentage. Items whose install year is a guess are listed apart so you can check them first. Nothing changes until you click Apply, and you can undo it.",
   },
   {
     q: "What happens to items that are already past their useful life?",
@@ -41,6 +45,14 @@ const FAQ = [
   {
     q: "Is my data saved?",
     a: "Your entries stay in this browser until you choose to save them. A free account keeps them safe and lets you add more properties.",
+  },
+  {
+    q: "Can I import my own spreadsheet?",
+    a: "Yes. Click Import from a spreadsheet, then paste rows from Excel or Google Sheets, or choose an Excel (.xlsx) or CSV file. We guess which column is which, match names like \"HWH\" to our list, and combine identical rows into one with a quantity. You can change any guess, and you see every row before anything is added. Your sheet is read in your browser and never uploaded. Starting from scratch? Our free CapEx spreadsheet template has the columns to fill in.",
+  },
+  {
+    q: "Can I edit my list in a spreadsheet and bring it back?",
+    a: "Yes. Click Download component list (CSV), make your changes in Excel or Google Sheets, then import the file again. Each row keeps its CapexClock ID, so changed rows are updated in place and new rows are added. Rows you deleted are only removed if you say so.",
   },
 ];
 
@@ -100,7 +112,11 @@ export default async function CapexCalculatorPage() {
           </section>
 
           <p className="mt-10 max-w-3xl text-slate-600 dark:text-slate-400">
-            More free tools: the{" "}
+            More free tools: a{" "}
+            <Link href="/capex-spreadsheet-template" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+              CapEx spreadsheet template
+            </Link>{" "}
+            with the columns to track, the{" "}
             <Link href="/reserve-calculator" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
               reserve calculator
             </Link>{" "}
