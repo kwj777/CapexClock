@@ -24,13 +24,14 @@ import {
 } from "@/lib/import/preview";
 import {
   decodeText,
-  FAIL_TEXT,
+  failedReason,
   fileKind,
   MAX_BYTES,
+  PROBLEM_TEXT,
   readText,
   type CsvParse,
-  type FailReason,
   type ImportSource,
+  type Problem,
 } from "@/lib/import/read";
 import {
   addLabel,
@@ -52,15 +53,6 @@ const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 const headingClass = "text-sm font-semibold text-slate-950 dark:text-white";
 const secondaryButton =
   "rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800";
-
-/** "Paste some rows first." isn't an import that failed, so it sends no event. */
-type Problem = FailReason | "empty" | "loading_failed";
-
-const PROBLEM_TEXT: Record<Problem, string> = {
-  ...FAIL_TEXT,
-  empty: "Paste some rows first, headings included.",
-  loading_failed: "The importer didn't load. Check your connection, then close this and try again.",
-};
 
 export interface ImportPanelProps {
   id: string;
@@ -142,17 +134,19 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
     void track("import_started", { source });
   }
 
-  function fail(reason: Problem) {
+  function fail(problem: Problem) {
     setOpened(null);
     setChoices(null);
-    setProblem(reason);
-    if (reason !== "empty" && reason !== "loading_failed") void track("import_failed", { reason });
+    setProblem(problem);
+    const reason = failedReason(problem);
+    if (reason) void track("import_failed", { reason });
   }
 
   function read(input: string, source: ImportSource) {
     if (!parse) return;
     if (input.trim() === "") {
-      fail("empty");
+      // A chosen file started an import; an empty paste box didn't.
+      fail(source === "file" ? "empty_file" : "empty");
       return;
     }
     begin(source);

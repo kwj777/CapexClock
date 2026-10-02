@@ -21,6 +21,29 @@ export const FAIL_TEXT: Record<FailReason, string> = {
   unreadable: "We couldn't read that file. Make sure it's a CSV file, or copy the rows and paste them here.",
 };
 
+/**
+ * What the panel tells the owner: a failed import, or "empty" (nothing pasted yet),
+ * "empty_file" (a chosen file with nothing in it) or "loading_failed" (the importer
+ * itself didn't load).
+ */
+export type Problem = FailReason | "empty" | "empty_file" | "loading_failed";
+
+export const PROBLEM_TEXT: Record<Problem, string> = {
+  ...FAIL_TEXT,
+  empty: "Paste some rows first, headings included.",
+  empty_file: "That file is empty. Choose another file, or copy the rows and paste them here.",
+  loading_failed: "The importer didn't load. Check your connection, then close this and try again.",
+};
+
+/**
+ * The reason import_failed sends, or null when nothing was imported yet: an empty
+ * paste box isn't an import, but a chosen file started one, and an empty file has no headings.
+ */
+export function failedReason(problem: Problem): FailReason | null {
+  if (problem === "empty" || problem === "loading_failed") return null;
+  return problem === "empty_file" ? "no_header" : problem;
+}
+
 /** What a chosen file is, by its name and type: text we can read, a spreadsheet file, or neither. */
 export function fileKind(name: string, type: string): "text" | "spreadsheet" | "other" {
   const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";

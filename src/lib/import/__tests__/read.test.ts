@@ -1,5 +1,5 @@
 import { openSheet, parseSheetYear, startingChoices } from "../open";
-import { byteLength, decodeText, fileKind, MAX_BYTES, readText } from "../read";
+import { byteLength, decodeText, failedReason, fileKind, MAX_BYTES, PROBLEM_TEXT, readText } from "../read";
 import { match, parse } from "../__fixtures__/sheets";
 
 describe("reading pasted rows and CSV files", () => {
@@ -104,5 +104,16 @@ describe("opening a sheet", () => {
     expect(parseSheetYear("2027", 2026)).toBeNull();
     expect(parseSheetYear("24", 2026)).toBeNull();
     expect(parseSheetYear("", 2026)).toBeNull();
+  });
+});
+
+describe("what the panel says when it can't read something", () => {
+  it("sends import_failed for a chosen file with nothing in it, but not for an empty paste box", () => {
+    expect(failedReason("empty_file")).toBe("no_header");
+    expect(PROBLEM_TEXT.empty_file).toBe("That file is empty. Choose another file, or copy the rows and paste them here.");
+    expect(failedReason("empty")).toBeNull();
+    expect(failedReason("loading_failed")).toBeNull();
+    expect(failedReason("too_big")).toBe("too_big");
+    expect(failedReason("unreadable")).toBe("unreadable");
   });
 });
