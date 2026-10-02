@@ -32,7 +32,7 @@ import {
 import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
 import { buildPreview, type Preview } from "@/lib/import/preview";
-import { PROBLEM_TEXT, type Problem } from "@/lib/import/read";
+import { failedReason, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
 import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { previewSummary } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
@@ -151,6 +151,8 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
       const reason = typeof only === "string" && list.length === 1 ? only : "no_header";
       setRead(null);
       setProblem(reason);
+      const sent = failedReason(reason);
+      if (sent) void track("import_failed", { reason: sent, source: next.source, where: "portfolio" });
       return;
     }
     const starting = startingTabs(next.tabs, list);

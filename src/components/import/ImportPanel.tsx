@@ -118,7 +118,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     setSheet(null);
     setProblem(reason);
     const sent = failedReason(reason);
-    if (sent) void track("import_failed", { reason: sent, source });
+    if (sent) void track("import_failed", { reason: sent, source, where });
   }
 
   function showTab(list: OpenedTab[], index: number) {
