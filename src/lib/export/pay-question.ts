@@ -67,3 +67,8 @@ export function nextStep(
   if (answer === "No") return "thanks";
   return pick === null ? "first_pick" : "thanks";
 }
+
+/** True while a step waits for an answer, so other prompts on the page can step back. */
+export function waitsForAnswer(step: ReturnType<typeof nextStep>): boolean {
+  return step === "question" || step === "first_pick";
+}
