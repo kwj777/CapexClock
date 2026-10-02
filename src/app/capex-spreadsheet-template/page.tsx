@@ -115,7 +115,7 @@ export default async function SpreadsheetTemplatePage() {
                       <th scope="row" className={`${cellClass} font-medium text-slate-950 dark:text-white`}>
                         {r.name}
                       </th>
-                      <td className={`${cellClass} tabular-nums`}>{r.quantity}</td>
+                      <td className={`${cellClass} tabular-nums`}>{Number(r.quantity).toLocaleString("en-US")}</td>
                       <td className={cellClass}>{COUNTED_PER_TEXT[r.unitLabel]}</td>
                       <td className={`${cellClass} tabular-nums`}>
                         {r.installYear}

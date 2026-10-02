@@ -42,6 +42,8 @@ import { createClient } from "@/lib/supabase/client";
 import { isSignedOut, readBack } from "./read-back";
 
 const NO_DUPLICATES = new Set<string>();
+// Fields of a property that's created (or left out) can't be changed here any more.
+const lockedClass = "read-only:bg-slate-100 read-only:text-slate-600 dark:read-only:bg-slate-800 dark:read-only:text-slate-300";
 
 interface TabPlan {
   tab: number;
@@ -88,6 +90,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const known = useRef(new Set(propertyIds));
   const previewed = useRef<SourceRead | null>(null);
   const resultRef = useRef<HTMLParagraphElement>(null);
+  const [runs, setRuns] = useState(0);
 
   const started = Object.keys(results).length > 0;
 
@@ -122,6 +125,10 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const blocked = toCreate.some((p) => (problems.get(p.id) ?? []).length > 0) || sheetYearBad;
   const fromDownload = plans.some((p) => p.preview.idColumn);
   const review = plans.find((p) => p.tab === reviewTab) ?? plans[0];
+
+  useEffect(() => {
+    if (runs > 0) resultRef.current?.focus();
+  }, [runs]);
 
   // Counts only: never names or anything from the sheet.
   useEffect(() => {
@@ -269,8 +276,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
     });
     setProgress("");
     setRunning(false);
+    // The button clicked is gone or disabled, so focus goes to what happened, once it's shown.
+    setRuns((n) => n + 1);
     if (created.length > 0) router.refresh();
-    resultRef.current?.focus();
   }
 
   const allResults = chosen.flatMap((p) => (results[p.id] ? [results[p.id]] : []));
@@ -459,7 +467,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           aria-invalid={nameBad || undefined}
                           aria-describedby={showLines ? problemId : undefined}
                           onChange={(e) => edit(p, "name", e.target.value)}
-                          className={`${inputClass} mt-1`}
+                          className={`${inputClass} ${lockedClass} mt-1`}
                         />
                       </div>
                       <div>
@@ -474,7 +482,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           aria-invalid={unitsBad || undefined}
                           aria-describedby={showLines ? problemId : undefined}
                           onChange={(e) => edit(p, "unitCount", e.target.value)}
-                          className={`${inputClass} mt-1 tabular-nums`}
+                          className={`${inputClass} ${lockedClass} mt-1 tabular-nums`}
                         />
                       </div>
                       <div>
@@ -489,7 +497,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           readOnly={locked}
                           aria-describedby={showLines ? problemId : undefined}
                           onChange={(e) => edit(p, "yearBuilt", e.target.value)}
-                          className={`${inputClass} mt-1 tabular-nums`}
+                          className={`${inputClass} ${lockedClass} mt-1 tabular-nums`}
                         />
                       </div>
                     </div>
