@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { presaleLinksFromEnv } from "@/lib/paid-ideas";
 import { supabaseEnv } from "@/lib/supabase/env";
 import { CONTACT_EMAIL } from "@/lib/site";
+
+// Stripe's customer portal, where founding members cancel. Baked in at build time.
+const PORTAL = presaleLinksFromEnv().portal;
 
 const navLink =
   "whitespace-nowrap text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
@@ -29,6 +33,10 @@ export function SiteHeader() {
           {tools(false)}
         </nav>
         <div className="flex items-center gap-4 sm:gap-5">
+          {/* The smallest phones find it in the footer. */}
+          <Link href="/pricing" className={`${navLink} hidden sm:inline`}>
+            Pricing
+          </Link>
           {/* Below lg the landing page's own signup section covers this. */}
           <Link href="/#signup" className={`${navLink} hidden lg:inline`}>
             Early access
@@ -66,9 +74,20 @@ export function SiteFooter() {
           </Link>
         </nav>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
+            Pricing
+          </Link>
+          <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">
+            Terms
+          </Link>
           <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
             Privacy
           </Link>
+          {PORTAL && (
+            <a href={PORTAL} className="hover:text-slate-900 dark:hover:text-white">
+              Manage or cancel membership
+            </a>
+          )}
           <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900 dark:hover:text-white">
             {CONTACT_EMAIL}
           </a>

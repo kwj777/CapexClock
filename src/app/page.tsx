@@ -70,7 +70,7 @@ const FAQ = [
   { q: "Do I need to connect my accounting software?", a: "No." },
   {
     q: "Can I use it now?",
-    a: "Yes. The calculator is open to everyone, and a free account saves your properties. Replacement reminders and a lender-ready condition report are coming next. Join the early access list to try them first.",
+    a: "Yes. The calculator is open to everyone, and a free account saves your properties. Replacement reminders and a condition report for lenders and buyers are coming next. Join the early access list to try them first.",
   },
 ];
 
@@ -206,7 +206,7 @@ export default function Home() {
               <h2 className="text-3xl font-semibold tracking-tight">Get early access to what&apos;s next</h2>
               <p className="mt-4 max-w-md text-lg text-slate-300">
                 The calculator is free to use today. Next we&apos;re building replacement reminders
-                and a lender-ready condition report. Join the list to try them early. Your answers
+                and a condition report for lenders and buyers. Join the list to try them early. Your answers
                 help us build the right thing first.
               </p>
             </div>
