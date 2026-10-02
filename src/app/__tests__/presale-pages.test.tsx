@@ -295,4 +295,14 @@ describe("our own words (plan T5)", () => {
       expect([file, /normally \$19|locked for life|line-through|<s>|<del>/i.test(source)]).toEqual([file, false]);
     }
   });
+
+  it("never promise what we'll build next, since only the idea that wins gets built", () => {
+    for (const path of sourceFiles(join(root, "src"))) {
+      const file = relative(root, path);
+      const source = readFileSync(path, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect([file, /(we(&apos;|')re|we are) building|coming next|coming soon/i.test(source)]).toEqual([file, false]);
+    }
+  });
 });
