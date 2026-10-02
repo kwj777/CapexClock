@@ -17,6 +17,7 @@ import {
   knownRows,
   listNotes,
   listsMissing,
+  missingLine,
   planImport,
   planSummary,
   removeText,
@@ -325,7 +326,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
                   <ul aria-label="Rows not in this file" className="mt-1 list-disc pl-5 sm:columns-2 sm:gap-6">
                     {plan.missing.map((m) => (
                       <li key={m.id} className="break-inside-avoid wrap-anywhere">
-                        {m.name}
+                        {missingLine(m)}
                       </li>
                     ))}
                   </ul>

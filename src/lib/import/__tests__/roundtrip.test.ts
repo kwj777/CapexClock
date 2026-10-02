@@ -134,7 +134,7 @@ describe("downloading the component list and importing it again", () => {
     const edited = [table[0], ...table.slice(2), newRow];
     const kept = importInto(draft, edited);
     expect(kept.plan.add.map((r) => r.name)).toEqual(["Boiler"]);
-    expect(kept.plan.missing).toEqual([{ id: draft.rows[0].id, name: draft.rows[0].name }]);
+    expect(kept.plan.missing).toEqual([{ id: draft.rows[0].id, name: draft.rows[0].name, installYear: draft.rows[0].installYear }]);
     expect(applyLabel(kept.plan, false)).toBe("Add 1 row");
     expect(kept.next.rows).toHaveLength(draft.rows.length + 1);
 

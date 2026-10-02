@@ -16,7 +16,7 @@ export interface ImportPlan {
   /** Rows of the list the file has, by id, with what's different ([] when nothing is). */
   update: { id: string; row: ImportedRow; changes: string[] }[];
   /** Rows of the list the file doesn't have. They stay unless the owner removes them. */
-  missing: { id: string; name: string }[];
+  missing: { id: string; name: string; installYear: string }[];
   /** The file matched rows of the list by CapexClock ID. */
   matched: boolean;
   /** Rows whose CapexClock ID isn't in the list, so they're added as new. */
@@ -120,7 +120,9 @@ export function planImport(rows: readonly PreviewRow[], list: readonly DraftRow[
   }
   plan.matched = used.size > 0;
   if (plan.matched) {
-    plan.missing = list.filter((r) => !used.has(r.id)).map((r) => ({ id: r.id, name: r.name.trim() || "Unnamed component" }));
+    plan.missing = list
+      .filter((r) => !used.has(r.id))
+      .map((r) => ({ id: r.id, name: r.name.trim() || "Unnamed component", installYear: r.installYear.trim() }));
   }
   return plan;
 }
@@ -216,6 +218,11 @@ export const MISSING_NAMED = 4;
 /** Every row the file doesn't have is listed above the remove choice, so none is removed unseen. */
 export function listsMissing(missing: readonly unknown[]): boolean {
   return missing.length > MISSING_NAMED;
+}
+
+/** One row in the list of rows the file doesn't have: "Gas furnace, installed 2011", so two of a kind can be told apart. */
+export function missingLine(row: { name: string; installYear: string }): string {
+  return row.installYear === "" ? row.name : `${row.name}, installed ${row.installYear}`;
 }
 
 /**

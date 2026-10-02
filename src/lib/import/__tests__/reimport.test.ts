@@ -9,6 +9,7 @@ import {
   listNote,
   listNotes,
   listsMissing,
+  missingLine,
   planImport,
   planSummary,
   removeText,
@@ -127,8 +128,8 @@ describe("planning an import against the list", () => {
     expect(plan.add.map((r) => r.name)).toEqual(["Tank water heater", "Boiler"]);
     expect(plan.repeatedIds).toBe(1);
     expect(plan.missing).toEqual([
-      { id: "b", name: "Furnace" },
-      { id: "c", name: "Carpet" },
+      { id: "b", name: "Furnace", installYear: "2016" },
+      { id: "c", name: "Carpet", installYear: "2016" },
     ]);
     expect(planSummary(plan)).toEqual([
       "Matched 1 row of your list by CapexClock ID: 1 to update.",
@@ -193,6 +194,9 @@ describe("planning an import against the list", () => {
     const ten = "ABCDEFGHIJ".split("").map((name) => ({ name }));
     expect(removeText(ten)).toBe("Remove these 10 rows from my list");
     expect(listsMissing(ten)).toBe(true);
+    // Each listed row says when it went in, so two of a kind can be told apart.
+    expect(missingLine({ name: "Gas furnace", installYear: "2011" })).toBe("Gas furnace, installed 2011");
+    expect(missingLine({ name: "Gas furnace", installYear: "" })).toBe("Gas furnace");
   });
 });
 
