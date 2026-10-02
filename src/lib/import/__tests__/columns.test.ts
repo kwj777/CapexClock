@@ -2,7 +2,6 @@ import {
   columnValues,
   componentSlug,
   doubtfulQuantity,
-  doubtfulQuantityColumn,
   doubtfulYearColumns,
   findHeaderRow,
   guessColumns,
@@ -16,10 +15,11 @@ import {
   isCounting,
   offersColumnLayout,
   parseRole,
-  sameUnitsColumn,
+  quantityQuestionColumn,
   samples,
   yearsHavePassed,
 } from "../columns";
+import type { ColumnRole } from "../columns";
 import { match } from "../__fixtures__/sheets";
 
 describe("guessing a column from its heading", () => {
@@ -260,30 +260,33 @@ describe("guessing the layout and every column", () => {
     expect(guessColumns(["Item", "Qty", "#"], match, "rows")).toEqual(["item", "quantity", "ignore"]);
   });
 
-  it("uses a # or Units column as the quantity only when no heading names one and the values are counts", () => {
+  it("never guesses a #, No. or Units column is the quantity: the preview asks", () => {
     const sheet = (head: string, values: string[]) => {
       const grid = [["Item", head], ...values.map((v, i) => [`Item ${i}`, v])];
       return guessColumns(headings(grid, 0), match, "rows", columnValues(grid, 0))[1];
     };
     expect(sheet("#", ["1", "2", "3", "4"])).toBe("ignore");
-    expect(sheet("No.", ["101", "102", "103"])).toBe("ignore");
-    expect(sheet("#", ["12", "1", "24"])).toBe("quantity");
-    expect(sheet("#", ["A1", "A2", "B1"])).toBe("ignore");
-    expect(sheet("Units", ["12", "1", "24", "12"])).toBe("quantity");
-    // The same number on every row is the building's unit count.
+    expect(sheet("#", ["12", "1", "24"])).toBe("ignore");
+    expect(sheet("No.", ["1", "2", "4", "5"])).toBe("ignore");
+    expect(sheet("Units", ["12", "1", "24", "12"])).toBe("ignore");
     expect(sheet("Units", ["12", "12", "12"])).toBe("ignore");
-    expect(sheet("Units", ["12"])).toBe("ignore");
-    expect(sheet("#", [])).toBe("ignore");
-  });
-
-  it("names the quantity column when its heading only might mean one", () => {
-    expect(doubtfulQuantityColumn(["Item", "#"], ["item", "quantity"])).toBe(1);
-    expect(doubtfulQuantityColumn(["Item", "Units"], ["item", "quantity"])).toBe(1);
-    expect(doubtfulQuantityColumn(["Item", "Qty"], ["item", "quantity"])).toBeNull();
-    expect(doubtfulQuantityColumn(["Item", "#"], ["item", "ignore"])).toBeNull();
     expect(doubtfulQuantity("No.")).toBe("number");
+    expect(doubtfulQuantity("Number")).toBe("number");
     expect(doubtfulQuantity("Units")).toBe("units");
     expect(doubtfulQuantity("# of units")).toBeNull();
+  });
+
+  it.each([
+    ["Total units", "quantity"],
+    ["Total qty", "quantity"],
+    ["Total # of units", "quantity"],
+    ["Total cost (all units)", "total"],
+    ["Total price", "total"],
+    ["Total $", "total"],
+    ["Total", "total"],
+    ["Unit count", "quantity"],
+  ])("reads %p as %p", (heading, field) => {
+    expect(guessField(heading)).toBe(field);
   });
 
   it("knows numbering when it sees it", () => {
@@ -371,17 +374,68 @@ describe("guessing the layout and every column", () => {
     expect(doubtfulYearColumns(heads, ["item", "ignore", "ignore", "installYear"])).toEqual([]);
   });
 
-  it("finds a Units column with the same number on every row, which could be the building's unit count", () => {
+  describe("the column the preview asks about, which may or may not be the quantity", () => {
     const values = (cells: Record<number, string[]>) => (c: number) => cells[c] ?? [];
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["12", "12", "12"] }))).toEqual({ column: 1, value: "12" });
-    // Asked again after the owner chose Quantity, so the answer shows.
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "quantity"], values({ 1: ["12", "12"] }))).toEqual({ column: 1, value: "12" });
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["12", "6"] }))).toBeNull();
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["1", "1"] }))).toBeNull();
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "ignore"], values({ 1: ["twelve"] }))).toBeNull();
-    expect(sameUnitsColumn(["Item", "Units", "Qty"], ["item", "ignore", "quantity"], values({ 1: ["12"] }))).toBeNull();
-    expect(sameUnitsColumn(["Item", "Units"], ["item", "notes"], values({ 1: ["12"] }))).toBeNull();
-    expect(sameUnitsColumn(["Item", "Qty"], ["item", "quantity"], values({ 1: ["12"] }))).toBeNull();
+    const no = () => false;
+    const ask = (heads: string[], roles: ColumnRole[], cells: Record<number, string[]>, buildingWide = no) =>
+      quantityQuestionColumn(heads, roles, values(cells), buildingWide);
+
+    it("asks about # or No. unless the numbers just run down the sheet", () => {
+      // Sorted by another column, a row deleted, or apartment numbers.
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["1", "2", "4", "5"] })).toEqual({
+        column: 0,
+        kind: "numbers",
+        values: ["1", "2", "4"],
+      });
+      expect(ask(["No.", "Item"], ["ignore", "item"], { 0: ["3", "1", "2"] })).toMatchObject({ column: 0, kind: "numbers" });
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["101", "102", "201"] })).toMatchObject({ kind: "numbers" });
+      // Two rows aren't enough to tell numbering from counts.
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["1", "2"] })).toMatchObject({ kind: "numbers", values: ["1", "2"] });
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["12", "1", "24"] })).toMatchObject({ kind: "numbers" });
+      // Plain numbering isn't asked about, and neither is a column of 1s or of words.
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["1", "2", "3"] })).toBeNull();
+      expect(ask(["No.", "Item"], ["ignore", "item"], { 0: ["101", "102", "103"] })).toBeNull();
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["1", "1", "1"] })).toBeNull();
+      expect(ask(["#", "Item"], ["ignore", "item"], { 0: ["A1", "A2"] })).toBeNull();
+      expect(ask(["#", "Item"], ["ignore", "item"], {})).toBeNull();
+    });
+
+    it("asks about a Units column with one number on every row, or one row", () => {
+      expect(ask(["Item", "Units"], ["item", "ignore"], { 1: ["12", "12", "12"] })).toEqual({ column: 1, kind: "same", values: ["12"] });
+      expect(ask(["Item", "Units"], ["item", "ignore"], { 1: ["12"] })).toEqual({ column: 1, kind: "numbers", values: ["12"] });
+      expect(ask(["Item", "Units"], ["item", "ignore"], { 1: ["12", "6"] })).toMatchObject({ kind: "numbers" });
+      // Asked again after the owner chose Quantity, so the answer shows.
+      expect(ask(["Item", "Units"], ["item", "quantity"], { 1: ["12", "12"] })).toMatchObject({ column: 1, kind: "same" });
+      expect(ask(["Item", "Units"], ["item", "ignore"], { 1: ["1", "1"] })).toBeNull();
+      expect(ask(["Item", "Units"], ["item", "ignore"], { 1: ["twelve"] })).toBeNull();
+      expect(ask(["Item", "Units"], ["item", "notes"], { 1: ["12"] })).toBeNull();
+    });
+
+    it("asks about a quantity column that says units and has one number on every row", () => {
+      for (const heading of ["# of units", "Unit count", "No. of units", "Total units", "Number of apartments"]) {
+        expect(ask(["Item", heading], ["item", "quantity"], { 1: ["12", "12"] })).toEqual({ column: 1, kind: "same", values: ["12"] });
+        // Still asked once answered, so the answer shows.
+        expect(ask(["Item", heading], ["item", "ignore"], { 1: ["12", "12"] })).toMatchObject({ column: 1 });
+      }
+      expect(ask(["Item", "# of units"], ["item", "quantity"], { 1: ["12", "6"] })).toBeNull();
+      expect(ask(["Item", "# of units"], ["item", "quantity"], { 1: ["12"] })).toBeNull();
+      // "Qty" with 12 on every row is asked about only when a row is something a building has one of.
+      expect(ask(["Item", "Qty"], ["item", "quantity"], { 1: ["12", "12"] })).toBeNull();
+      expect(ask(["Item", "Qty"], ["item", "quantity"], { 1: ["12", "12"] }, () => true)).toMatchObject({ column: 1, kind: "same" });
+    });
+
+    it("doesn't ask when another column is the quantity, or two are", () => {
+      expect(ask(["Item", "Units", "Qty"], ["item", "ignore", "quantity"], { 1: ["12"], 2: ["3", "4"] })).toBeNull();
+      expect(ask(["Item", "#", "Qty"], ["item", "ignore", "quantity"], { 1: ["4", "9"], 2: ["3", "4"] })).toBeNull();
+      expect(ask(["Item", "Units", "#"], ["item", "quantity", "quantity"], { 1: ["12"], 2: ["12"] })).toBeNull();
+    });
+
+    it("looks past a numbering column to a Units column", () => {
+      expect(ask(["#", "Item", "Units"], ["ignore", "item", "ignore"], { 0: ["1", "2", "3"], 2: ["12", "12", "12"] })).toMatchObject({
+        column: 2,
+        kind: "same",
+      });
+    });
   });
 
   it("reads a dropdown's value back as a role", () => {

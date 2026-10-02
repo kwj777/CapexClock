@@ -1,6 +1,6 @@
 import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { FixField, ImportedRow, Preview, PreviewRow, RowStatus, SkipReason, Skipped } from "./preview";
+import type { FixField, ImportedRow, Preview, PreviewRow, QuantityQuestion, RowStatus, SkipReason, Skipped } from "./preview";
 import { columnLetter, listText, quote } from "./text";
 
 export { columnLetter };
@@ -121,18 +121,12 @@ export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
 export function previewHints(preview: Preview): string[] {
   const hints: string[] = [];
   if (preview.missingItemColumn) hints.push("Choose which column has the item names.");
-  // While the units question is open, it says what happens instead.
-  if (preview.noQuantityColumn && !preview.missingItemColumn && preview.unitsQuestion?.answer !== null) {
+  // While the quantity question is open, it says what happens instead.
+  if (preview.noQuantityColumn && !preview.missingItemColumn && preview.quantityQuestion?.answer !== null) {
     hints.push(
       preview.quantityFromTotals
         ? "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up."
         : "There's no quantity column, so each row counts as one, and identical rows are added up.",
-    );
-  }
-  if (preview.doubtfulQuantity) {
-    const { column, heading } = preview.doubtfulQuantity;
-    hints.push(
-      `We used column ${columnLetter(column)}, ${quote(heading)}, as the quantity. If it numbers the rows or apartments instead, set it to Ignore.`,
     );
   }
   if (preview.noYearColumn && !preview.missingItemColumn) {
@@ -169,9 +163,30 @@ export function longListText(rowsNow: number, adding: number): string {
   return `${makes}, and the calculator gets slow past about ${SLOW_ROWS}. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.`;
 }
 
-/** The units question: "Column B, "Units", says 12 on every row. What is it?" */
-export function unitsQuestionText(question: NonNullable<Preview["unitsQuestion"]>): string {
-  return `Column ${columnLetter(question.column)}, ${quote(question.heading)}, says ${question.value} on every row. What is it?`;
+/**
+ * The quantity question: "Column B, "Units", says 12 on every row. What is it?" or
+ * "Column A, "#", has numbers like 1, 2 and 4. What are they?"
+ */
+export function quantityQuestionText(question: Pick<QuantityQuestion, "column" | "heading" | "kind" | "values">): string {
+  const column = `Column ${columnLetter(question.column)}, ${quote(question.heading)},`;
+  if (question.kind === "same") return `${column} says ${question.values[0]} on every row. What is it?`;
+  if (question.values.length === 1) return `${column} has the number ${question.values[0]}. What is it?`;
+  return `${column} has numbers like ${listText(question.values)}. What are they?`;
+}
+
+/** The two answers to the quantity question, in order: it's the quantity, or each row counts as one. */
+export function quantityAnswers(
+  question: Pick<QuantityQuestion, "kind">,
+): readonly (readonly ["quantity" | "each_one", string])[] {
+  return [
+    ["quantity", "How many of each item there are"],
+    [
+      "each_one",
+      question.kind === "same"
+        ? "The number of units in the building, so each row counts as one"
+        : "Row or apartment numbers, so each row counts as one",
+    ],
+  ];
 }
 
 /** The label of each field the preview lets the owner fix. */

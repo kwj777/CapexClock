@@ -9,10 +9,11 @@ import {
   longListText,
   previewHints,
   previewSummary,
+  quantityAnswers,
+  quantityQuestionText,
   rowNumbers,
   skippedLines,
   SLOW_ROWS,
-  unitsQuestionText,
 } from "../wording";
 
 const row = (overrides: Partial<ImportedRow> = {}): ImportedRow => ({
@@ -130,8 +131,7 @@ describe("import wording", () => {
       missingItemColumn: false,
       noQuantityColumn: false,
       quantityFromTotals: false,
-      doubtfulQuantity: null,
-      unitsQuestion: null,
+      quantityQuestion: null,
       noYearColumn: false,
       doubtfulYears: [],
       withoutCost: 0,
@@ -154,9 +154,6 @@ describe("import wording", () => {
     expect(previewHints({ ...base, noYearColumn: true })).toEqual([
       "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above.",
     ]);
-    expect(previewHints({ ...base, doubtfulQuantity: { column: 0, heading: "#" } })).toEqual([
-      'We used column A, "#", as the quantity. If it numbers the rows or apartments instead, set it to Ignore.',
-    ]);
   });
 
   it("names year columns that could mean something else", () => {
@@ -174,15 +171,32 @@ describe("import wording", () => {
   it("asks what a Units column with one number is, and holds the no-quantity hint until it's answered", () => {
     const sheet = "Item,Units,Year installed,Cost\nWater heater,12,2016,1400\nFridge,12,2018,900";
     const asked = preview(sheet);
-    if (!asked.unitsQuestion) throw new Error("No units question");
-    expect(asked.unitsQuestion).toEqual({ column: 1, heading: "Units", value: "12", answer: null });
-    expect(unitsQuestionText(asked.unitsQuestion)).toBe('Column B, "Units", says 12 on every row. What is it?');
+    if (!asked.quantityQuestion) throw new Error("No quantity question");
+    expect(asked.quantityQuestion).toEqual({ column: 1, heading: "Units", kind: "same", values: ["12"], answer: null });
+    expect(quantityQuestionText(asked.quantityQuestion)).toBe('Column B, "Units", says 12 on every row. What is it?');
+    expect(quantityAnswers(asked.quantityQuestion)).toEqual([
+      ["quantity", "How many of each item there are"],
+      ["each_one", "The number of units in the building, so each row counts as one"],
+    ]);
     expect(previewHints(asked)).toEqual([]);
-    expect(previewHints(preview(sheet, { unitsAnswered: true }))).toEqual([
+    expect(previewHints(preview(sheet, { quantityAnswered: true }))).toEqual([
       "There's no quantity column, so each row counts as one, and identical rows are added up.",
     ]);
-    // Answered as the quantity: no hint about a doubtful quantity column either.
-    expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], unitsAnswered: true }))).toEqual([]);
+    // Answered as the quantity: no hint about the quantity at all.
+    expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true }))).toEqual([]);
+  });
+
+  it("asks what a # column's numbers are, naming a few of them", () => {
+    const asked = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n4,Stove,2015\n7,Dishwasher,2019");
+    if (!asked.quantityQuestion) throw new Error("No quantity question");
+    expect(quantityQuestionText(asked.quantityQuestion)).toBe('Column A, "#", has numbers like 4, 101 and 7. What are they?');
+    expect(quantityAnswers(asked.quantityQuestion)[1]).toEqual(["each_one", "Row or apartment numbers, so each row counts as one"]);
+    expect(quantityQuestionText({ column: 0, heading: "No.", kind: "numbers", values: ["5"] })).toBe(
+      'Column A, "No.", has the number 5. What is it?',
+    );
+    expect(quantityQuestionText({ column: 1, heading: "# of units", kind: "same", values: ["1,200"] })).toBe(
+      'Column B, "# of units", says 1,200 on every row. What is it?',
+    );
   });
 
   it("warns before a list gets long enough to slow the calculator", () => {

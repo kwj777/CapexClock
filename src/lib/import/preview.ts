@@ -6,15 +6,15 @@ import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
   columnValues,
   componentSlug,
-  doubtfulQuantityColumn,
   doubtfulYearColumns,
   headings,
   headingSaysSqFt,
   headingTiming,
-  sameUnitsColumn,
+  quantityQuestionColumn,
   type ColumnRole,
   type FieldKind,
   type Layout,
+  type QuantityDoubt,
 } from "./columns";
 import { nameKey, type NameMatcher } from "./names";
 import { cellText, clip, columnLetter, isBlankRow, listText, quote, type Cell, type Grid } from "./text";
@@ -110,13 +110,12 @@ export interface Preview {
   noQuantityColumn: boolean;
   /** With no quantity column, a total and a cost each give each row's quantity. */
   quantityFromTotals: boolean;
-  /** The quantity comes from a column whose heading only might mean one ("#", "No.", "Units"). */
-  doubtfulQuantity: { column: number; heading: string } | null;
   /**
-   * A "Units" column with the same number on every row: how many of each item, or
-   * the building's unit count? Null for the answer until the owner says.
+   * A column that may or may not be the quantity ("#", "No.", "Units", or one number
+   * on every row): is it how many of each item, or something else, so each row
+   * counts as one? Null for the answer until the owner says.
    */
-  unitsQuestion: { column: number; heading: string; value: string; answer: "quantity" | "building" | null } | null;
+  quantityQuestion: QuantityQuestion | null;
   /** No column gives install years (or ages, years left or replace-by years), so each row uses the year built. */
   noYearColumn: boolean;
   /** Year columns whose headings could mean something else, like "Date" or "Replacement year". */
@@ -124,6 +123,12 @@ export interface Preview {
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
   counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
+}
+
+export interface QuantityQuestion extends QuantityDoubt {
+  heading: string;
+  /** "each_one": it's the unit count or row numbers, so each row counts as one. */
+  answer: "quantity" | "each_one" | null;
 }
 
 /** The answer that keeps a name as the owner's own item. */
@@ -138,8 +143,11 @@ export interface ImportChoices {
   answers: Readonly<Record<string, string>>;
   /** What the owner typed to fix a record, by record key. */
   fixes: Readonly<Record<string, Partial<Record<FixField, string>>>>;
-  /** The owner answered what a "Units" column with the same number on every row is. */
-  unitsAnswered: boolean;
+  /**
+   * The owner answered the quantity question. The answer is the column's role:
+   * Quantity, or Ignore for "each row counts as one".
+   */
+  quantityAnswered: boolean;
 }
 
 export interface Sheet {
@@ -205,6 +213,12 @@ interface Record_ {
   details: string[];
   /** The quantity, when it's a number, so merged rows can add up. */
   quantity: number | null;
+  /**
+   * The row's quantity was guessed and the owner should say: it waits on the quantity
+   * question, or its cost is per sq ft with no square feet. The issue is added when
+   * rows are merged, so it can say the quantity the merged row is added with.
+   */
+  quantityWaits: "question" | "sq_ft" | null;
 }
 
 interface Context {
@@ -212,8 +226,8 @@ interface Context {
   match: NameMatcher;
   choices: ImportChoices;
   currentYear: number;
-  /** A "Units" column the owner hasn't said is the quantity or not, so rows counted as one ask. */
-  unitsPending: number | null;
+  /** The column of a quantity question the owner hasn't answered, so rows it changes wait. */
+  quantityPending: number | null;
   /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
   quantityInSqFt: boolean;
   costInSqFt: boolean;
@@ -342,6 +356,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     lifeIsTypical: false,
     details: [],
     quantity: 1,
+    quantityWaits: null,
   };
 
   if (isTotalRow(row, cellText(cell("item")))) return "total";
@@ -437,6 +452,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
 
   // Cost each, or a total divided by the quantity.
   const totalCell = cell("total");
+  let fromTotal = false;
   if (costFix !== undefined || cellText(costCell) !== "") {
     const c = readMoney(costCell);
     if (c.problem) {
@@ -446,7 +462,9 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       if (c.value !== null) record.row.costEach = numberText(c.value);
       if (c.note) record.changes.push(c.note);
       const t = cellText(totalCell) !== "" ? readMoney(totalCell) : null;
-      if (c.value !== null && !c.range && t?.value != null && !t.problem) checkTotal(record, c.value, t.value, quantityGiven);
+      if (c.value !== null && !c.range && t?.value != null && !t.problem) {
+        fromTotal = checkTotal(record, c.value, t.value, quantityGiven);
+      }
     }
   } else if (cellText(totalCell) !== "") {
     const t = readMoney(totalCell);
@@ -471,16 +489,13 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     }
   }
 
-  // Nothing gave a quantity, so the row counts as one.
-  if (!quantityGiven && record.quantity === 1) {
-    if (costPerSqFt) {
-      record.issues.push({ field: "quantity", text: "The cost is per sq ft. Type the square feet." });
-    } else if (ctx.unitsPending !== null) {
-      record.issues.push({
-        field: "quantity",
-        text: `Answer the question about column ${columnLetter(ctx.unitsPending)} above, or type the quantity. If you don't, it's added as 1.`,
-      });
-    }
+  if (!quantityGiven && record.quantity === 1 && costPerSqFt) {
+    // Nothing gave the square feet, so the row counts as 1 sq ft.
+    record.quantityWaits = "sq_ft";
+  } else if (ctx.quantityPending !== null && quantityFix === undefined && !fromTotal) {
+    // The answer changes this row only if the column says something other than 1.
+    const asked = readQuantity(row[ctx.quantityPending]).value;
+    if (asked !== null && asked !== 1) record.quantityWaits = "question";
   }
 
   const condition = readCondition(cell("condition"));
@@ -503,12 +518,12 @@ function sameAmount(a: number, b: number): boolean {
 /**
  * Checks a row's total against its quantity and cost each. With no quantity on the
  * sheet, the total says how many there are; a total that disagrees with a quantity
- * the sheet does give needs the owner.
+ * the sheet does give needs the owner. True when the quantity came from the total.
  */
-function checkTotal(record: Record_, each: number, total: number, quantityGiven: boolean) {
+function checkTotal(record: Record_, each: number, total: number, quantityGiven: boolean): boolean {
   const quantity = record.quantity;
-  if (quantity === null) return;
-  if (sameAmount(quantity * each, total)) return;
+  if (quantity === null) return false;
+  if (sameAmount(quantity * each, total)) return false;
   if (!quantityGiven && each > 0) {
     const worked = total / each;
     const whole = Math.round(worked);
@@ -518,14 +533,18 @@ function checkTotal(record: Record_, each: number, total: number, quantityGiven:
       const i = record.changes.indexOf(NO_QUANTITY);
       if (i >= 0) record.changes.splice(i, 1);
       record.changes.push(`Worked out the quantity, ${whole}, from the ${money(total)} total at ${money(each)} each`);
-      return;
+      return true;
     }
   }
   const sum = `${quantity.toLocaleString("en-US")} × ${money(each)}`;
   record.issues.push(
-    { field: "quantity", text: `The sheet's total, ${money(total)}, isn't ${sum}. Fix the quantity or the cost each, or ignore the Total column.` },
+    {
+      field: "quantity",
+      text: `The sheet's total, ${money(total)}, isn't ${sum}. Fix the quantity or the cost each, or ignore the Total column. If you don't, the total isn't used.`,
+    },
     { field: "costEach", text: `Leave this blank to keep ${money(each)}.` },
   );
+  return false;
 }
 
 /** Puts an install year reading into a record. Unsolved ones keep what the sheet says, so the form flags it. */
@@ -578,6 +597,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       lifeIsTypical: true,
       details: [],
       quantity: 1,
+      quantityWaits: null,
     };
     const fix = fixed(ctx, key, "installYear");
     if (fix === undefined && PRESENT.test(text)) {
@@ -660,8 +680,17 @@ function mergeKey(r: Record_): string {
   ]);
 }
 
+/** What a row whose quantity waits on the owner says, with the quantity it's added with. */
+function waitingText(waits: "question" | "sq_ft", quantity: string, questionColumn: number | null): string {
+  const n = Number(quantity);
+  const shown = Number.isFinite(n) ? n.toLocaleString("en-US") : quantity;
+  return waits === "sq_ft"
+    ? `The cost is per sq ft. Type the square feet. If you don't, it's added as ${shown} sq ft.`
+    : `Answer the question about column ${columnLetter(questionColumn ?? 0)} above, or type the quantity. If you don't, it's added as ${shown}.`;
+}
+
 /** Merges identical records into one row with a quantity. */
-function merge(records: Record_[], locationLabel: string): PreviewRow[] {
+function merge(records: Record_[], locationLabel: string, questionColumn: number | null): PreviewRow[] {
   const groups = new Map<string, Record_[]>();
   for (const r of records) {
     const key = mergeKey(r);
@@ -679,6 +708,11 @@ function merge(records: Record_[], locationLabel: string): PreviewRow[] {
         quantity = numberText(group.reduce((sum, r) => sum + (r.quantity ?? 0), 0));
       }
       changes.unshift(`Combined ${group.length} identical rows`);
+    }
+    for (const waits of ["sq_ft", "question"] as const) {
+      if (group.some((r) => r.quantityWaits === waits)) {
+        issues.push({ field: "quantity", text: waitingText(waits, quantity, questionColumn) });
+      }
     }
     const question = first.pending && first.asked ? first.asked : null;
     if (question) {
@@ -698,6 +732,24 @@ function merge(records: Record_[], locationLabel: string): PreviewRow[] {
       lifeIsTypical: first.lifeIsTypical,
     };
   });
+}
+
+/** A row names a library item a building has one of, like a roof or a boiler. */
+function namesBuildingWideItem(
+  { grid, headerRow }: Sheet,
+  columns: readonly ColumnRole[],
+  library: ReadonlyMap<string, LibraryComponent>,
+  match: NameMatcher,
+): boolean {
+  const itemColumn = columns.indexOf("item");
+  if (itemColumn < 0) return false;
+  for (let i = headerRow + 1; i < grid.length; i++) {
+    const text = cellText(grid[i]?.[itemColumn]);
+    if (text === "") continue;
+    const found = match(text);
+    if ((found.kind === "exact" || found.kind === "matched") && library.get(found.slug)?.unitLabel === "per_building") return true;
+  }
+  return false;
 }
 
 /** The last row with anything in it; blank rows after it aren't listed. */
@@ -725,14 +777,20 @@ export function buildPreview(
   const { grid, headerRow } = sheet;
   const heads = headings(grid, headerRow);
   const { columns, layout } = choices;
-  const units = layout === "rows" ? sameUnitsColumn(heads, columns, columnValues(grid, headerRow)) : null;
-  const unitsAnswer = !units ? null : columns[units.column] === "quantity" ? "quantity" : choices.unitsAnswered ? "building" : null;
+  const libraryBySlug = new Map(library.map((c) => [c.slug, c]));
+  const doubt =
+    layout === "rows"
+      ? quantityQuestionColumn(heads, columns, columnValues(grid, headerRow), () =>
+          namesBuildingWideItem(sheet, columns, libraryBySlug, match),
+        )
+      : null;
+  const quantityAnswer = !doubt || !choices.quantityAnswered ? null : columns[doubt.column] === "quantity" ? "quantity" : "each_one";
   const ctx: Context = {
-    library: new Map(library.map((c) => [c.slug, c])),
+    library: libraryBySlug,
     match,
     choices,
     currentYear,
-    unitsPending: units && unitsAnswer === null ? units.column : null,
+    quantityPending: doubt && quantityAnswer === null ? doubt.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
   };
@@ -778,7 +836,7 @@ export function buildPreview(
 
   const locationColumn = columns.indexOf("location");
   const label = locationColumn >= 0 ? clip(heads[locationColumn].replace(/[:#]+\s*$/, "").trim(), 30) || "Location" : "Location";
-  const rows = merge(records, label);
+  const rows = merge(records, label, ctx.quantityPending);
 
   const questions = new Map<string, NameQuestion>();
   for (const r of records) {
@@ -795,8 +853,6 @@ export function buildPreview(
       ? columns.some((role, c) => componentSlug(role) !== null && headingTiming(heads[c]) === "age")
       : used.has("age") || used.has("remaining") || used.has("replaceBy");
   const count = (status: RowStatus) => rows.filter((r) => r.status === status).length;
-  // The units question already says what a "Units" column is.
-  const doubtful = layout === "rows" && !units ? doubtfulQuantityColumn(heads, columns) : null;
   return {
     rows,
     skipped,
@@ -805,8 +861,7 @@ export function buildPreview(
     missingItemColumn: layout === "rows" && !used.has("item"),
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
     quantityFromTotals: layout === "rows" && !used.has("quantity") && used.has("total") && used.has("cost"),
-    doubtfulQuantity: doubtful === null ? null : { column: doubtful, heading: heads[doubtful] },
-    unitsQuestion: units && { column: units.column, heading: heads[units.column], value: units.value, answer: unitsAnswer },
+    quantityQuestion: doubt && { ...doubt, heading: heads[doubt.column], answer: quantityAnswer },
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,

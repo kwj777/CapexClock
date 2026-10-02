@@ -151,6 +151,14 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   ["quantity", ["qty", "sq", "ft"]],
   ["quantity", ["quantity", "sq", "ft"]],
   [null, ["sq", "ft"]],
+  // "Total units" and "Total qty" count items; "Total cost (all units)" is money.
+  ["total", ["total", "cost"]],
+  ["total", ["total", "price"]],
+  ["total", ["total", "$"]],
+  ["quantity", ["total", "units"]],
+  ["quantity", ["total", "qty"]],
+  ["quantity", ["total", "quantity"]],
+  ["quantity", ["total", "count"]],
   ["total", ["total"]],
   ["total", ["extended"]],
   ["total", ["ext", "cost"]],
@@ -276,8 +284,8 @@ const NUMBER_HEADINGS = new Set(["#", "no", "number", "num", "nbr"]);
 
 /**
  * A heading that might be a quantity but might not: "#" or "No." often numbers the
- * rows, and "Units" can be the building's unit count. These are used only when no
- * heading names a quantity, and only if the values look like counts.
+ * rows, and "Units" can be the building's unit count or the apartment numbers. The
+ * guesses leave these out, and the preview asks about them (see quantityQuestionColumn).
  */
 export function doubtfulQuantity(heading: string): "number" | "units" | null {
   const text = words(heading);
@@ -413,7 +421,7 @@ const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
  * ones, so "Year installed" wins over a bare "Date". A "#", "No." or "Units" column
- * is the quantity only when no heading names one and its values look like counts.
+ * is left out here, and the preview asks whether it's the quantity.
  * With no item column, a "System" column holds the item names. A "Replacement year"
  * column whose years have all gone by (before `currentYear`) is read as when each
  * item was last replaced.
@@ -456,17 +464,6 @@ export function guessColumns(
     return roles;
   }
 
-  if (!roles.includes("quantity")) {
-    const at = heads.findIndex((h, i) => {
-      const kind = doubtfulQuantity(h);
-      if (roles[i] !== "ignore" || kind === null) return false;
-      const cells = values(i);
-      if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || isCounting(cells)) return false;
-      // The same number on every row may be the building's unit count: the preview asks.
-      return kind === "number" || new Set(cells).size > 1;
-    });
-    if (at >= 0) roles[at] = "quantity";
-  }
   if (!roles.includes("item")) {
     const at = heads.findIndex(
       (h, i) => (roles[i] === "category" || roles[i] === "ignore") && guessField(h) === "category" && /\bsystems?\b/.test(words(h)),
@@ -486,29 +483,61 @@ export function guessColumns(
   return roles;
 }
 
-/** The quantity column, when its heading only might be one ("#", "No.", "Units"). */
-export function doubtfulQuantityColumn(heads: readonly string[], columns: readonly ColumnRole[]): number | null {
-  const at = columns.indexOf("quantity");
-  return at >= 0 && guessField(heads[at] ?? "") === null && doubtfulQuantity(heads[at] ?? "") !== null ? at : null;
+/** A column that may or may not be the quantity, for the preview to ask about once. */
+export interface QuantityDoubt {
+  column: number;
+  /**
+   * "same": one number on every row, which may be the building's unit count.
+   * "numbers": numbers that may count items, or number the rows or apartments.
+   */
+  kind: "same" | "numbers";
+  /** The number on every row, or the first few different ones. */
+  values: string[];
 }
 
+// Words in a quantity heading that say it counts apartments: "# of units", "Unit count".
+const UNIT_WORDS = new Set(["unit", "units", "apt", "apts", "apartment", "apartments", "door", "doors"]);
+
 /**
- * A "Units" column with the same number (not 1) on every row, when no other column
- * is the quantity. It could be how many of each item there are, or the building's
- * unit count, so the preview asks which.
+ * The column to ask about, if any, when no other column is the quantity:
+ * - "#", "No." or "Units" holding numbers that don't simply run 1, 2, 3 (or 101,
+ *   102, 103) down the sheet. They may be counts, or row or apartment numbers.
+ * - A quantity column with the same number (not 1) on every row, when its heading
+ *   says units ("# of units", "Unit count") or `buildingWide()` says a row is an
+ *   item a building has one of, like a roof. It may be the building's unit count.
+ * A column of 1s isn't asked about, since both answers give the same rows.
  */
-export function sameUnitsColumn(
+export function quantityQuestionColumn(
   heads: readonly string[],
   columns: readonly ColumnRole[],
   values: ColumnValues,
-): { column: number; value: string } | null {
-  const column = heads.findIndex(
-    (h, i) => doubtfulQuantity(h) === "units" && (columns[i] === "ignore" || columns[i] === "quantity"),
-  );
-  if (column < 0 || columns.some((r, i) => r === "quantity" && i !== column)) return null;
-  const cells = values(column);
-  if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || new Set(cells).size > 1) return null;
-  return Number(cells[0].replace(/,/g, "")) === 1 ? null : { column, value: cells[0] };
+  buildingWide: () => boolean,
+): QuantityDoubt | null {
+  const quantities = columns.flatMap((role, i) => (role === "quantity" ? [i] : []));
+  if (quantities.length > 1) return null;
+  const candidates =
+    quantities.length === 1
+      ? quantities
+      : heads.flatMap((h, i) =>
+          columns[i] === "ignore" && (doubtfulQuantity(h) !== null || guessField(h) === "quantity") ? [i] : [],
+        );
+  for (const column of candidates) {
+    const heading = heads[column] ?? "";
+    const cells = values(column);
+    if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v))) continue;
+    const numbers = cells.map((v) => Number(v.replace(/,/g, "")));
+    if (numbers.every((n) => n === 1)) continue;
+    const same = cells.length > 1 && numbers.every((n) => n === numbers[0]);
+    if (doubtfulQuantity(heading) !== null) {
+      if (isCounting(cells)) continue;
+      return same ? { column, kind: "same", values: [cells[0]] } : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
+    }
+    const saysUnits = words(heading)
+      .split(" ")
+      .some((w) => UNIT_WORDS.has(w));
+    if (same && (saysUnits || buildingWide())) return { column, kind: "same", values: [cells[0]] };
+  }
+  return null;
 }
 
 /** Install-year and replace-by columns whose headings could mean something else, for the preview to name. */

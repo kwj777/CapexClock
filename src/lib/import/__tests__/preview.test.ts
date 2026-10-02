@@ -319,22 +319,92 @@ describe("a sheet with numbered rows", () => {
       ["Gas furnace", "12"],
       ["Boiler", "1"],
     ]);
-    expect(p.doubtfulQuantity).toBeNull();
+    expect(p.quantityQuestion).toBeNull();
   });
 
   it("skips the total at the foot, even with a number in front of it", () => {
     expect(p.skipped).toEqual([{ sheetRow: 5, reason: "total" }]);
   });
 
-  it("uses # as the quantity when nothing else is, and says so", () => {
-    const sheet = ["#,Item,Year", "12,Fridge,2018", "1,Roof,2008", "24,Smoke detector,2020"].join("\n");
+  it("asks whether # is the quantity when nothing else is, and holds the rows it changes", () => {
+    const sheet = ["#,Item,Year", "12,Fridge,2018", "1,Boiler,2008", "24,Smoke detector,2020"].join("\n");
     const counts = preview(sheet);
-    expect(counts.rows.map((r) => r.row.quantity)).toEqual(["12", "1", "24"]);
-    expect(counts.doubtfulQuantity).toEqual({ column: 0, heading: "#" });
+    expect(counts.quantityQuestion).toEqual({ column: 0, heading: "#", kind: "numbers", values: ["12", "1", "24"], answer: null });
+    expect(counts.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+      ["1", "needs_you"],
+      // Both answers give this row 1, so it doesn't wait.
+      ["1", "ready"],
+      ["1", "needs_you"],
+    ]);
+    const answered = preview(sheet, { columns: ["quantity", "item", "installYear"], quantityAnswered: true });
+    expect(answered.quantityQuestion?.answer).toBe("quantity");
+    expect(answered.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
+      ["12", []],
+      ["1", []],
+      ["24", []],
+    ]);
     const numbered = preview(["#,Item,Year", "1,Fridge,2018", "2,Roof,2008", "3,Smoke detector,2020"].join("\n"));
     expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
     expect(numbered.noQuantityColumn).toBe(true);
-    expect(numbered.doubtfulQuantity).toBeNull();
+    expect(numbered.quantityQuestion).toBeNull();
+  });
+
+  describe("row and apartment numbers that don't simply run 1, 2, 3", () => {
+    const status = (p: Preview) => p.rows.map((r) => [r.row.name, r.row.quantity, r.status]);
+
+    it("doesn't take a numbering with a gap for quantities", () => {
+      const sheet = ["#,Item,Year installed,Cost each", "1,Tank water heater,2016,1400", "2,Gas furnace,2012,4200", "4,Boiler,2010,60000", "5,Refrigerator,2018,900"].join("\n");
+      const p = preview(sheet);
+      expect(p.quantityQuestion).toMatchObject({ column: 0, kind: "numbers", answer: null });
+      expect(status(p)).toEqual([
+        ["Tank water heater", "1", "ready"],
+        ["Gas furnace", "1", "needs_you"],
+        ["Boiler", "1", "needs_you"],
+        ["Refrigerator", "1", "needs_you"],
+      ]);
+      expect(p.counts).toMatchObject({ ready: 1, needsYou: 3 });
+      expect(byName(p, "Boiler").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column A above, or type the quantity. If you don't, it's added as 1." },
+      ]);
+      const numbers = preview(sheet, { quantityAnswered: true });
+      expect(numbers.quantityQuestion?.answer).toBe("each_one");
+      expect(numbers.rows.every((r) => r.issues.length === 0 && r.row.quantity === "1")).toBe(true);
+      expect(numbers.counts.needsYou).toBe(0);
+    });
+
+    it("doesn't take numbers sorted by another column for quantities", () => {
+      const p = preview(["No.,Item,Year installed", "3,Fridge,2012", "1,Range,2015", "2,Dishwasher,2019"].join("\n"));
+      expect(p.quantityQuestion).toMatchObject({ column: 0, heading: "No.", kind: "numbers" });
+      expect(status(p).map(([, quantity]) => quantity)).toEqual(["1", "1", "1"]);
+      expect(p.counts.needsYou).toBe(2);
+    });
+
+    it("doesn't take apartment numbers for quantities, or add them up", () => {
+      const sheet = ["#,Item,Year installed", "101,Water heater,2016", "102,Water heater,2016", "201,Water heater,2016"].join("\n");
+      const p = preview(sheet);
+      expect(status(p)).toEqual([["Tank water heater", "3", "needs_you"]]);
+      expect(byName(p, "Tank water heater").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column A above, or type the quantity. If you don't, it's added as 3." },
+      ]);
+      // Taken as counts only once the owner says so.
+      const counts = preview(sheet, { columns: ["quantity", "item", "installYear"], quantityAnswered: true });
+      expect(status(counts)).toEqual([["Tank water heater", "404", "changed"]]);
+    });
+
+    it("asks about a sheet of two rows", () => {
+      const p = preview(["#,Item,Year installed", "1,Fridge,2012", "2,Range,2015"].join("\n"));
+      expect(p.quantityQuestion).toMatchObject({ kind: "numbers", values: ["1", "2"] });
+      expect(status(p)).toEqual([
+        ["Refrigerator", "1", "changed"],
+        ["Range / oven", "1", "needs_you"],
+      ]);
+    });
+
+    it("lets a typed quantity stand without the answer", () => {
+      const p = preview(["#,Item,Year installed", "4,Fridge,2012", "9,Range,2015"].join("\n"), { fixes: { r1: { quantity: "12" } } });
+      expect(byName(p, "Refrigerator")).toMatchObject({ issues: [], row: { quantity: "12" } });
+      expect(byName(p, "Range / oven").status).toBe("needs_you");
+    });
   });
 });
 
@@ -431,7 +501,10 @@ describe("a total that disagrees with the quantity and cost each", () => {
     const heater = byName(p, "Tank water heater");
     expect(heater.status).toBe("needs_you");
     expect(heater.issues).toEqual([
-      { field: "quantity", text: "The sheet's total, $16,800, isn't 1 × $1,400. Fix the quantity or the cost each, or ignore the Total column." },
+      {
+        field: "quantity",
+        text: "The sheet's total, $16,800, isn't 1 × $1,400. Fix the quantity or the cost each, or ignore the Total column. If you don't, the total isn't used.",
+      },
       { field: "costEach", text: "Leave this blank to keep $1,400." },
     ]);
     // Rounding is fine.
@@ -445,7 +518,7 @@ describe("a total that disagrees with the quantity and cost each", () => {
     const p = preview(["Item,Cost,Total", "Fridge,1100,2000"].join("\n"));
     expect(byName(p, "Refrigerator").issues[0]).toEqual({
       field: "quantity",
-      text: "The sheet's total, $2,000, isn't 1 × $1,100. Fix the quantity or the cost each, or ignore the Total column.",
+      text: "The sheet's total, $2,000, isn't 1 × $1,100. Fix the quantity or the cost each, or ignore the Total column. If you don't, the total isn't used.",
     });
   });
 
@@ -588,7 +661,13 @@ describe("items the library counts in square feet", () => {
     const p = preview(["Item,Cost", "Carpet,$4/sf"].join("\n"));
     const carpet = byName(p, "Carpet");
     expect(carpet.status).toBe("needs_you");
-    expect(carpet.issues).toEqual([{ field: "quantity", text: "The cost is per sq ft. Type the square feet." }]);
+    expect(carpet.issues).toEqual([
+      { field: "quantity", text: "The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft." },
+    ]);
+    // Two rows like it, combined, are added as 2 sq ft.
+    expect(byName(preview(["Item,Cost", "Carpet,$4/sf", "Carpet,$4/sf"].join("\n")), "Carpet").issues).toEqual([
+      { field: "quantity", text: "The cost is per sq ft. Type the square feet. If you don't, it's added as 2 sq ft." },
+    ]);
     const fixed = byName(preview(["Item,Cost", "Carpet,$4/sf"].join("\n"), { fixes: { r1: { quantity: "900 sq ft" } } }), "Carpet");
     expect(fixed.issues).toEqual([]);
     expect(fixed.row).toMatchObject({ quantity: "900", unitLabel: "per_sq_ft" });
@@ -625,7 +704,7 @@ describe("a Units column with the same number on every row", () => {
   it("asks once whether it's the quantity, and holds the rows until it's answered", () => {
     const p = preview(sheet);
     expect(open(sheet).columns).toEqual(["item", "ignore", "installYear", "cost"]);
-    expect(p.unitsQuestion).toEqual({ column: 1, heading: "Units", value: "12", answer: null });
+    expect(p.quantityQuestion).toEqual({ column: 1, heading: "Units", kind: "same", values: ["12"], answer: null });
     expect(p.rows.map((r) => [r.row.quantity, r.status])).toEqual([
       ["1", "needs_you"],
       ["1", "needs_you"],
@@ -637,19 +716,18 @@ describe("a Units column with the same number on every row", () => {
   });
 
   it("uses it as the quantity when the owner says so", () => {
-    const p = preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], unitsAnswered: true });
-    expect(p.unitsQuestion?.answer).toBe("quantity");
+    const p = preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true });
+    expect(p.quantityQuestion?.answer).toBe("quantity");
     expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
       ["12", []],
       ["12", []],
       ["12", []],
     ]);
-    expect(p.doubtfulQuantity).toBeNull();
   });
 
   it("counts each row as one when it's the building's unit count", () => {
-    const p = preview(sheet, { unitsAnswered: true });
-    expect(p.unitsQuestion?.answer).toBe("building");
+    const p = preview(sheet, { quantityAnswered: true });
+    expect(p.quantityQuestion?.answer).toBe("each_one");
     expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
       ["1", []],
       ["1", []],
@@ -661,13 +739,47 @@ describe("a Units column with the same number on every row", () => {
     const typed = preview(sheet, { fixes: { r2: { quantity: "12" } } });
     expect(byName(typed, "Refrigerator")).toMatchObject({ issues: [], row: { quantity: "12" } });
     const totals = preview(["Item,Units,Unit cost,Total", "Water heater,12,1400,16800"].join("\n"));
-    expect(totals.unitsQuestion).not.toBeNull();
+    expect(totals.quantityQuestion).not.toBeNull();
     expect(byName(totals, "Tank water heater")).toMatchObject({ issues: [], row: { quantity: "12" } });
   });
 
   it("isn't asked when it says 1, or when another column is the quantity", () => {
-    expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).unitsQuestion).toBeNull();
-    expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).unitsQuestion).toBeNull();
-    expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).unitsQuestion).toBeNull();
+    expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).quantityQuestion).toBeNull();
+    expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).quantityQuestion).toBeNull();
+    expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).quantityQuestion).toBeNull();
+  });
+
+  it("asks the same about a quantity heading that says units, like \"# of units\"", () => {
+    for (const heading of ["# of units", "Unit count", "No. of units", "Total units"]) {
+      const units = preview([`Item,${heading},Year installed,Cost each`, "Asphalt shingle roof,12,2008,38000", "Boiler,12,2010,60000"].join("\n"));
+      expect(units.quantityQuestion).toMatchObject({ column: 1, kind: "same", values: ["12"], answer: null });
+      expect(units.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+        ["12", "needs_you"],
+        ["12", "needs_you"],
+      ]);
+      expect(byName(units, "Boiler").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column B above, or type the quantity. If you don't, it's added as 12." },
+      ]);
+      // The building's unit count: each row counts as one.
+      const each = preview([`Item,${heading},Year installed,Cost each`, "Asphalt shingle roof,12,2008,38000", "Boiler,12,2010,60000"].join("\n"), {
+        columns: ["item", "ignore", "installYear", "cost"],
+        quantityAnswered: true,
+      });
+      expect(each.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
+        ["1", []],
+        ["1", []],
+      ]);
+    }
+  });
+
+  it("asks about a Qty column with one number on every row only when a row is something a building has one of", () => {
+    const roof = preview(["Item,Qty,Year installed", "Asphalt shingle roof,12,2008", "Refrigerator,12,2018"].join("\n"));
+    expect(roof.quantityQuestion).toMatchObject({ column: 1, kind: "same" });
+    const appliances = preview(["Item,Qty,Year installed", "Dishwasher,12,2015", "Refrigerator,12,2018"].join("\n"));
+    expect(appliances.quantityQuestion).toBeNull();
+    expect(appliances.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+      ["12", "ready"],
+      ["12", "ready"],
+    ]);
   });
 });
