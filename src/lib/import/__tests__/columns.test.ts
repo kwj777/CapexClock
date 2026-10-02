@@ -135,11 +135,35 @@ describe("guessing a column from its heading", () => {
     ["Cost/SF", "cost"],
     ["Qty (sq ft)", "quantity"],
     ["Quantity, sq ft", "quantity"],
-    ["Sq ft", null],
+    // An item's area in square feet; an apartment's or the building's size isn't read.
+    ["Sq ft", "area"],
+    ["SF", "area"],
+    ["Area (SF)", "area"],
+    ["Area (ft²)", "area"],
+    ["Square footage", "area"],
+    ["Total sq ft", "area"],
+    ["Roof area, sq ft", "area"],
     ["Apartment sq ft", null],
-    ["Total sq ft", null],
+    ["Unit SF", null],
+    ["Bldg sq ft", null],
+    ["Rentable SF", null],
+    ["Rent per sq ft", null],
+    ["Unit cost per SF", "cost"],
+    ["Qty SF", "quantity"],
+    ["$ psf", "cost"],
   ])("reads %p as %p", (heading, field) => {
     expect(guessField(heading)).toBe(field);
+  });
+
+  it("reads a bare Area column of numbers as square feet, and one of places as nothing", () => {
+    const sheet = (values: string[]) => {
+      const grid = [["Item", "Area", "Cost"], ...values.map((v) => ["Carpet", v, "4"])];
+      return guessColumns(headings(grid, 0), match, "rows", columnValues(grid, 0))[1];
+    };
+    expect(sheet(["9600", "1,200"])).toBe("area");
+    expect(sheet(["9,600 sf"])).toBe("area");
+    expect(sheet(["Basement", "Unit 3"])).toBe("ignore");
+    expect(sheet([])).toBe("ignore");
   });
 
   it("knows a heading in square feet", () => {

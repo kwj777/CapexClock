@@ -5,6 +5,7 @@ import { cellText, isBlankRow, words, type Grid } from "./text";
 export type FieldKind =
   | "item"
   | "quantity"
+  | "area"
   | "location"
   | "installYear"
   | "age"
@@ -30,6 +31,7 @@ export type Layout = "rows" | "columns";
 export const FIELD_TEXT: Record<FieldKind, string> = {
   item: "Item name",
   quantity: "Quantity",
+  area: "Square feet",
   location: "Apartment or location",
   installYear: "Install year",
   age: "Age in years",
@@ -128,11 +130,35 @@ const EXACT_STRENGTH = new Map<string, Strength>([
   ["when", "doubtful"],
 ]);
 
+// Words that make a heading in square feet a cost or a count, not an area: "Cost/SF", "Qty SF".
+const MONEY_OR_COUNT = new Set(["cost", "price", "$", "budget", "amount", "value", "qty", "quantity", "count"]);
+// Words that make it the size of an apartment or the building: "Unit SF", "Bldg sq ft".
+const PLACE_WORDS = new Set(
+  "apartment apartments apt apts unit units building bldg rentable leasable living gross suite property house home".split(" "),
+);
+
+/** The heading says square feet: "Sq ft", "SF", "Square footage", "ft²". */
+function inSquareFeet(have: readonly string[]): boolean {
+  const has = (w: string) => have.includes(w);
+  return (
+    ((has("sq") || has("square") || has("area")) && (has("ft") || has("feet") || has("foot") || has("footage"))) ||
+    has("sf") ||
+    has("sqft") ||
+    has("ft2")
+  );
+}
+
+/** An area in square feet, not a cost or a count in them. */
+function areaWords(have: readonly string[]): boolean {
+  return inSquareFeet(have) && !have.some((w) => MONEY_OR_COUNT.has(w));
+}
+
 /**
- * Keyword rules, in order: the first one whose words are all in the heading wins.
- * Null rules come first: tenant details and the year built are never read.
+ * Keyword rules, in order: the first one whose words are all in the heading wins
+ * (or, for a test, that passes it). Null rules come first: tenant details and the
+ * year built are never read.
  */
-const RULES: [FieldKind | null, string[], Strength?][] = [
+const RULES: [FieldKind | null, string[] | ((have: readonly string[]) => boolean), Strength?][] = [
   [null, ["tenant"]],
   [null, ["tenants"]],
   [null, ["resident"]],
@@ -144,13 +170,15 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   [null, ["move"]],
   [null, ["built"]],
   [null, ["warranty"]],
-  // An apartment's or the building's size isn't read, but a cost or quantity in square feet is.
+  // A cost or quantity in square feet is read, and so is an item's area ("Area (SF)"),
+  // but not an apartment's or the building's size.
   ["cost", ["cost", "sq", "ft"]],
   ["cost", ["$", "sq", "ft"]],
   ["cost", ["price", "sq", "ft"]],
   ["quantity", ["qty", "sq", "ft"]],
   ["quantity", ["quantity", "sq", "ft"]],
-  [null, ["sq", "ft"]],
+  [null, (have) => areaWords(have) && have.some((w) => PLACE_WORDS.has(w))],
+  ["area", areaWords],
   // "Total units" and "Total qty" count items; "Total cost (all units)" is money.
   ["total", ["total", "cost"]],
   ["total", ["total", "price"]],
@@ -265,9 +293,10 @@ export function guessHeading(heading: string): { field: FieldKind | null; streng
   if (exact !== undefined) return { field: exact, strength: EXACT_STRENGTH.get(text) ?? "sure" };
   const have = text.split(" ");
   for (const [field, needed, strength = "sure"] of RULES) {
-    if (!needed.every((w) => have.includes(w))) continue;
+    if (typeof needed === "function" ? !needed(have) : !needed.every((w) => have.includes(w))) continue;
     // "Service" in "Years in service" is the rule's own word; in "Service date" it isn't.
-    const event = have.some((w) => EVENT_WORDS.has(w) && !needed.includes(w));
+    const own = typeof needed === "function" ? [] : needed;
+    const event = have.some((w) => EVENT_WORDS.has(w) && !own.includes(w));
     if (field !== null && EVENT_BLOCKS.has(field) && event) return { field: null, strength: "sure" };
     return { field, strength };
   }
@@ -474,6 +503,11 @@ export function yearsHavePassed(values: readonly string[], currentYear: number):
 /** Numbers only, like "12" or "1,200". */
 const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
 
+/** Every filled cell is a number, perhaps in square feet ("9,600 sf"), and there's at least one. */
+function isAreaColumn(values: readonly string[]): boolean {
+  return values.length > 0 && values.every((v) => /^\d[\d,]*(?:\.\d+)?\s*(?:sq\.?\s*ft\.?|sf|sqft|square\s+f(?:ee|oo)t)?$/i.test(v));
+}
+
 /**
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
@@ -522,6 +556,11 @@ export function guessColumns(
     return roles;
   }
 
+  // A bare "Area" of numbers is square feet; one of words ("Basement") isn't read.
+  if (!roles.includes("area")) {
+    const at = heads.findIndex((h, i) => roles[i] === "ignore" && words(h) === "area" && isAreaColumn(values(i)));
+    if (at >= 0) roles[at] = "area";
+  }
   if (!roles.includes("item")) {
     const at = heads.findIndex(
       (h, i) => (roles[i] === "category" || roles[i] === "ignore") && guessField(h) === "category" && /\bsystems?\b/.test(words(h)),

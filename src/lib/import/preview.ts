@@ -423,6 +423,15 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   const costFix = fixed(ctx, key, "costEach");
   const costCell = costFix ?? cell("cost");
   const costPerSqFt = saysPerSqFt(costCell) || ctx.costInSqFt;
+  if (quantityFix === undefined && !squareFeet) {
+    const area = readArea(ctx, record, cell("area"), {
+      costPerSqFt,
+      quantityGiven,
+      cost: cellText(costCell),
+      costFixed: costFix !== undefined,
+    });
+    if (area !== null) [quantityGiven, squareFeet] = [true, true];
+  }
   if (squareFeet || costPerSqFt) {
     if (squareFeet && record.row.librarySlug && record.row.unitLabel !== "per_sq_ft") {
       record.changes.push("Counted in square feet, as the sheet does");
@@ -515,6 +524,54 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     if (text !== "") record.details.push(text);
   }
   return record;
+}
+
+/**
+ * A Square feet column ("Sq ft", "Area (SF)"). It's the quantity when the cost is per
+ * sq ft, or when there's no cost and the library prices the item per sq ft. When the
+ * library prices it per sq ft but the cost doesn't say, the owner says which it is.
+ * Otherwise it goes in the notes. Returns the square feet when they're the quantity.
+ */
+function readArea(
+  ctx: Context,
+  record: Record_,
+  areaCell: Cell,
+  { costPerSqFt, quantityGiven, cost, costFixed }: { costPerSqFt: boolean; quantityGiven: boolean; cost: string; costFixed: boolean },
+): number | null {
+  const text = cellText(areaCell);
+  if (text === "") return null;
+  const area = readQuantity(areaCell);
+  if (area.value === 0) return null;
+  const column = columnLetter(ctx.choices.columns.indexOf("area"));
+  const shown = area.value === null ? quote(text) : `${area.value.toLocaleString("en-US")} sq ft`;
+  const pricedPerSqFt = record.row.unitLabel === "per_sq_ft";
+  if (costPerSqFt || (pricedPerSqFt && !quantityGiven && cost === "")) {
+    if (area.value === null) {
+      record.issues.push({ field: "quantity", text: `Column ${column} says ${quote(text)}. Type the square feet.` });
+      record.row.quantity = text;
+      record.quantity = null;
+      return null;
+    }
+    const was = record.quantity !== null && quantityGiven ? `, not the quantity ${record.row.quantity}` : "";
+    const why = costPerSqFt ? "the cost is per sq ft" : `${record.row.name} is priced per sq ft`;
+    const i = record.changes.indexOf(NO_QUANTITY);
+    if (i >= 0) record.changes.splice(i, 1);
+    record.changes.push(`Used the ${shown} in column ${column} as the quantity${was}, since ${why}`);
+    record.quantity = area.value;
+    record.row.quantity = numberText(area.value);
+    return area.value;
+  }
+  record.details.push(`Area: ${area.value === null ? text : shown}`);
+  // A cost that can't be read already needs the owner, and says so.
+  const each = readMoney(cost).value;
+  if (pricedPerSqFt && !quantityGiven && !costFixed && area.value !== null && each !== null) {
+    const plain = numberText(each);
+    record.issues.push({
+      field: "costEach",
+      text: `Column ${column} says ${shown}. If ${money(each)} is per sq ft, type "${plain}/sq ft" here. If it's for the whole area, type ${plain}. If you don't, the square feet aren't used.`,
+    });
+  }
+  return null;
 }
 
 /** Two amounts agree, give or take rounding. */

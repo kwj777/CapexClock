@@ -696,6 +696,64 @@ describe("service, inspection and replacement dates", () => {
   });
 });
 
+describe("a Square feet column", () => {
+  it("asks whether the cost is per sq ft when the library prices the item that way and the sheet doesn't say", () => {
+    const sheet = ["Item,Area (SF),Unit cost", "Carpet,9600,$4"].join("\n");
+    expect(open(sheet).columns).toEqual(["item", "area", "cost"]);
+    const carpet = byName(preview(sheet), "Carpet");
+    expect(carpet.status).toBe("needs_you");
+    expect(carpet.issues).toEqual([
+      {
+        field: "costEach",
+        text: 'Column B says 9,600 sq ft. If $4 is per sq ft, type "4/sq ft" here. If it\'s for the whole area, type 4. If you don\'t, the square feet aren\'t used.',
+      },
+    ]);
+    expect(carpet.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "4", notes: "Area: 9,600 sq ft" });
+    // Per sq ft: the square feet are the quantity.
+    const perSqFt = byName(preview(sheet, { fixes: { r1: { costEach: "4/sq ft" } } }), "Carpet");
+    expect(perSqFt.issues).toEqual([]);
+    expect(perSqFt.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft", costEach: "4" });
+    // For the whole area: one, at that cost.
+    const whole = byName(preview(sheet, { fixes: { r1: { costEach: "38400" } } }), "Carpet");
+    expect(whole.issues).toEqual([]);
+    expect(whole.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "38400", notes: "Area: 9,600 sq ft" });
+  });
+
+  it("uses the square feet as the quantity when the cost is per sq ft", () => {
+    const heading = byName(preview(["Item,SF,Cost per sq ft", "Carpet,9600,4"].join("\n")), "Carpet");
+    expect(heading.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft", costEach: "4", notes: "" });
+    expect(heading.changes).toContain("Used the 9,600 sq ft in column B as the quantity, since the cost is per sq ft");
+    expect(heading.issues).toEqual([]);
+    const cell = byName(preview(["Item,Sq ft,Cost", "Hallway tile,800,$9/sf"].join("\n")), "Hallway tile");
+    expect(cell.row).toMatchObject({ quantity: "800", unitLabel: "per_sq_ft", costEach: "9" });
+    // A quantity that's a count gives way, and the row says so.
+    const counted = byName(preview(["Item,Qty,Sq ft,Cost per sq ft", "Carpet,12,9600,4"].join("\n")), "Carpet");
+    expect(counted.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft" });
+    expect(counted.changes).toContain("Used the 9,600 sq ft in column C as the quantity, not the quantity 12, since the cost is per sq ft");
+  });
+
+  it("uses the square feet for an item priced per sq ft with no cost yet", () => {
+    const lot = byName(preview(["Item,Sq ft,Year", "Parking lot resurface,20000,2010"].join("\n")), "Parking lot resurface");
+    expect(lot.row).toMatchObject({ quantity: "20000", unitLabel: "per_sq_ft", costEach: "" });
+    expect(lot.changes).toContain("Used the 20,000 sq ft in column B as the quantity, since Parking lot resurface is priced per sq ft");
+  });
+
+  it("keeps an area in the notes when the cost is for the whole item", () => {
+    const p = preview(["Item,Qty,Sq ft,Cost", "Asphalt shingle roof,1,8000,\"$45,000\"", "Carpet,12,9600,\"$2,500\""].join("\n"));
+    const roof = byName(p, "Asphalt shingle roof");
+    expect(roof.status).toBe("ready");
+    expect(roof.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "45000", notes: "Area: 8,000 sq ft" });
+    const carpet = byName(p, "Carpet");
+    expect(carpet.issues).toEqual([]);
+    expect(carpet.row).toMatchObject({ quantity: "12", unitLabel: "per_building", notes: "Area: 9,600 sq ft" });
+  });
+
+  it("asks for the square feet when the cost is per sq ft and the area can't be read", () => {
+    const carpet = byName(preview(["Item,Sq ft,Cost", "Carpet,lots,$4/sf"].join("\n")), "Carpet");
+    expect(carpet.issues).toEqual([{ field: "quantity", text: 'Column B says "lots". Type the square feet.' }]);
+  });
+});
+
 describe("items the library counts in square feet", () => {
   it("keeps a count as a count, priced each, and says so", () => {
     const p = preview(["Item,Qty,Year,Cost each", "Carpet,12,2020,2500", "Parking lot resurface,1,2010,60000"].join("\n"));
