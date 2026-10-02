@@ -223,7 +223,7 @@ function FixForm({
           <div key={field} className="mt-2 first:mt-0">
             <label htmlFor={inputId} className="text-xs font-medium text-slate-700 dark:text-slate-300">
               {FIX_LABEL[field]}
-              <span className="sr-only">, {label}</span>
+              <span className="sr-only"> for {label}</span>
             </label>
             <input
               id={inputId}
