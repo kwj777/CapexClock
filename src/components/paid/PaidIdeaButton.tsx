@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { NOT_BUILT_TEXT, offerForIdea, PAID_IDEA_TEXT, type PaidIdea } from "@/lib/paid-ideas";
+import { track } from "@/lib/analytics";
+import {
+  NOT_BUILT_TEXT,
+  offerForIdea,
+  PAID_IDEA_TEXT,
+  paidIdeaEvent,
+  panelName,
+  PHOTO_OFFER,
+  photoOfferHref,
+  type PaidIdea,
+  type PaidWhere,
+} from "@/lib/paid-ideas";
+import { CONTACT_EMAIL } from "@/lib/site";
 import { usePaidIdeas } from "./PaidIdeas";
 import PresaleOffer from "./PresaleOffer";
 import TellMeFirstForm from "./TellMeFirstForm";
@@ -134,7 +146,6 @@ function PaidIdeaPanel({
   onClose: () => void;
 }) {
   const { where, ownerEmail, signedUp, markSignedUp, offerLinks } = usePaidIdeas();
-  const headingId = `${id}-heading`;
   const offer = offerForIdea(idea);
   const buyLink = offer && offerLinks[offer];
   // Signed up from this panel just now (not from another button for the same idea).
@@ -151,7 +162,8 @@ function PaidIdeaPanel({
     <section
       ref={panelRef}
       id={id}
-      aria-labelledby={headingId}
+      // Named after its idea, not just "Not built yet", so the panels can be told apart.
+      aria-label={panelName(idea)}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
@@ -159,7 +171,7 @@ function PaidIdeaPanel({
       className="ph-no-capture rounded-xl bg-amber-50 p-4 text-left text-slate-900 ring-1 ring-amber-200 sm:p-5 dark:bg-slate-900 dark:text-white dark:ring-amber-500/40"
     >
       <div className="flex items-start justify-between gap-3">
-        <p id={headingId} className="text-sm font-semibold">
+        <p className="text-sm font-semibold">
           {NOT_BUILT_TEXT}
         </p>
         <button
@@ -178,6 +190,7 @@ function PaidIdeaPanel({
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             {PAID_IDEA_TEXT[idea].pitch} Want to hear first if we build it?
           </p>
+          {idea === "photo" && <PhotoOffer where={where} />}
           {/* Always in the panel, so screen readers announce the message when it appears. */}
           <div role="status">
             {signedUp.has(idea) && (
@@ -204,5 +217,24 @@ function PaidIdeaPanel({
         </>
       )}
     </section>
+  );
+}
+
+/** The photo idea's free offer: rows filled in by hand from a photo emailed to us. */
+function PhotoOffer({ where }: { where: PaidWhere }) {
+  return (
+    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+      {PHOTO_OFFER.before}{" "}
+      <a
+        href={photoOfferHref(CONTACT_EMAIL)}
+        // Opens the mail app; the page stays, so the property editor needn't ask about unsaved edits.
+        data-keeps-edits
+        onClick={() => void track("photo_offer_clicked", paidIdeaEvent("photo", where))}
+        className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
+      >
+        {CONTACT_EMAIL}
+      </a>{" "}
+      {PHOTO_OFFER.after}
+    </p>
   );
 }

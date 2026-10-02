@@ -263,7 +263,7 @@ describe("buyNowClick", () => {
     });
   });
 
-  it("goes again without counting again after a cancelled 'leave page?' prompt", () => {
+  it("goes again without counting again after a canceled 'leave page?' prompt", () => {
     expect(buyNowClick({ ...click, counted: true })).toEqual({ step: "go", send: false });
   });
 
