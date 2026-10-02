@@ -22,7 +22,7 @@ export default async function PortfolioPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-8 sm:px-6">
-      <PortfolioHeader library={library} propertyIds={properties.map((p) => p.id)} />
+      <PortfolioHeader library={library} properties={properties.map(({ id, name }) => ({ id, name }))} />
 
       <ImportDraftPrompt />
 

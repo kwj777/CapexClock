@@ -219,4 +219,30 @@ describe("the building's details from the sheet", () => {
     const { fill } = sheetDetails({ unitCount: 1, yearBuilt: 1998 }, { unitCount: "", yearBuilt: "" });
     expect(fillText(fill)).toBe("Rental units and year built will come from the sheet: 1 unit and built 1998.");
   });
+
+  it("are named on the button, in the summary the live region reads, and in the done message", () => {
+    const units = { field: "unitCount", value: "14", current: "12" } as const;
+    const year = { field: "yearBuilt", value: "1998", current: "" } as const;
+    const counts = { rows: 2, ready: 2, changed: 0, needsYou: 0, skipped: 0, otherBuildings: 0 };
+    const list = [listRow("a"), listRow("b", { name: "Furnace" }), listRow("c", { name: "Carpet" })];
+    // A component list download: one row changed, one added, the unit count changed.
+    const plan = planImport([previewRow("a", sheetRow({ installYear: "2019" })), previewRow(null, sheetRow({ name: "Boiler" }))], list);
+    expect(applyLabel(plan, false, [units])).toBe("Update 1 row, add 1 and set rental units to 14");
+    expect(importSummary(counts, plan, false, [units])).toBe(
+      "2 rows: 1 to update and 1 to add. 2 ready. 2 rows in your list aren't in this file and will stay. Rental units will be set to 14.",
+    );
+    expect(doneText(plan, 0, [units])).toBe("Updated 1 row and added 1 from your spreadsheet. Rental units are now 14.");
+    // Both details, on a sheet without IDs.
+    const fresh = planImport([previewRow(null)], list);
+    expect(applyLabel(fresh, false, [units, year])).toBe("Add 1 row, set rental units to 14 and set year built to 1998");
+    expect(importSummary({ ...counts, rows: 1, ready: 1 }, fresh, false, [units, year])).toBe(
+      "1 row to add: 1 ready. Rental units will be set to 14 and year built to 1998.",
+    );
+    expect(doneText(fresh, 0, [units, year])).toBe("Added 1 row from your spreadsheet. Rental units are now 14 and year built is now 1998.");
+    // Only the details change.
+    const same = planImport([previewRow("a"), previewRow("b", sheetRow({ name: "Furnace" })), previewRow("c", sheetRow({ name: "Carpet" }))], list);
+    expect(applyLabel(same, false, [units])).toBe("Set rental units to 14");
+    expect(doneText(same, 0, [units])).toBe("Rental units are now 14.");
+    expect(doneText(same, 0)).toBe("Your list already matched the spreadsheet.");
+  });
 });

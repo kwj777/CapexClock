@@ -6,7 +6,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: "Do I have to use these exact columns?",
-    a: "No. The importer reads most landlord spreadsheets, with headings like Item, Qty, Year installed or Cost, and lets you check each guess before anything is added. A sheet in these columns imports without any questions.",
+    a: "No. The importer reads most landlord spreadsheets, with headings like Item, Qty, Year installed or Cost, and lets you check each guess before anything is added. A sheet in these columns needs no column changes. We may still ask which item a short name like Roof means.",
   },
   {
     q: "What if I don't know when something was installed?",

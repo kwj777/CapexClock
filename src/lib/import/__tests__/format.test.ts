@@ -1,5 +1,6 @@
 import { FIELD_TEXT, FIELDS } from "../columns";
 import { FORMAT_COLUMNS, FORMAT_HEADINGS, formatField, isCapexClockFormat, isForecastCsv } from "../format";
+import { match } from "../__fixtures__/sheets";
 
 describe("CapexClock's own columns", () => {
   it("are the plan's list, in order", () => {
@@ -37,6 +38,15 @@ describe("CapexClock's own columns", () => {
       expect(c.why).toMatch(/\.$/);
       expect(`${c.what} ${c.why}`).not.toMatch(/[–—]/);
     }
+  });
+
+  it("give example names the import knows, and say when it asks about a short one", () => {
+    const component = FORMAT_COLUMNS.find((c) => c.field === "item");
+    const named = component?.what.replace(/^What it is, like /, "").replace(/\.$/, "").split(/, | or /) ?? [];
+    expect(named).toEqual(["Asphalt shingle roof", "Water heater", "Furnace", "Refrigerator"]);
+    for (const name of named) expect(["exact", "matched"]).toContain(match(name).kind);
+    expect(match("Roof").kind).toBe("unsure");
+    expect(component?.why).toContain("For a short name like Roof, the import asks which kind.");
   });
 
   it("are known by headings no one else's sheet has, in any case", () => {

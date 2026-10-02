@@ -14,10 +14,11 @@ const PortfolioImport = dynamic(() => import("./PortfolioImport"), {
 /** My properties' heading, with Add a property and the spreadsheet import. */
 export default function PortfolioHeader({
   library,
-  propertyIds,
+  properties,
 }: {
   library: LibraryComponent[];
-  propertyIds: string[];
+  /** The account's properties, so the importer can tell which buildings are already here. */
+  properties: { id: string; name: string }[];
 }) {
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -51,7 +52,7 @@ export default function PortfolioHeader({
           </Link>
         </div>
       </div>
-      {open && <PortfolioImport id={panelId} library={library} propertyIds={propertyIds} onClose={close} />}
+      {open && <PortfolioImport id={panelId} library={library} existing={properties} onClose={close} />}
     </>
   );
 }
