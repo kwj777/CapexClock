@@ -35,6 +35,7 @@ import {
   keepUnsaved,
   loadUnsaved,
   nothingToRestore,
+  opensAnotherApp,
   unsavedKey,
   wasDropped,
   type UnsavedEdits,
@@ -187,7 +188,22 @@ export default function PropertyEditor({
 
   useEffect(() => {
     if (!dirty) return;
+    // A mail link opens the mail app and this page stays, but Chrome still fires
+    // beforeunload for it. That one is let through, if it comes within a second.
+    let openingApp = false;
+    let openingTimer: ReturnType<typeof setTimeout> | undefined;
+    const letAppOpen = () => {
+      openingApp = true;
+      clearTimeout(openingTimer);
+      openingTimer = setTimeout(() => {
+        openingApp = false;
+      }, 1000);
+    };
     const warn = (event: BeforeUnloadEvent) => {
+      if (openingApp) {
+        openingApp = false;
+        return;
+      }
       if (!leaving.current) event.preventDefault();
     };
     const askToLeave = (event: Event) => {
@@ -205,6 +221,10 @@ export default function PropertyEditor({
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
       if (!(link instanceof HTMLAnchorElement)) return;
+      if (opensAnotherApp(link.href)) {
+        letAppOpen();
+        return;
+      }
       if (link.hasAttribute("download") || link.hasAttribute("data-keeps-edits")) return;
       if (link.target && link.target !== "_self") return;
       const to = new URL(link.href);
@@ -225,6 +245,7 @@ export default function PropertyEditor({
     document.addEventListener("click", confirmLeave, true);
     document.addEventListener("submit", confirmSubmit, true);
     return () => {
+      clearTimeout(openingTimer);
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", confirmLeave, true);
       document.removeEventListener("submit", confirmSubmit, true);
