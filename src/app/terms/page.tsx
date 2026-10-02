@@ -15,7 +15,7 @@ import { CONTACT_EMAIL } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Terms | CapexClock",
   description:
-    "The terms for CapexClock's free tools, the $12/month founding membership and the $29 condition report: renewals, cancelling, refunds and what a report is.",
+    "The terms for CapexClock's free tools, the $12/month founding membership and the $29 condition report: renewals, canceling, refunds and what a report is.",
   alternates: { canonical: "/terms" },
 };
 

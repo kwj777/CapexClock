@@ -10,7 +10,7 @@ const TRACK_WAIT_MS = 600;
 /**
  * How long more clicks are ignored once the page is told to go to Stripe, so a
  * double click is one trip and one event. If the page stays (the property
- * editor's "leave page?" prompt was cancelled), Buy now works again after this,
+ * editor's "leave page?" prompt was canceled), Buy now works again after this,
  * without counting again.
  */
 const LEAVING_MS = 2000;

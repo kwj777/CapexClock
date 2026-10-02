@@ -38,7 +38,7 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 | `NEXT_PUBLIC_TEST_BUTTONS` | No | `off` hides the three paid-idea test buttons. Unset = shown. See [Paid-idea test buttons](#paid-idea-test-buttons). |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile **site** key for the sign-in check. Unset = no check. The secret key goes in Supabase, never here. See [Sign-in CAPTCHA](#sign-in-captcha-cloudflare-turnstile). |
-| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too and from the same Stripe mode (both test-mode links, with `test_` in them, or both live), so members can always cancel online. Unset (or no matching portal link) = the reminders panel keeps its email form and /pricing says "Not on sale yet". See [Pre-orders](#pre-orders-stripe-payment-links). |
+| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too and from the same Stripe mode (both test-mode links, with `test_` in them, or both live), so members can always cancel online. Unset (or no matching portal link) = the reminders panel keeps its email form and /pricing says "Not on sale right now". See [Pre-orders](#pre-orders-stripe-payment-links). |
 | `NEXT_PUBLIC_STRIPE_LINK_REPORT` | No | Stripe Payment Link for the $29 condition report (`https://buy.stripe.com/…`). Unset = the report panel keeps its email form. |
 | `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal **login link** (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and the membership isn't on sale (the report still can be). |
 
@@ -210,18 +210,18 @@ no `version` but the same question and the same once-per-browser rule.
 ## Pre-orders (Stripe Payment Links)
 
 Two paid ideas can be bought before they're built, and you fill each order by hand: the
-**founding membership** ($12 every month until cancelled: reminder emails, a yearly budget
+**founding membership** ($12 every month until canceled: reminder emails, a yearly budget
 summary and a yearly condition report) and the **condition report** ($29 once, made within 2
 business days). The site has no payment code: Buy now is a plain link to a Stripe Payment Link,
 and Stripe takes the card, sends receipts and runs the cancel page.
 
 Until the links are set, nothing changes for visitors: the panels keep their email forms and
-/pricing says "Not on sale yet". The pages that go with this are always live:
+/pricing says "Not on sale right now". The pages that go with this are always live:
 
 - `/pricing`: Free ("Free today, with no limits during early access") next to the two offers,
   a short FAQ and the [sample report](public/sample-condition-report.pdf). In the sitemap and
   the header.
-- `/terms`: what each offer includes, renewal and cancelling, the 30-day refund, the report's
+- `/terms`: what each offer includes, renewal and canceling, the 30-day refund, the report's
   label, who may rely on a report, the liability cap and the founding promise.
 - `/thanks/membership` and `/thanks/report`: where Stripe sends buyers after paying. Hidden from
   search and not in the sitemap. They say what happens next and how to email a sheet or export,
@@ -246,7 +246,7 @@ They make promises you'll have to keep by hand:
   and a yearly condition report;
 - each report goes out within 2 business days of getting the owner's details;
 - anyone who asks within 30 days of a payment gets it back in full;
-- if reminders aren't built, every founding membership is cancelled and every payment refunded;
+- if reminders aren't built, every founding membership is canceled and every payment refunded;
 - files people email you are deleted 30 days after you deliver.
 
 Tell Claude anything you want changed. Ask your accountant about sales tax first, and optionally
@@ -322,14 +322,14 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
    - **Manage or cancel membership** is at the bottom of the page, and opens Stripe's sign-in
      page for your **live** portal (its address has no `test_` in it).
 
-   If the membership says "Not on sale yet", the `[CapexClock]` line in the deploy log says why:
+   If the membership says "Not on sale right now", the `[CapexClock]` line in the deploy log says why:
    usually `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is missing, or is still the test-mode link. Fix it
    and redeploy.
 
    That's the start of the six-week check-in.
 
 To pause sales, delete the two `NEXT_PUBLIC_STRIPE_LINK_…` settings and redeploy: the panels go
-back to the email form and /pricing says "Not on sale yet". Keep `NEXT_PUBLIC_STRIPE_PORTAL_LINK`
+back to the email form and /pricing says "Not on sale right now". Keep `NEXT_PUBLIC_STRIPE_PORTAL_LINK`
 while anyone is still a member, so they can cancel online. After 20 payments Stripe switches a
 link off by itself; Buy now then reaches Stripe's "no longer available" page, so delete that
 setting and redeploy when it happens.

@@ -366,7 +366,7 @@ export interface BuyNowClick {
  * What a click on Buy now does: "ignore" it, let the browser open a new tab,
  * or "go" to Stripe in this tab. `send` says whether it sends
  * presale_checkout_clicked: once per trip to Stripe. A click whose "leave
- * page?" prompt was cancelled leaves the page here, so the next one doesn't
+ * page?" prompt was canceled leaves the page here, so the next one doesn't
  * count again. A new tab is a trip of its own.
  */
 export function buyNowClick({ leaving, counted, newTab }: BuyNowClick): {
