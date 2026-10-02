@@ -30,6 +30,7 @@ export default async function NewPropertyPage({ searchParams }: PageProps<"/app/
       <PropertyEditorLoader
         library={library}
         userId={account.id}
+        userEmail={account.email}
         initialName=""
         initialDraft={EMPTY_DRAFT}
         importFromCalculator={fromCalculator}

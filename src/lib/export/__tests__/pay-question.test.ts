@@ -1,4 +1,4 @@
-import { alreadyAsked, remember } from "../pay-question";
+import { alreadyAsked, PAY_QUESTION_VERSION, remember, versioned } from "../pay-question";
 
 function memoryStore() {
   const items = new Map<string, string>();
@@ -40,5 +40,12 @@ describe("pay question memory", () => {
     expect(() => remember("shown", null)).not.toThrow();
     // No browser at all, as when the page is rendered on the server.
     expect(alreadyAsked()).toBe(false);
+  });
+});
+
+describe("pay question events", () => {
+  it("carry the question's version, so a changed question is counted apart", () => {
+    expect(versioned({ answer: "yes", trigger: "pdf" })).toEqual({ answer: "yes", trigger: "pdf", version: "2" });
+    expect(versioned({ pick: "report", answer: "maybe" }).version).toBe(PAY_QUESTION_VERSION);
   });
 });

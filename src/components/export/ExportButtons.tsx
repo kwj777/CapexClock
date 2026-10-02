@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
 import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
 import ComponentListButton from "./ComponentListButton";
 import { download } from "./download";
 import PayQuestion from "./PayQuestion";
@@ -65,40 +66,47 @@ export default function ExportButtons({
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          ref={(el) => {
-            buttons.current.pdf = el;
-          }}
-          type="button"
-          className={button}
-          aria-disabled={busy !== null}
-          onClick={() => exportAs("pdf")}
-        >
-          {busy === "pdf" ? "Preparing PDF…" : "Download PDF"}
-        </button>
-        <button
-          ref={(el) => {
-            buttons.current.csv = el;
-          }}
-          type="button"
-          className={button}
-          aria-disabled={busy !== null}
-          onClick={() => exportAs("csv")}
-        >
-          Download forecast (CSV)
-        </button>
-        {list && (
-          <ComponentListButton name={name} building={list.building} draft={list.draft} where="downloads" className={button} />
-        )}
-        {failed && (
-          <span role="alert" className="text-sm text-red-700 dark:text-red-400">
-            The download didn&apos;t work. Please try again.
-          </span>
-        )}
-      </div>
-      <PayQuestion trigger={exported} onDismiss={() => exported && buttons.current[exported]?.focus()} />
-    </div>
+    // The condition report idea sits with the downloads; its panel opens below them.
+    <PaidIdeaDisclosure idea="report">
+      {(reportButton, reportPanel) => (
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              ref={(el) => {
+                buttons.current.pdf = el;
+              }}
+              type="button"
+              className={button}
+              aria-disabled={busy !== null}
+              onClick={() => exportAs("pdf")}
+            >
+              {busy === "pdf" ? "Preparing PDF…" : "Download PDF"}
+            </button>
+            <button
+              ref={(el) => {
+                buttons.current.csv = el;
+              }}
+              type="button"
+              className={button}
+              aria-disabled={busy !== null}
+              onClick={() => exportAs("csv")}
+            >
+              Download forecast (CSV)
+            </button>
+            {list && (
+              <ComponentListButton name={name} building={list.building} draft={list.draft} where="downloads" className={button} />
+            )}
+            {reportButton}
+            {failed && (
+              <span role="alert" className="text-sm text-red-700 dark:text-red-400">
+                The download didn&apos;t work. Please try again.
+              </span>
+            )}
+          </div>
+          {reportPanel && <div className="mt-3">{reportPanel}</div>}
+          <PayQuestion trigger={exported} onDismiss={() => exported && buttons.current[exported]?.focus()} />
+        </div>
+      )}
+    </PaidIdeaDisclosure>
   );
 }
