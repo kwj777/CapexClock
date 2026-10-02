@@ -190,7 +190,6 @@ function PaidIdeaPanel({
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             {PAID_IDEA_TEXT[idea].pitch} Want to hear first if we build it?
           </p>
-          {idea === "photo" && <PhotoOffer where={where} />}
           {/* Always in the panel, so screen readers announce the message when it appears. */}
           <div role="status">
             {signedUp.has(idea) && (
@@ -214,6 +213,8 @@ function PaidIdeaPanel({
               }}
             />
           )}
+          {/* Below the form, so "Want to hear first?" sits right above the form it asks about. */}
+          {idea === "photo" && <PhotoOffer where={where} />}
         </>
       )}
     </section>
@@ -223,7 +224,7 @@ function PaidIdeaPanel({
 /** The photo idea's free offer: rows filled in by hand from a photo emailed to us. */
 function PhotoOffer({ where }: { where: PaidWhere }) {
   return (
-    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+    <p className="mt-4 border-t border-amber-200 pt-3 text-sm text-slate-700 dark:border-amber-500/30 dark:text-slate-300">
       {PHOTO_OFFER.before}{" "}
       <a
         href={photoOfferHref(CONTACT_EMAIL)}

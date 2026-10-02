@@ -29,7 +29,7 @@ const LINKS = presaleLinksFromEnv();
 const FAQ = [
   {
     q: "Is CapexClock free?",
-    a: "Yes. It's free today, with no limits during early access: the calculators, saved properties, and PDF and CSV exports.",
+    a: "Yes. It's free today, with no limits during early access: the calculators, saved properties, and PDF, Excel and CSV exports.",
   },
   {
     q: "What do founding members get?",
@@ -88,7 +88,7 @@ export default function PricingPage() {
                 <li>The reserve calculator</li>
                 <li>Lifespans for roofs, HVAC, water heaters and more</li>
                 <li>A free account to save your properties</li>
-                <li>PDF and CSV exports</li>
+                <li>PDF, Excel and CSV exports</li>
               </ul>
               <Link
                 href="/capex-calculator"

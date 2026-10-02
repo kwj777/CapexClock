@@ -6,8 +6,8 @@ import { defaultLife, type LibraryComponent, type TypicalCost } from "@/lib/libr
  * The quick estimate: a per-unit monthly reserve range from a unit count, a year
  * built and the systems the building has, priced at typical costs. Typical costs
  * are never saved or used in a property's forecast; the estimate is only shown.
- * The assumptions below are in typical-costs.md, which is waiting for Kevin to
- * approve them.
+ * The assumptions below are in typical-costs.md, which Kevin approved on
+ * October 2, 2026.
  */
 
 /** Building-wide items are priced per apartment for a building this size. */

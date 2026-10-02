@@ -105,7 +105,7 @@ export function exportFileName(name: string, extension: "csv" | "pdf", startYear
   return `${fileSlug(name)}-forecast-${startYear}.${extension}`;
 }
 
-/** "maple-court-component-list.csv" */
-export function componentListFileName(name: string): string {
-  return `${fileSlug(name)}-component-list.csv`;
+/** "maple-court-component-list.xlsx" */
+export function componentListFileName(name: string, extension: "csv" | "xlsx"): string {
+  return `${fileSlug(name)}-component-list.${extension}`;
 }

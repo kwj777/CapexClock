@@ -62,8 +62,8 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
       <a href={mailto} className={link}>
         Email {CONTACT_EMAIL}
       </a>{" "}
-      with your spreadsheet, or with a PDF or CSV from the calculator: under your forecast, click Download PDF or
-      Download component list (CSV) and attach the file. Please remove tenant names first.
+      with your spreadsheet, or with a file from the calculator: under your forecast, click Download PDF or
+      Download component list (Excel) and attach the file. Please remove tenant names first.
     </>
   );
 

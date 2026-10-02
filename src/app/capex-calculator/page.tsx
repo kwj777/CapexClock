@@ -52,7 +52,7 @@ const FAQ = [
   },
   {
     q: "Can I edit my list in a spreadsheet and bring it back?",
-    a: "Yes. Click Download component list (CSV), make your changes in Excel or Google Sheets, then import the file again. Each row keeps its CapexClock ID, so changed rows are updated in place and new rows are added. Rows you deleted are only removed if you say so.",
+    a: "Yes. Click Download component list (Excel), make your changes in Excel or Google Sheets, then import the file again. Each row keeps its CapexClock ID, so changed rows are updated in place and new rows are added. Rows you deleted are only removed if you say so.",
   },
 ];
 

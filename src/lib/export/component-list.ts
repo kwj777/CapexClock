@@ -17,9 +17,11 @@ function plainNumber(text: string): string {
 /** One row's cells, by the field each column holds. */
 type RowValues = Partial<Record<FieldKind, string>>;
 
-function line(values: RowValues): string {
-  return csvRow(FORMAT_COLUMNS.map((c) => values[c.field] ?? ""));
-}
+/**
+ * A list as a sheet: the headings, then a row of text for each component, in
+ * FORMAT_COLUMNS order. The CSV and Excel downloads are both written from it.
+ */
+export type ListGrid = string[][];
 
 /** The list's building details, written on every row so sorting or filtering the sheet keeps them. */
 export interface ListBuilding {
@@ -59,23 +61,35 @@ function rowValues(building: ListBuilding, row: DraftRow, withId: boolean): RowV
 }
 
 /** The headings, then the rows. */
-function file(rows: RowValues[]): string {
-  const headings = Object.fromEntries(FORMAT_COLUMNS.map((c) => [c.field, c.heading]));
+function grid(rows: RowValues[]): ListGrid {
+  return [FORMAT_COLUMNS.map((c) => c.heading), ...rows.map((values) => FORMAT_COLUMNS.map((c) => values[c.field] ?? ""))];
+}
+
+/** A list as a CSV file. */
+export function listCsv(list: ListGrid): string {
   // CRLF is what spreadsheet apps expect from CSV.
-  return BOM + [headings, ...rows].map(line).join("\r\n") + "\r\n";
+  return BOM + list.map(csvRow).join("\r\n") + "\r\n";
 }
 
 /**
  * Every component in the list, one per row, in CapexClock's own format. Each row
  * carries its CapexClock ID, so importing the file again updates these rows.
  */
+export function componentListGrid(building: ListBuilding, rows: readonly DraftRow[]): ListGrid {
+  return grid(rows.map((r) => rowValues(building, r, true)));
+}
+
 export function componentListCsv(building: ListBuilding, rows: readonly DraftRow[]): string {
-  return file(rows.map((r) => rowValues(building, r, true)));
+  return listCsv(componentListGrid(building, rows));
 }
 
 /** The blank template: the headings and nothing else. */
+export function templateGrid(): ListGrid {
+  return grid([]);
+}
+
 export function templateCsv(): string {
-  return file([]);
+  return listCsv(templateGrid());
 }
 
 /** Condition, notes and a guess for some of the example's rows, to show what those columns hold. */
@@ -96,6 +110,10 @@ export function exampleRows(): DraftRow[] {
 export const EXAMPLE_BUILDING: ListBuilding = { name: "Example: 12-unit building", unitCount: "12", yearBuilt: "1998" };
 
 /** The filled-in example template, without CapexClock IDs since it isn't anyone's list. */
+export function exampleGrid(): ListGrid {
+  return grid(exampleRows().map((r) => rowValues(EXAMPLE_BUILDING, r, false)));
+}
+
 export function exampleCsv(): string {
-  return file(exampleRows().map((r) => rowValues(EXAMPLE_BUILDING, r, false)));
+  return listCsv(exampleGrid());
 }

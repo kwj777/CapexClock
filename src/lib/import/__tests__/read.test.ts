@@ -89,7 +89,7 @@ describe("opening a sheet", () => {
     ];
     expect(openSheet(grid, match, 2026)).toBe("forecast_file");
     expect(failedReason("forecast_file")).toBe("forecast_file");
-    expect(PROBLEM_TEXT.forecast_file).toMatch(/Download component list \(CSV\)/);
+    expect(PROBLEM_TEXT.forecast_file).toMatch(/Download component list \(Excel\)/);
   });
 
   it("says the same for a forecast downloaded from the live site before condition and notes were added", () => {

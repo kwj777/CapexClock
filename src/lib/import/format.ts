@@ -155,10 +155,22 @@ export const COUNTED_PER_TEXT = {
   per_sq_ft: "sq ft",
 } as const;
 
-/** The template and the filled-in example, served from /capex-spreadsheet-template. */
-export const TEMPLATE_FILES = {
-  template: { path: "/capex-spreadsheet-template/capexclock-template.csv", name: "capexclock-template.csv" },
-  example: { path: "/capex-spreadsheet-template/capexclock-example.csv", name: "capexclock-example.csv" },
-} as const;
+/** The template and the filled-in example, by their file names without the extension. */
+const TEMPLATE_NAMES = { template: "capexclock-template", example: "capexclock-example" } as const;
 
-export type TemplateFile = keyof typeof TEMPLATE_FILES;
+export type TemplateFile = keyof typeof TEMPLATE_NAMES;
+
+/**
+ * The downloads come as Excel files and as CSV. Excel opens an .xlsx file as it is,
+ * while Excel for Mac can open a CSV in its Text Import Wizard, which guesses the
+ * columns wrong.
+ */
+export const TEMPLATE_FORMATS = ["xlsx", "csv"] as const;
+
+export type TemplateFormat = (typeof TEMPLATE_FORMATS)[number];
+
+/** Where the template or the example is served from /capex-spreadsheet-template, and its file name. */
+export function templateFile(file: TemplateFile, format: TemplateFormat): { path: string; name: string } {
+  const name = `${TEMPLATE_NAMES[file]}.${format}`;
+  return { path: `/capex-spreadsheet-template/${name}`, name };
+}

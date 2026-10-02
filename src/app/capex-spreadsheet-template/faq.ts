@@ -22,7 +22,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: "How do I update my list later?",
-    a: "In the calculator, click Download component list (CSV). Change it in any spreadsheet app, then import it again. Rows keep their CapexClock ID, so they're updated in place instead of added twice. Rows you deleted from the file are only removed if you say so.",
+    a: "In the calculator, click Download component list (Excel). Change it in any spreadsheet app, then import it again. Rows keep their CapexClock ID, so they're updated in place instead of added twice. Rows you deleted from the file are only removed if you say so.",
   },
   {
     q: "Is my spreadsheet uploaded anywhere?",

@@ -528,9 +528,11 @@ if the first try saved none (then it has `retry` = true). An import that creates
 `import_completed`. Each "Retry failed" also sends `import_retried`, so each import counts once.
 
 On **Template page**, `file` is `template` (the blank template) or `example` (the filled-in
-example). The page itself is checked in Search Console (below): it should show up in Google
-results by the check-in. **Component list downloads** counts "Download component list (CSV)";
-`where` is `downloads` (next to the forecast downloads) or `components` (next to Import).
+example), and `format` is `xlsx` (Excel) or `csv`. The page itself is checked in Search Console
+(below): it should show up in Google results by the check-in. **Component list downloads** counts
+"Download component list (Excel)" and "Download component list (CSV)"; `where` is `downloads`
+(next to the forecast downloads) or `components` (next to Import), and `format` is `xlsx` or
+`csv`. Downloads from before the Excel files were added have no `format`; they were all CSV.
 
 On **Comparison**, filter each compare series: click the filter icon on it, choose **Path name**,
 then **equals**, and type `/capex-calculator`. The filter matters because the comparison also
@@ -540,8 +542,8 @@ The comparison is working when `compare_viewed` is at least a tenth of `forecast
 **Quick estimate** shows how many people who got a quick estimate on /reserve-calculator went on
 to the CapEx calculator in the same visit. In **New insight**, pick **Funnels** instead of
 Trends. Add `quick_estimate_shown` as step 1 and `$pageview` as step 2, then filter step 2 to
-**Path name** equals `/capex-calculator`. Under the steps, set **Conversion window limit** to
-**1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
+**Path name** equals `/capex-calculator`. Open **Funnel settings** (below the steps, closed at
+first) and set **Conversion window limit** to **1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
 `quick_estimate_shown` goes once per page view, after an estimate has been on screen for 2
 seconds, and carries only `systems`, how many systems were ticked.
 

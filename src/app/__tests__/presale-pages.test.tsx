@@ -204,7 +204,7 @@ describe("the thank-you pages", () => {
     expect(page).toContain("What happens next");
     expect(html).toContain('href="mailto:support@capexclock.com?subject=');
     // The buttons' own names, so a buyer can find them under the forecast.
-    expect(page).toContain("Download PDF or Download component list (CSV)");
+    expect(page).toContain("Download PDF or Download component list (Excel)");
     expect(page).toContain("$12 every month until you cancel. Cancel any time online.");
     expect(html).toContain(`href="${SETTINGS.NEXT_PUBLIC_STRIPE_PORTAL_LINK}"`);
     expect(page).toContain("Manage or cancel membership");

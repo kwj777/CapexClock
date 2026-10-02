@@ -224,8 +224,11 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
         file. Your sheet is read in this browser and never uploaded.
       </p>
       <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-        Starting from scratch? <TemplateLink file="template" where={`import_${where}`} />. A component list you
-        downloaded here updates your rows when you import it again.
+        Starting from scratch? <TemplateLink file="template" format="xlsx" where={`import_${where}`} /> or{" "}
+        <TemplateLink file="template" format="csv" where={`import_${where}`}>
+          the CSV version
+        </TemplateLink>
+        . A component list you downloaded here updates your rows when you import it again.
       </p>
 
       <SourcePicker where={where} onRead={onRead} onProblem={onProblem} />
