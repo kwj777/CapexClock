@@ -117,6 +117,27 @@ export function lacksUpdate0004(components: ComponentRow[]): boolean {
 }
 
 /**
+ * After a save whose rows read back "without_details": true when the database
+ * dropped the condition, notes and "guess" flags it was sent, so each row still has
+ * what it had before this save, and a new row has none. A database without update
+ * 0004 does that, and so does one where 0002 was run again after 0004. False means
+ * a row holds details this editor neither sent nor had, so another tab or device
+ * saved them in between. `before` is what this editor last saved.
+ */
+export function detailsDropped(before: Pick<SaveInput, "components">, components: ComponentRow[]): boolean {
+  if (lacksUpdate0004(components)) return true;
+  const earlier = new Map(before.components.flatMap((c) => (c.id ? [[c.id, c] as const] : [])));
+  return components.every((row) => {
+    const was = earlier.get(row.id);
+    return (
+      row.condition === (was?.condition ?? null) &&
+      (row.notes ?? null) === (was?.notes ?? null) &&
+      (row.install_year_is_estimate ?? false) === (was?.install_year_is_estimate ?? false)
+    );
+  });
+}
+
+/**
  * True when two versions of a property's edits would save exactly the same thing,
  * row ids aside, and neither has anything left to fix. Kept edits that match what's
  * already saved have nothing to bring back.

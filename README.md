@@ -38,7 +38,7 @@ npm run build
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 | `NEXT_PUBLIC_TEST_BUTTONS` | No | `off` hides the three paid-idea test buttons. Unset = shown. See [Paid-idea test buttons](#paid-idea-test-buttons). |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile **site** key for the sign-in check. Unset = no check. The secret key goes in Supabase, never here. See [Sign-in CAPTCHA](#sign-in-captcha-cloudflare-turnstile). |
-| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too and from the same Stripe mode (both test-mode links, with `test_` in them, or both live), so members can always cancel online. Unset (or no matching portal link) = the reminders panel keeps its email form and /pricing says "Not on sale yet". See [Pre-orders](#pre-orders-stripe-payment-links). |
+| `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too and from the same Stripe mode (both test-mode links, with `test_` in them, or both live), so members can always cancel online. Unset (or no matching portal link) = the reminders panel keeps its email form and /pricing says "Not on sale right now". See [Pre-orders](#pre-orders-stripe-payment-links). |
 | `NEXT_PUBLIC_STRIPE_LINK_REPORT` | No | Stripe Payment Link for the $29 condition report (`https://buy.stripe.com/…`). Unset = the report panel keeps its email form. |
 | `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal **login link** (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and the membership isn't on sale (the report still can be). |
 
@@ -197,6 +197,19 @@ PostHog events, all with `{idea, where}` and never the email or unit count:
 `paid_idea_seen` (once per page view per idea, once the button is actually on screen),
 `paid_idea_clicked` (once per page view per idea) and `paid_idea_signup`.
 
+**The photo offer.** The photo idea's real test is a free offer (plan section 2): its panel says
+"Want it now? Email a photo of the label to support@capexclock.com and we'll fill in the row for
+you, free." The address opens an email with the subject "Photo of a label", and a click sends
+`photo_offer_clicked` (`{idea, where}` only). When a photo arrives:
+
+1. Forward it to the CapexClock thread. Claude reads the label and drafts the row: the item, its
+   install year (the made-on date from the label or serial number, marked a guess), and the brand
+   and model for the notes.
+2. Check the draft and reply to that one person, from support@capexclock.com.
+3. Delete the photo within 30 days of replying, as /privacy says.
+
+Count the photos you get each week in the Monday numbers.
+
 The pay question after an export keeps its wording. A Yes or Maybe now asks "Which would you
 use first?" and sends `pay_question_first_pick` with `pick` (`reminders`, `report`, `photo` or
 `other`). Every pay-question event now has `version` = `2`; events from before this change have
@@ -205,18 +218,18 @@ no `version` but the same question and the same once-per-browser rule.
 ## Pre-orders (Stripe Payment Links)
 
 Two paid ideas can be bought before they're built, and you fill each order by hand: the
-**founding membership** ($12 every month until cancelled: reminder emails, a yearly budget
+**founding membership** ($12 every month until canceled: reminder emails, a yearly budget
 summary and a yearly condition report) and the **condition report** ($29 once, made within 2
 business days). The site has no payment code: Buy now is a plain link to a Stripe Payment Link,
 and Stripe takes the card, sends receipts and runs the cancel page.
 
 Until the links are set, nothing changes for visitors: the panels keep their email forms and
-/pricing says "Not on sale yet". The pages that go with this are always live:
+/pricing says "Not on sale right now". The pages that go with this are always live:
 
 - `/pricing`: Free ("Free today, with no limits during early access") next to the two offers,
   a short FAQ and the [sample report](public/sample-condition-report.pdf). In the sitemap and
   the header.
-- `/terms`: what each offer includes, renewal and cancelling, the 30-day refund, the report's
+- `/terms`: what each offer includes, renewal and canceling, the 30-day refund, the report's
   label, who may rely on a report, the liability cap and the founding promise.
 - `/thanks/membership` and `/thanks/report`: where Stripe sends buyers after paying. Hidden from
   search and not in the sitemap. They say what happens next and how to email a sheet or export,
@@ -241,7 +254,7 @@ They make promises you'll have to keep by hand:
   and a yearly condition report;
 - each report goes out within 2 business days of getting the owner's details;
 - anyone who asks within 30 days of a payment gets it back in full;
-- if reminders aren't built, every founding membership is cancelled and every payment refunded;
+- if reminders aren't built, every founding membership is canceled and every payment refunded;
 - files people email you are deleted 30 days after you deliver.
 
 Tell Claude anything you want changed. Ask your accountant about sales tax first, and optionally
@@ -317,14 +330,14 @@ Do everything in **test mode** first (the **Test mode** switch in the Stripe das
    - **Manage or cancel membership** is at the bottom of the page, and opens Stripe's sign-in
      page for your **live** portal (its address has no `test_` in it).
 
-   If the membership says "Not on sale yet", the `[CapexClock]` line in the deploy log says why:
+   If the membership says "Not on sale right now", the `[CapexClock]` line in the deploy log says why:
    usually `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is missing, or is still the test-mode link. Fix it
    and redeploy.
 
    That's the start of the six-week check-in.
 
 To pause sales, delete the two `NEXT_PUBLIC_STRIPE_LINK_…` settings and redeploy: the panels go
-back to the email form and /pricing says "Not on sale yet". Keep `NEXT_PUBLIC_STRIPE_PORTAL_LINK`
+back to the email form and /pricing says "Not on sale right now". Keep `NEXT_PUBLIC_STRIPE_PORTAL_LINK`
 while anyone is still a member, so they can cancel online. After 20 payments Stripe switches a
 link off by itself; Buy now then reaches Stripe's "no longer available" page, so delete that
 setting and redeploy when it happens.
@@ -346,7 +359,10 @@ preferences**). Then for each order:
    the payment → Refund**. For a member, also cancel the subscription (**Customers → the customer
    → the subscription → Cancel**, immediately). If reminders aren't built after the check-in,
    cancel every membership and refund every payment, as /terms promises.
-5. Delete files people emailed you 30 days after you deliver, as /privacy says.
+5. **Photos (the free photo offer):** forward each photo of a label to the thread. Claude drafts
+   the row from it; you check it and reply to that one person. Delete the photo within 30 days of
+   replying. See [The photo offer](#paid-idea-test-buttons).
+6. Delete files people emailed you 30 days after you deliver, as /privacy says.
 
 The sample report is made from the calculator's example building by a script. After changing the
 report's layout or the example (or in a new year, so its dates stay current), run
@@ -386,11 +402,13 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 1. **PostHog:** the numbers on the dashboard below (a screenshot of each tile is fine).
 2. **Netlify:** **Forms → paid-interest** and **Forms → early-access**: how many new entries
    since last Monday.
-3. **Supabase:** the weekly query below.
-4. **Stripe** (once the links are live): for each Payment Link, the payments since last Monday
+3. **Your inbox:** how many people emailed a photo of a label since last Monday (the photo
+   offer), and how many of those you answered.
+4. **Supabase:** the weekly query below.
+5. **Stripe** (once the links are live): for each Payment Link, the payments since last Monday
    and any refunds (**Payment Links → the link**, or **Payments**). For memberships, also the
    number under **Billing → Subscriptions → Active**. Stripe is the real count of sales.
-5. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
+6. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
 
 ### Build the PostHog dashboard (once, about 20 minutes)
 
@@ -415,7 +433,7 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Pay question | `pay_question_shown`, `pay_question_answered`, `pay_question_dismissed` (Total count) | none | Since the review fix |
 | Pay question answers | `pay_question_answered` (Total count) | `answer` | Since the review fix |
 | Which would you use first | `pay_question_first_pick` (Total count) | `pick` | Since step 1 |
-| Idea buttons | `paid_idea_seen`, `paid_idea_clicked`, `paid_idea_signup` (Total count) | `idea` | Since step 1 |
+| Idea buttons | `paid_idea_seen`, `paid_idea_clicked`, `paid_idea_signup`, `photo_offer_clicked` (Total count) | `idea` | Since step 1 |
 | People who saw each idea | `paid_idea_seen` (Unique users) | `idea` | Since step 1 |
 | This week | `calculator_started`, `forecast_generated`, `pdf_exported`, `csv_exported`, `account_created`, `property_saved` (Total count) | none | Last 7 days |
 | Buy now | `presale_checkout_clicked`, `presale_completed` (Total count) | `offer` | Since step 2 |
@@ -430,7 +448,8 @@ one is missing, open the site, use that button once, wait a few minutes and try 
 Phase 3 steps add their own rows to this table.
 
 On the **Buy now** tile, `presale_checkout_clicked` counts trips to Stripe: once per click that
-leaves for Stripe (a double click is one), and once per Buy now opened in a new tab. One click can
+leaves for Stripe (a double click is one), and once per Buy now opened in a new tab with a middle,
+Ctrl, Cmd or Shift click. Opening it from the right-click menu isn't counted. One click can
 count without a trip: in the property editor with unsaved changes, the browser asks "Leave site?"
 first, and the click counts even if the owner stays. `presale_completed` counts the thank-you
 pages, once per visit. Stripe is the real count of sales; these only rank the two offers.

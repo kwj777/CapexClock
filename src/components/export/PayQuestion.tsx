@@ -2,17 +2,14 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
-import { alreadyAsked, remember, versioned } from "@/lib/export/pay-question";
+import { alreadyAsked, nextStep, PAY_ANSWERS, remember, versioned, type PayAnswer } from "@/lib/export/pay-question";
 import { FIRST_PICK_QUESTION, FIRST_PICKS, type FirstPick } from "@/lib/paid-ideas";
 
 export const PAY_QUESTION =
   "Would you pay $19/month for replacement reminders and a lender-ready condition report?";
 
-const ANSWERS = ["Yes", "Maybe", "No"] as const;
-type Answer = (typeof ANSWERS)[number];
-
 /**
- * One-question pricing survey. It appears after the first export in a browser
+ * A short pricing survey. It appears after the first export in a browser
  * and stays until answered or dismissed, but never comes back on a later
  * visit, even if it was ignored. A Yes or Maybe gets one more question: which
  * paid idea they'd use first.
@@ -27,15 +24,16 @@ export default function PayQuestion({
   onDismiss?: () => void;
 }) {
   const [askedBefore] = useState(() => alreadyAsked());
-  const [answer, setAnswer] = useState<Answer | "dismissed" | null>(null);
+  const [answer, setAnswer] = useState<PayAnswer | "dismissed" | null>(null);
   const [pick, setPick] = useState<FirstPick | "skipped" | null>(null);
   const shown = useRef(false);
   const followUp = useRef<HTMLParagraphElement>(null);
   const thanks = useRef<HTMLParagraphElement>(null);
   const followUpId = useId();
   const open = trigger !== null && !askedBefore;
-  const asksFirstPick = (answer === "Yes" || answer === "Maybe") && pick === null;
-  const thanked = answer === "No" || pick !== null;
+  const step = nextStep(answer, pick);
+  const asksFirstPick = step === "first_pick";
+  const thanked = step === "thanks";
 
   useEffect(() => {
     if (!open || shown.current) return;
@@ -50,7 +48,7 @@ export default function PayQuestion({
     else if (thanked) thanks.current?.focus();
   }, [asksFirstPick, thanked]);
 
-  function choose(value: Answer) {
+  function choose(value: PayAnswer) {
     setAnswer(value);
     remember(value);
     void track("pay_question_answered", versioned({ answer: value.toLowerCase(), trigger: trigger ?? "" }));
@@ -77,7 +75,7 @@ export default function PayQuestion({
     <>
       {/* Always in the page, so screen readers announce the question when it appears. */}
       <div aria-live="polite">
-        {open && answer === null && (
+        {open && step === "question" && (
           <div className={card}>
             <div className="flex items-start justify-between gap-4">
               <p className="text-sm font-medium text-slate-900 dark:text-white">{PAY_QUESTION}</p>
@@ -91,12 +89,12 @@ export default function PayQuestion({
               </button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {ANSWERS.map((a) => (
+              {PAY_ANSWERS.map((a) => (
                 <button
                   key={a}
                   type="button"
                   onClick={() => choose(a)}
-                  className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700"
+                  className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:hover:ring-amber-500"
                 >
                   {a}
                 </button>
@@ -122,7 +120,7 @@ export default function PayQuestion({
                 key={p.value}
                 type="button"
                 onClick={() => choosePick(p.value)}
-                className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700"
+                className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-amber-50 hover:ring-amber-400 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:hover:ring-amber-500"
               >
                 {p.label}
               </button>

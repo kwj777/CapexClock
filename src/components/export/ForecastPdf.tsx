@@ -2,7 +2,7 @@ import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/re
 import type { ReactElement } from "react";
 import { CONDITION_TEXT } from "@/components/calculator/draft";
 import { formatReserve } from "@/components/calculator/format";
-import { formatCostEach, formatQuantity, longWordParts, moneyColumn } from "@/lib/export/format";
+import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
   ESTIMATED_NOTE,
   exportRows,
@@ -156,6 +156,10 @@ const s = StyleSheet.create({
 
 // Wide enough for "250,000 sq ft", "$9,999,999.99" each and "$99,999,999.99" in total.
 const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84, condition: 56 };
+// The notes column fills what's left of a letter page (612pt, less 40pt each side) after
+// the name and condition, less its own padding. Its 9pt type gives a line this many em.
+const NOTES_PADDING = 10;
+const NOTES_LINE_EMS = Math.floor((612 - 2 * 40 - cols.name - cols.condition - NOTES_PADDING) / 9);
 // A longer table starts on a new page.
 const MAX_ROWS_KEPT_TOGETHER = 12;
 // A row stays on one page unless its name is long enough that it might not fit
@@ -385,8 +389,8 @@ function ConditionNotes({ items, printable }: { items: ConditionNote[]; printabl
             <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
             <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>
             {/* Notes can hold a pasted link, too long to fit on one line without breaking. */}
-            <Text style={{ flex: 1, paddingLeft: 10 }} hyphenationCallback={longWordParts}>
-              {printable(item.notes)}
+            <Text style={{ flex: 1, paddingLeft: NOTES_PADDING }}>
+              {breakLongWords(printable(item.notes), NOTES_LINE_EMS)}
             </Text>
           </View>
         ))}

@@ -4,6 +4,7 @@ import {
   cleanDetails,
   costLabel,
   customRow,
+  detailsShown,
   detailsSummary,
   editRow,
   EMPTY_DRAFT,
@@ -13,6 +14,7 @@ import {
   importUndoFor,
   neighborRowId,
   notesLeftText,
+  notesTooLong,
   parseUnitCount,
   PROBLEM_TEXT,
   problemFields,
@@ -383,7 +385,25 @@ describe("condition, notes and a guessed install year", () => {
     expect(notesLeftText("x".repeat(1800))).toBe("200 characters left");
     expect(notesLeftText("x".repeat(1999))).toBe("1 character left");
     expect(notesLeftText("x".repeat(2000))).toBe("0 characters left");
-    expect(notesLeftText("x".repeat(2100))).toBe("0 characters left");
+  });
+
+  it("shows condition and notes as the owner chose, or while the notes need fixing", () => {
+    expect(detailsShown(null, false)).toBe(false);
+    expect(detailsShown(null, true)).toBe(true);
+    // Less closes them even while the notes need fixing, and More opens them.
+    expect(detailsShown(false, true)).toBe(false);
+    expect(detailsShown(true, false)).toBe(true);
+  });
+
+  it("says how far over the limit kept notes are, counting an emoji as one", () => {
+    expect(notesTooLong("x".repeat(2000))).toBe(false);
+    expect(notesTooLong("x".repeat(2001))).toBe(true);
+    expect(notesLeftText("x".repeat(2001))).toBe("1 character over the 2,000 limit");
+    expect(notesLeftText("x".repeat(2100))).toBe("100 characters over the 2,000 limit");
+    // 1,500 emoji are 3,000 code units but 1,500 characters, which a save takes.
+    expect(notesTooLong("🙂".repeat(1500))).toBe(false);
+    expect(notesLeftText("🙂".repeat(1500))).toBe("0 characters left");
+    expect(notesTooLong("🙂".repeat(2001))).toBe(true);
   });
 });
 

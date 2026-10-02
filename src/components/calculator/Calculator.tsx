@@ -35,6 +35,7 @@ import {
   CONDITIONS,
   costLabel,
   customRow,
+  detailsShown,
   detailsSummary,
   editRow,
   exampleDraft,
@@ -47,6 +48,7 @@ import {
   MAX_NOTES_LENGTH,
   neighborRowId,
   notesLeftText,
+  notesTooLong,
   parseUnitCount,
   peekImportUndo,
   problemFields,
@@ -781,16 +783,22 @@ function ComponentRow({
   // Marks the field the row's note is about and points it at the note.
   const flag = (field: RowField) =>
     problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
-  // Condition and notes sit behind More on narrow screens. They open by themselves
-  // when there's something to fix in them.
-  const [open, setOpen] = useState(false);
-  const showDetails = open || problem?.fields.includes("notes") === true;
   const summary = detailsSummary(row);
   const notes = row.notes ?? "";
   const notesLeft = notesLeftText(notes);
+  const notesOver = notesTooLong(notes);
+  const notesFlagged = problem?.fields.includes("notes") === true;
   const notesDescribedBy =
-    [problem?.fields.includes("notes") ? problemId : "", notesLeft ? notesLeftId : ""].filter(Boolean).join(" ") ||
-    undefined;
+    [notesFlagged ? problemId : "", notesLeft ? notesLeftId : ""].filter(Boolean).join(" ") || undefined;
+  // Condition and notes sit behind More on narrow screens (see detailsShown).
+  const notesNeedFixing = notesFlagged || notesOver;
+  const [open, setOpen] = useState<boolean | null>(null);
+  const [neededFixing, setNeededFixing] = useState(notesNeedFixing);
+  if (notesNeedFixing !== neededFixing) {
+    setNeededFixing(notesNeedFixing);
+    if (notesNeedFixing) setOpen(null);
+  }
+  const showDetails = detailsShown(open, notesNeedFixing);
 
   return (
     <li className="py-4">
@@ -918,7 +926,7 @@ function ComponentRow({
           </button>
           <button
             type="button"
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => setOpen(!showDetails)}
             aria-expanded={showDetails}
             aria-controls={detailsId}
             className="rounded-md px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -962,7 +970,7 @@ function ComponentRow({
               rows={2}
               placeholder="e.g. Leaks a little. Quote from ABC Plumbing."
               aria-label={`Notes, ${label}`}
-              {...flag("notes")}
+              aria-invalid={notesFlagged || notesOver ? true : undefined}
               aria-describedby={notesDescribedBy}
               // Opened for a problem, it stays open once that's fixed, rather than closing mid-edit.
               onFocus={() => setOpen(true)}
@@ -971,7 +979,12 @@ function ComponentRow({
             />
           </label>
           {notesLeft && (
-            <p id={notesLeftId} className="mt-1 text-xs text-slate-500 lg:text-right dark:text-slate-400">
+            <p
+              id={notesLeftId}
+              className={`mt-1 text-xs lg:text-right ${
+                notesOver ? "font-medium text-amber-800 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
               {notesLeft}
             </p>
           )}
