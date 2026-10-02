@@ -102,8 +102,8 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     void track("import_previewed", { rows, ready, flagged: changed + needsYou, skipped, source: read.source });
   }, [openedSheet, preview, read]);
 
-  // Screen readers hear the summary once choices settle, not on every key press. A
-  // component list download's says what it updates, adds and removes.
+  // Screen readers hear the summary once choices settle, not on every key press. For
+  // a component list download, it says what the import updates, adds and removes.
   const summary = preview && plan ? importSummary(preview.counts, plan, removeMissing) : "";
   useEffect(() => {
     if (!summary) return;
