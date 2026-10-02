@@ -422,6 +422,8 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Pricing page | `$pageview` (Unique users), with a filter on the series: **Current URL** contains `/pricing` | none | Since step 2 |
 | Import | `import_started`, `import_completed` (Total count) | none | Since step 4 |
 | Import problems | `import_failed` (Total count) | `reason` | Since step 4 |
+| Template page | `template_downloaded` (Total count) | `file` | Since step 5 |
+| Component list downloads | `component_list_exported` (Total count) | `where` | Since step 5 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
@@ -437,9 +439,18 @@ On the **Import** tile, `import_started` counts imports that got data (rows past
 chosen), once each time the import panel is used, and `import_completed` counts the ones the
 owner added. Import is working when `import_completed` is at least 6 in 10 of `import_started`.
 On **Import problems**, `reason` says why a sheet couldn't be read: `too_big` (over 2,000 rows
-or 5 MB), `no_header` (no heading row found, or an empty file), `unsupported` (an Excel, Numbers
-or other spreadsheet file, which needs saving as CSV first) or `unreadable`. The events carry
-counts and these labels only, never anything from the sheet.
+or 5 MB), `no_header` (no heading row found, or an empty file), `unsupported` (an old .xls, .ods
+or Numbers file, or a password-locked one), `forecast_file` (the forecast CSV, which can't be
+read back; the owner is told to use the component list instead) or `unreadable`. The events carry
+counts and these labels only, never anything from the sheet. To see where imports come from, add
+a breakdown on the Import tile: `source` is `paste`, `file` (CSV) or `xlsx`, and `where` is
+`calculator`, `editor`, `template_page` or `portfolio` (My properties). On My properties, "Retry
+failed" sends `import_retried` instead of a second `import_completed`, so each import counts once.
+
+On **Template page**, `file` is `template` (the blank template) or `example` (the filled-in
+example). The page itself is checked in Search Console (below): it should show up in Google
+results by the check-in. **Component list downloads** counts "Download component list (CSV)";
+`where` is `downloads` (next to the forecast downloads) or `components` (next to Import).
 
 ### Weekly Supabase query
 
@@ -482,3 +493,5 @@ Do this once, then check it once a month.
 
 Once a month, paste from **Performance → Search results** (last 28 days): total clicks, total
 impressions, and the top pages. **Indexing → Pages** shows how many pages Google has indexed.
+Also type `capex-spreadsheet-template` into the **Inspect any URL** box at the top: "URL is on
+Google" means the template page is in Google results.
