@@ -450,8 +450,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                           onChange={(e) => setIncluded((s) => ({ ...s, [p.id]: e.target.checked }))}
                           className="h-4 w-4 accent-amber-500"
                         />
-                        Create this property
-                        <span className="sr-only">: {p.name || "no name yet"}</span>
+                        <span>
+                          Create this property<span className="sr-only">: {p.name || "no name yet"}</span>
+                        </span>
                       </label>
                     )}
                     <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
