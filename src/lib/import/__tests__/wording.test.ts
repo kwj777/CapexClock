@@ -210,6 +210,31 @@ describe("import wording", () => {
     expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true }))).toEqual([]);
   });
 
+  it("asks what a column with one number for each building is, and says what the answer does", () => {
+    const sheet = [
+      "Building,# of units,Item,Year installed,Cost each",
+      "Elm,12,Asphalt shingle roof,2010,38000",
+      "Elm,12,Tank water heater,2015,1400",
+      "Oak,8,Asphalt shingle roof,2008,30000",
+      "Oak,8,Tank water heater,2016,1400",
+      "Ash,24,Tank water heater,2016,1400",
+      "Fir,6,Tank water heater,2016,1400",
+    ].join("\n");
+    const asked = preview(sheet);
+    if (!asked.quantityQuestion) throw new Error("No quantity question");
+    expect(quantityQuestionText(asked.quantityQuestion)).toBe(
+      'Column B, "# of units", has one number for each building, like 12, 8 and 24. What is it?',
+    );
+    expect(quantityAnswers(asked.quantityQuestion)).toEqual([
+      ["quantity", "How many of each item there are"],
+      ["each_one", "Each building's unit count. Items like fridges count one per unit, and the rest count as one."],
+    ]);
+    const answered = preview(sheet, { columns: ["building", "unitCount", "item", "installYear", "cost"], quantityAnswered: true });
+    expect(previewHints(answered)).toEqual([
+      "Column B is each building's unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.",
+    ]);
+  });
+
   it("asks what a # column's numbers are, naming a few of them", () => {
     const asked = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n4,Stove,2015\n7,Dishwasher,2019");
     if (!asked.quantityQuestion) throw new Error("No quantity question");

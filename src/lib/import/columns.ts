@@ -537,6 +537,36 @@ export function columnValues(grid: Grid, headerRow: number): ColumnValues {
   };
 }
 
+/** Each building's filled cells in a column, building by building, for guesses that compare buildings. */
+export type BuildingValues = (column: number) => readonly (readonly string[])[];
+
+/**
+ * Every filled cell under the headings, split by the building in `buildingColumn`. A
+ * row belongs to the building it names, or to the last one named above it, as with
+ * merged cells. Names match whatever their case and punctuation.
+ */
+export function buildingValues(grid: Grid, headerRow: number, buildingColumn: number): BuildingValues {
+  // The building each row belongs to, worked out once.
+  const owners: string[] = [];
+  let building = "";
+  for (let i = headerRow + 1; i < grid.length; i++) {
+    const named = cellText(grid[i]?.[buildingColumn]);
+    if (named !== "") building = words(named);
+    owners.push(building);
+  }
+  return (column) => {
+    const groups = new Map<string, string[]>();
+    owners.forEach((owner, k) => {
+      const text = cellText(grid[headerRow + 1 + k]?.[column]);
+      if (text === "") return;
+      const group = groups.get(owner);
+      if (group) group.push(text);
+      else groups.set(owner, [text]);
+    });
+    return [...groups.values()];
+  };
+}
+
 /** Every year named in a column is before this year, so none of them can still be due. */
 export function yearsHavePassed(values: readonly string[], currentYear: number): boolean {
   let found = false;
@@ -671,10 +701,12 @@ export interface QuantityDoubt {
   column: number;
   /**
    * "same": one number on every row, which may be the building's unit count.
+   * "building": in a sheet of several buildings, one number on every row of each
+   * building, which may be each building's unit count.
    * "numbers": numbers that may count items, or number the rows or apartments.
    */
-  kind: "same" | "numbers";
-  /** The number on every row, or the first few different ones. */
+  kind: "same" | "building" | "numbers";
+  /** The number on every row, each building's first few, or the first few different ones. */
   values: string[];
 }
 
@@ -689,12 +721,27 @@ function hasUnitWords(heading: string): boolean {
 }
 
 /**
+ * In a sheet of several buildings, each building has one number on every one of its
+ * rows, and they aren't all the same. A building's lone row counts only when the
+ * heading says units, since one row says nothing about repeats.
+ */
+function sameInEachBuilding(groups: readonly (readonly string[])[], saysUnits: boolean): boolean {
+  if (groups.length < 2) return false;
+  const number = (v: string) => Number(v.replace(/,/g, ""));
+  if (!groups.every((g) => g.every((v) => number(v) === number(g[0])))) return false;
+  return saysUnits || groups.some((g) => g.length > 1);
+}
+
+/**
  * The column to ask about, if any, when no other column is the quantity:
  * - "#", "No." or "Units" holding numbers that don't simply run 1, 2, 3 (or 101,
  *   102, 103) down the sheet. They may be counts, or row or apartment numbers.
  * - A quantity column with the same number (not 1) on every row, when its heading
  *   says units ("# of units", "Unit count") or `buildingWide()` says a row is an
  *   item a building has one of, like a roof. It may be the building's unit count.
+ * - The same, in a sheet of several buildings (`byBuilding`, from its Building
+ *   column), for a number that's the same on every row of each building. It may be
+ *   each building's unit count.
  * A column of 1s isn't asked about, since both answers give the same rows. Our own
  * format says which column is which, so it never asks.
  */
@@ -703,6 +750,7 @@ export function quantityQuestionColumn(
   columns: readonly ColumnRole[],
   values: ColumnValues,
   buildingWide: () => boolean,
+  byBuilding?: BuildingValues,
 ): QuantityDoubt | null {
   if (isCapexClockFormat(heads)) return null;
   const quantities = columns.flatMap((role, i) => (role === "quantity" ? [i] : []));
@@ -723,11 +771,16 @@ export function quantityQuestionColumn(
     const numbers = cells.map((v) => Number(v.replace(/,/g, "")));
     if (numbers.every((n) => n === 1)) continue;
     const same = cells.length > 1 && numbers.every((n) => n === numbers[0]);
+    const groups = !same && byBuilding ? byBuilding(column) : [];
+    const each = sameInEachBuilding(groups, hasUnitWords(heading));
+    const sameDoubt: QuantityDoubt = { column, kind: "same", values: [cells[0]] };
+    const eachDoubt: QuantityDoubt = { column, kind: "building", values: [...new Set(groups.map((g) => g[0]))].slice(0, 3) };
     if (doubtfulQuantity(heading) !== null) {
       if (isCounting(cells)) continue;
-      return same ? { column, kind: "same", values: [cells[0]] } : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
+      if (same) return sameDoubt;
+      return each ? eachDoubt : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
     }
-    if (same && (hasUnitWords(heading) || buildingWide())) return { column, kind: "same", values: [cells[0]] };
+    if ((same || each) && (hasUnitWords(heading) || buildingWide())) return same ? sameDoubt : eachDoubt;
   }
   return null;
 }

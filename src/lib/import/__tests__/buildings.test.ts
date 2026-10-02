@@ -4,6 +4,7 @@ import {
   planProperties,
   planProperty,
   plannedProblems,
+  plannedSave,
   portfolioSummary,
   propertyNameKey,
   startingPicks,
@@ -90,6 +91,67 @@ describe("a property whose rows need the owner", () => {
     const rows = ["Boiler", "Roof", "Carpet", "Range", "Fridge", "Stove"].map((name) => ({ ...row, name }));
     expect(plannedProblems({ ...base, rows, waiting: [0, 1, 2, 3, 4, 5] }, CURRENT_YEAR)).toEqual([
       "Boiler, Roof, Carpet and 3 more need you. Answer or fix them under Check the columns and rows first.",
+    ]);
+  });
+});
+
+describe("a column with each building's unit count on its rows", () => {
+  // Made-up buildings: Elm has 12 units and Oak 8, given on every row.
+  const sheet = (heading: string) =>
+    [
+      `Building,${heading},Item,Year installed,Cost each`,
+      "Elm,12,Asphalt shingle roof,2010,38000",
+      "Elm,12,Tank water heater,2015,1400",
+      "Oak,8,Asphalt shingle roof,2008,30000",
+      "Oak,8,Tank water heater,2016,1400",
+    ].join("\n");
+
+  it("is asked about, and holds every building until it's answered", () => {
+    for (const heading of ["# of units", "Unit count", "No. of units", "Total units", "Units"]) {
+      const asked = preview(sheet(heading));
+      expect(asked.quantityQuestion).toMatchObject({ column: 1, kind: "building", values: ["12", "8"], answer: null });
+      expect(asked.counts).toMatchObject({ rows: 4, needsYou: 4 });
+      const planned = planProperties(0, asked, names);
+      expect(planned.map((p) => [p.name, p.waiting])).toEqual([
+        ["Elm", [0, 1]],
+        ["Oak", [0, 1]],
+      ]);
+      expect(plannedProblems(withEdits(planned[0], { unitCount: "12" }), CURRENT_YEAR)).toEqual([
+        "Asphalt shingle roof and Tank water heater need you. Answer or fix them under Check the columns and rows first.",
+      ]);
+    }
+  });
+
+  it("answered as each building's unit count: one roof each, and a water heater in every unit", () => {
+    for (const heading of ["# of units", "Units"]) {
+      const answered = preview(sheet(heading), { columns: ["building", "unitCount", "item", "installYear", "cost"], quantityAnswered: true });
+      expect(answered.quantityQuestion?.answer).toBe("each_one");
+      const planned = planProperties(0, answered, names);
+      expect(planned.map((p) => [p.name, p.unitCount, p.waiting, plannedProblems(p, CURRENT_YEAR)])).toEqual([
+        ["Elm", "12", [], []],
+        ["Oak", "8", [], []],
+      ]);
+      expect(planned.map((p) => plannedSave(p, CURRENT_YEAR).components.map((c) => [c.name, c.quantity, c.unit_label]))).toEqual([
+        [
+          ["Asphalt shingle roof", 1, "per_building"],
+          ["Tank water heater", 12, "per_unit"],
+        ],
+        [
+          ["Asphalt shingle roof", 1, "per_building"],
+          ["Tank water heater", 8, "per_unit"],
+        ],
+      ]);
+    }
+  });
+
+  it("answered as the quantity: kept as the sheet gives it", () => {
+    const answered = preview(sheet("# of units"), { columns: ["building", "quantity", "item", "installYear", "cost"], quantityAnswered: true });
+    expect(answered.quantityQuestion?.answer).toBe("quantity");
+    const [elm] = planProperties(0, answered, names);
+    expect(elm.waiting).toEqual([]);
+    expect(elm.rows.map((r) => [r.name, r.quantity])).toEqual([
+      ["Asphalt shingle roof", "12"],
+      ["Tank water heater", "12"],
     ]);
   });
 });

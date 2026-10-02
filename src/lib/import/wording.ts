@@ -154,10 +154,11 @@ export function previewHints(preview: Preview): string[] {
   if (preview.noQuantityColumn && !preview.missingItemColumn && preview.quantityQuestion?.answer !== null) {
     const area = preview.areaColumn ? " Items priced per sq ft use the Square feet column instead." : "";
     const question = preview.quantityQuestion;
-    const units = question?.kind === "same" && question.answer === "each_one" ? columnLetter(question.column) : null;
+    const units = question && question.kind !== "numbers" && question.answer === "each_one" ? question : null;
+    const whose = units?.kind === "building" ? "each building's" : "the building's";
     hints.push(
       units !== null
-        ? `Column ${units} is the building's unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.${area}`
+        ? `Column ${columnLetter(units.column)} is ${whose} unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.${area}`
         : preview.quantityFromTotals
           ? `There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.${area}`
           : `There's no quantity column, so each row counts as one, and identical rows are added up.${area}`,
@@ -206,20 +207,23 @@ export function longListText(rowsNow: number, adding: number): string {
 }
 
 /**
- * The quantity question: "Column B, "Units", says 12 on every row. What is it?" or
- * "Column A, "#", has numbers like 1, 2 and 4. What are they?"
+ * The quantity question: "Column B, "Units", says 12 on every row. What is it?",
+ * "Column B, "# of units", has one number for each building, like 12 and 8. What is
+ * it?" or "Column A, "#", has numbers like 1, 2 and 4. What are they?"
  */
 export function quantityQuestionText(question: Pick<QuantityQuestion, "column" | "heading" | "kind" | "values">): string {
   const column = `Column ${columnLetter(question.column)}, ${quote(question.heading)},`;
   if (question.kind === "same") return `${column} says ${question.values[0]} on every row. What is it?`;
+  if (question.kind === "building") return `${column} has one number for each building, like ${listText(question.values)}. What is it?`;
   if (question.values.length === 1) return `${column} has the number ${question.values[0]}. What is it?`;
   return `${column} has numbers like ${listText(question.values)}. What are they?`;
 }
 
 /**
  * The two answers to the quantity question, in order: it's the quantity, or it isn't.
- * One number on every row is then the building's unit count, so items the library
- * counts per unit get one in each unit; other numbers number the rows.
+ * One number on every row (or on every row of each building) is then the building's
+ * unit count, so items the library counts per unit get one in each unit; other
+ * numbers number the rows.
  */
 export function quantityAnswers(
   question: Pick<QuantityQuestion, "kind">,
@@ -230,7 +234,9 @@ export function quantityAnswers(
       "each_one",
       question.kind === "same"
         ? "The number of units in the building. Items like fridges count one per unit, and the rest count as one."
-        : "Row or apartment numbers, so each row counts as one",
+        : question.kind === "building"
+          ? "Each building's unit count. Items like fridges count one per unit, and the rest count as one."
+          : "Row or apartment numbers, so each row counts as one",
     ],
   ];
 }

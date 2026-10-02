@@ -90,12 +90,12 @@ export default function SheetReview({
 
   /**
    * "quantity": the column is how many of each item. "each_one": it isn't. One number on
-   * every row is then the building's unit count, so items in every unit take the unit
-   * count and the rest count as one. Other numbers number the rows or apartments, so
-   * they're left out and each row counts as one.
+   * every row (or every row of each building) is then the building's unit count, so items
+   * in every unit take the unit count and the rest count as one. Other numbers number the
+   * rows or apartments, so they're left out and each row counts as one.
    */
   function answerQuantity(question: NonNullable<Preview["quantityQuestion"]>, value: "quantity" | "each_one") {
-    const role: ColumnRole = value === "quantity" ? "quantity" : question.kind === "same" ? "unitCount" : "ignore";
+    const role: ColumnRole = value === "quantity" ? "quantity" : question.kind === "numbers" ? "ignore" : "unitCount";
     setChoices((c) => ({
       ...c,
       quantityAnswered: true,

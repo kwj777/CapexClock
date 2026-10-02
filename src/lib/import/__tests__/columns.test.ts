@@ -1,4 +1,5 @@
 import {
+  buildingValues,
   columnValues,
   componentSlug,
   doubtfulQuantity,
@@ -493,6 +494,59 @@ describe("guessing the layout and every column", () => {
       expect(ask(["Item", "Units", "Qty"], ["item", "ignore", "quantity"], { 1: ["12"], 2: ["3", "4"] })).toBeNull();
       expect(ask(["Item", "#", "Qty"], ["item", "ignore", "quantity"], { 1: ["4", "9"], 2: ["3", "4"] })).toBeNull();
       expect(ask(["Item", "Units", "#"], ["item", "quantity", "quantity"], { 1: ["12"], 2: ["12"] })).toBeNull();
+    });
+
+    describe("in a sheet of several buildings", () => {
+      // Elm has 12 units and Oak 8, given on each of their rows.
+      const grid = (heading: string, cells = ["12", "12", "8", "8"]) => [
+        ["Building", heading, "Item"],
+        ["Elm", cells[0], "Asphalt shingle roof"],
+        ["Elm", cells[1], "Tank water heater"],
+        ["Oak", cells[2], "Asphalt shingle roof"],
+        ["Oak", cells[3], "Tank water heater"],
+      ];
+      const askEach = (rows: string[][], roles: ColumnRole[], buildingWide = no) =>
+        quantityQuestionColumn(rows[0], roles, columnValues(rows, 0), buildingWide, buildingValues(rows, 0, 0));
+
+      it("asks about a number that's the same on every row of each building", () => {
+        for (const heading of ["# of units", "Unit count", "No. of units", "Total units", "Number of apartments"]) {
+          expect(askEach(grid(heading), ["building", "quantity", "item"])).toEqual({ column: 1, kind: "building", values: ["12", "8"] });
+        }
+        // "Units" too, which would otherwise be asked about as numbers.
+        expect(askEach(grid("Units"), ["building", "ignore", "item"])).toEqual({ column: 1, kind: "building", values: ["12", "8"] });
+        // "Qty" only when a row is something a building has one of.
+        expect(askEach(grid("Qty"), ["building", "quantity", "item"])).toBeNull();
+        expect(askEach(grid("Qty"), ["building", "quantity", "item"], () => true)).toMatchObject({ kind: "building" });
+        // One number for every building is still "the same on every row".
+        expect(askEach(grid("# of units", ["12", "12", "12", "12"]), ["building", "quantity", "item"])).toMatchObject({ kind: "same" });
+      });
+
+      it("carries a building's name down to the rows under it, as merged cells do", () => {
+        const merged = grid("Unit count").map((row, i) => (i === 2 || i === 4 ? ["", ...row.slice(1)] : row));
+        expect(askEach(merged, ["building", "quantity", "item"])).toMatchObject({ kind: "building", values: ["12", "8"] });
+        expect(buildingValues(merged, 0, 0)(1)).toEqual([
+          ["12", "12"],
+          ["8", "8"],
+        ]);
+      });
+
+      it("asks about a lone row for each building only when the heading says units", () => {
+        const lone = [
+          ["Building", "# of units", "Item"],
+          ["Elm", "12", "Asphalt shingle roof"],
+          ["Oak", "8", "Asphalt shingle roof"],
+        ];
+        expect(askEach(lone, ["building", "quantity", "item"])).toMatchObject({ kind: "building" });
+        const qty = lone.map((row, i) => (i === 0 ? ["Building", "Qty", "Item"] : row));
+        expect(askEach(qty, ["building", "quantity", "item"], () => true)).toBeNull();
+      });
+
+      it("leaves numbers that differ within a building to the usual rules", () => {
+        expect(askEach(grid("# of units", ["12", "6", "8", "8"]), ["building", "quantity", "item"])).toBeNull();
+        expect(askEach(grid("Units", ["12", "6", "8", "8"]), ["building", "ignore", "item"])).toMatchObject({ kind: "numbers" });
+        // Without the buildings, a Units column of 12s and 8s is just numbers.
+        expect(ask(["Units", "Item"], ["ignore", "item"], { 0: ["12", "12", "8", "8"] })).toMatchObject({ kind: "numbers" });
+      });
     });
 
     it("looks past a numbering column to a Units column", () => {

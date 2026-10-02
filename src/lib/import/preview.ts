@@ -4,6 +4,7 @@ import type { UnitLabel } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
+  buildingValues,
   columnValues,
   componentSlug,
   doubtfulYearColumns,
@@ -178,8 +179,9 @@ export interface Preview {
 export interface QuantityQuestion extends QuantityDoubt {
   heading: string;
   /**
-   * "each_one": it's the building's unit count (kind "same"), so an item in every unit
-   * takes it and other rows count as one, or row numbers, so each row counts as one.
+   * "each_one": it's the building's unit count (kind "same" or "building"), so an item
+   * in every unit takes it and other rows count as one, or it's row numbers, so each
+   * row counts as one.
    */
   answer: "quantity" | "each_one" | null;
 }
@@ -1024,10 +1026,15 @@ export function buildPreview(
   const heads = headings(grid, headerRow);
   const { columns, layout } = choices;
   const libraryBySlug = new Map(library.map((c) => [c.slug, c]));
+  const buildingColumn = columns.indexOf("building");
   const doubt =
     layout === "rows"
-      ? quantityQuestionColumn(heads, columns, columnValues(grid, headerRow), () =>
-          namesBuildingWideItem(sheet, columns, libraryBySlug, match),
+      ? quantityQuestionColumn(
+          heads,
+          columns,
+          columnValues(grid, headerRow),
+          () => namesBuildingWideItem(sheet, columns, libraryBySlug, match),
+          buildingColumn >= 0 ? buildingValues(grid, headerRow, buildingColumn) : undefined,
         )
       : null;
   // Choosing "Building's unit count" for the column answers the question too.
@@ -1040,7 +1047,7 @@ export function buildPreview(
     choices,
     currentYear,
     quantityPending: doubt && quantityAnswer === null ? doubt.column : null,
-    unitsColumn: doubt?.kind === "same" && quantityAnswer === "each_one" ? doubt.column : null,
+    unitsColumn: doubt && doubt.kind !== "numbers" && quantityAnswer === "each_one" ? doubt.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
     known,
