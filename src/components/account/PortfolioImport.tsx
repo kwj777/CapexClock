@@ -316,7 +316,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
         already have, open it and use Import from a spreadsheet there.
       </p>
 
-      {!started && <SourcePicker onRead={onRead} onProblem={onProblem} />}
+      {!started && <SourcePicker where="portfolio" onRead={onRead} onProblem={onProblem} />}
 
       {problem && (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300">

@@ -27,10 +27,18 @@ import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@
 import { duplicates, duplicateText, longListText, NEEDS_YOU_TEXT } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
 import SheetReview, { type SheetState } from "./SheetReview";
-import SourcePicker, { headingClass, inputClass, labelClass, secondaryButton, type SourceRead } from "./SourcePicker";
+import SourcePicker, {
+  headingClass,
+  inputClass,
+  labelClass,
+  secondaryButton,
+  type ImportWhere as SourceWhere,
+  type SourceRead,
+} from "./SourcePicker";
 import TemplateLink from "./TemplateLink";
 
-export type ImportWhere = "calculator" | "editor" | "template_page";
+/** Where the panel is; My properties has its own importer. */
+export type ImportWhere = Exclude<SourceWhere, "portfolio">;
 
 export interface ImportPanelProps {
   id: string;
@@ -101,8 +109,8 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     if (!openedSheet || !preview || !read || previewed.current === openedSheet) return;
     previewed.current = openedSheet;
     const { rows, ready, changed, needsYou, skipped } = preview.counts;
-    void track("import_previewed", { rows, ready, flagged: changed + needsYou, skipped, source: read.source });
-  }, [openedSheet, preview, read]);
+    void track("import_previewed", { rows, ready, flagged: changed + needsYou, skipped, source: read.source, where });
+  }, [openedSheet, preview, read, where]);
 
   // Screen readers hear the summary once choices settle, not on every key press. For
   // a component list download, it says what the import updates, adds and removes.
@@ -218,7 +226,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
         downloaded here updates your rows when you import it again.
       </p>
 
-      <SourcePicker onRead={onRead} onProblem={onProblem} />
+      <SourcePicker where={where} onRead={onRead} onProblem={onProblem} />
 
       {problem && (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300">

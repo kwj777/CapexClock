@@ -31,7 +31,12 @@ export interface SourceRead {
   fileName: string | null;
 }
 
+/** Where an import happens, for the import events: the calculator, the property editor, the template page or My properties. */
+export type ImportWhere = "calculator" | "editor" | "template_page" | "portfolio";
+
 export interface SourcePickerProps {
+  /** Sent with import_started and import_failed, as the panel sends it with its own events. */
+  where: ImportWhere;
   onRead: (read: SourceRead) => void;
   /** A paste or file that couldn't be read; the source is null for an empty paste box. */
   onProblem: (problem: Problem) => void;
@@ -46,7 +51,7 @@ export interface SourcePickerProps {
  * Sends import_started once, when rows are pasted or a file is chosen, and
  * import_failed for anything that can't be read.
  */
-export default function SourcePicker({ onRead, onProblem, intro }: SourcePickerProps) {
+export default function SourcePicker({ where, onRead, onProblem, intro }: SourcePickerProps) {
   const baseId = useId();
   const pasteId = `${baseId}-paste`;
   const pasteHintId = `${baseId}-paste-hint`;
@@ -81,12 +86,12 @@ export default function SourcePicker({ onRead, onProblem, intro }: SourcePickerP
   function begin(source: ImportSource) {
     if (started.current) return;
     started.current = true;
-    void track("import_started", { source });
+    void track("import_started", { source, where });
   }
 
   function fail(problem: Problem, source: ImportSource) {
     const reason = failedReason(problem);
-    if (reason) void track("import_failed", { reason, source });
+    if (reason) void track("import_failed", { reason, source, where });
     onProblem(problem);
   }
 
