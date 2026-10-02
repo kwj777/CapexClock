@@ -69,8 +69,9 @@ export default async function SpreadsheetTemplatePage() {
               What to track, and why
             </h2>
             <p className="mt-3 text-slate-600 dark:text-slate-400">
-              The template has {FORMAT_COLUMNS.length} columns. Only Component, Quantity, Install year, Useful life and
-              Cost each are needed for a forecast. The rest make it more useful.
+              The template has {FORMAT_COLUMNS.length} columns. For a forecast, each row needs a Component and a Cost each,
+              and a Useful life for anything we don&apos;t know by name. Leave Install year blank to use the year built,
+              and leave Quantity blank on anything counted per unit to use the unit count. The rest make it more useful.
             </p>
             <dl className="mt-6 divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
               {FORMAT_COLUMNS.map((c) => (

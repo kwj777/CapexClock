@@ -479,8 +479,11 @@ or Numbers file, or a password-locked one), `forecast_file` (the forecast CSV, w
 read back; the owner is told to use the component list instead) or `unreadable`. The events carry
 counts and these labels only, never anything from the sheet. To see where imports come from, add
 a breakdown on the Import tile: `source` is `paste`, `file` (CSV) or `xlsx`, and `where` is
-`calculator`, `editor`, `template_page` or `portfolio` (My properties). On My properties, "Retry
-failed" sends `import_retried` instead of a second `import_completed`, so each import counts once.
+`calculator`, `editor`, `template_page` or `portfolio` (My properties). Every import event carries
+both, so the finish rate can be read for each page. On My properties, `import_completed` is sent
+once, when the first property of an import is created: on Create, or on a later "Retry failed"
+if the first try saved none (then it has `retry` = true). An import that creates nothing sends no
+`import_completed`. Each "Retry failed" also sends `import_retried`, so each import counts once.
 
 On **Template page**, `file` is `template` (the blank template) or `example` (the filled-in
 example). The page itself is checked in Search Console (below): it should show up in Google

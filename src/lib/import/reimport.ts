@@ -140,15 +140,20 @@ function plural(n: number, one: string, many = `${one}s`): string {
  * The button that applies the import: "Add 23 rows", or for a component list
  * download "Update 2 rows, add 1 and remove 3". Null when it would change nothing.
  */
-export function applyLabel(plan: ImportPlan, removeMissing: boolean): string | null {
-  if (!plan.matched) return plan.add.length > 0 ? `Add ${plural(plan.add.length, "row")}` : null;
+export function applyLabel(plan: ImportPlan, removeMissing: boolean, details: readonly DetailChange[] = []): string | null {
   const parts: string[] = [];
-  const changed = changedCount(plan);
-  if (changed > 0) parts.push(`update ${plural(changed, "row")}`);
-  if (plan.add.length > 0) parts.push(`add ${parts.length > 0 ? plan.add.length.toLocaleString("en-US") : plural(plan.add.length, "row")}`);
-  if (removeMissing && plan.missing.length > 0) {
-    parts.push(`remove ${parts.length > 0 ? plan.missing.length.toLocaleString("en-US") : plural(plan.missing.length, "row")}`);
+  if (!plan.matched) {
+    if (plan.add.length > 0) parts.push(`add ${plural(plan.add.length, "row")}`);
+  } else {
+    const changed = changedCount(plan);
+    if (changed > 0) parts.push(`update ${plural(changed, "row")}`);
+    if (plan.add.length > 0) parts.push(`add ${parts.length > 0 ? plan.add.length.toLocaleString("en-US") : plural(plan.add.length, "row")}`);
+    if (removeMissing && plan.missing.length > 0) {
+      parts.push(`remove ${parts.length > 0 ? plan.missing.length.toLocaleString("en-US") : plural(plan.missing.length, "row")}`);
+    }
   }
+  // The building's details change too, so the button says so.
+  for (const d of details) parts.push(`set ${DETAIL_NAME[d.field]} to ${d.value}`);
   if (parts.length === 0) return null;
   const text = listText(parts);
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -191,8 +196,14 @@ export function planSummary(plan: ImportPlan): string[] {
  * list download says what it does to the list, removals included:
  * "7 rows: 1 to update, 1 to add and 5 the same. 7 ready. 1 row in your list isn't in this file and will stay."
  */
-export function importSummary(counts: Preview["counts"], plan: ImportPlan, removeMissing: boolean): string {
-  if (!plan.matched) return previewSummary(counts);
+export function importSummary(
+  counts: Preview["counts"],
+  plan: ImportPlan,
+  removeMissing: boolean,
+  details: readonly DetailChange[] = [],
+): string {
+  const change = detailsText(details, "before");
+  if (!plan.matched) return change ? `${previewSummary(counts)} ${change}` : previewSummary(counts);
   const changed = changedCount(plan);
   const same = plan.update.length - changed;
   const parts: string[] = [];
@@ -209,7 +220,7 @@ export function importSummary(counts: Preview["counts"], plan: ImportPlan, remov
       `${plural(missing, "row")} in your list ${missing === 1 ? "isn't" : "aren't"} in this file and will ${removeMissing ? "be removed" : "stay"}.`,
     );
   }
-  return `${lines.join(" ")}${skippedText(counts)}`;
+  return `${lines.join(" ")}${skippedText(counts)}${change ? ` ${change}` : ""}`;
 }
 
 /** Most rows the remove choice names itself; past this, every one is listed above it. */
@@ -259,6 +270,23 @@ export interface DetailChange {
   current: string;
 }
 
+const DETAIL_NAME: Record<DetailChange["field"], string> = { unitCount: "rental units", yearBuilt: "year built" };
+
+/**
+ * The building details an import sets, as a sentence: "Rental units will be set to
+ * 14 and year built to 1998." or, once done, "Rental units are now 14." "" for none.
+ */
+export function detailsText(details: readonly DetailChange[], when: "before" | "after"): string {
+  if (details.length === 0) return "";
+  const said = details.map((d, i) => {
+    const name = DETAIL_NAME[d.field];
+    if (when === "after") return `${name} ${d.field === "unitCount" ? "are" : "is"} now ${d.value}`;
+    return i === 0 ? `${name} will be set to ${d.value}` : `${name} to ${d.value}`;
+  });
+  const text = listText(said);
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
 /**
  * The sheet's unit count and year built against the list's: blank ones in the list
  * are filled in, and different ones are asked about. Equal ones aren't mentioned.
@@ -294,15 +322,23 @@ export function askText(change: DetailChange): string {
   return `Change ${change.field === "unitCount" ? "rental units" : "year built"} from ${change.current} to ${change.value}`;
 }
 
-/** What the list hears once the import is applied: "Updated 2 rows and added 1 from your spreadsheet." */
-export function doneText(plan: ImportPlan, removed: number): string {
-  if (!plan.matched) return `Added ${plural(plan.add.length, "row")} from your spreadsheet.`;
-  const changed = changedCount(plan);
+/**
+ * What the list hears once the import is applied: "Updated 2 rows and added 1 from
+ * your spreadsheet. Rental units are now 14."
+ */
+export function doneText(plan: ImportPlan, removed: number, details: readonly DetailChange[] = []): string {
   const parts: string[] = [];
-  if (changed > 0) parts.push(`updated ${plural(changed, "row")}`);
-  if (plan.add.length > 0) parts.push(`added ${parts.length > 0 ? plan.add.length.toLocaleString("en-US") : plural(plan.add.length, "row")}`);
-  if (removed > 0) parts.push(`removed ${parts.length > 0 ? removed.toLocaleString("en-US") : plural(removed, "row")}`);
-  if (parts.length === 0) return "Your list already matched the spreadsheet.";
+  if (!plan.matched) {
+    if (plan.add.length > 0) parts.push(`added ${plural(plan.add.length, "row")}`);
+  } else {
+    const changed = changedCount(plan);
+    if (changed > 0) parts.push(`updated ${plural(changed, "row")}`);
+    if (plan.add.length > 0) parts.push(`added ${parts.length > 0 ? plan.add.length.toLocaleString("en-US") : plural(plan.add.length, "row")}`);
+    if (removed > 0) parts.push(`removed ${parts.length > 0 ? removed.toLocaleString("en-US") : plural(removed, "row")}`);
+  }
+  const change = detailsText(details, "after");
+  if (parts.length === 0) return change || "Your list already matched the spreadsheet.";
   const text = listText(parts);
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)} from your spreadsheet.`;
+  const rows = `${text.charAt(0).toUpperCase()}${text.slice(1)} from your spreadsheet.`;
+  return change ? `${rows} ${change}` : rows;
 }

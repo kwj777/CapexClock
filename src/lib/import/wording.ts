@@ -1,6 +1,6 @@
 import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { FixField, ImportedRow, Preview, PreviewRow, RowStatus, SkipReason, Skipped } from "./preview";
+import type { FixField, ImportedRow, Preview, PreviewRow, QuantityQuestion, RowStatus, SkipReason, Skipped } from "./preview";
 import { columnLetter, listText, quote } from "./text";
 
 export { columnLetter };
@@ -39,6 +39,17 @@ export function rowNumbers(rows: readonly number[]): string {
   }
   const shown = items.length > 12 ? [...items.slice(0, 10), `${items.length - 10} more`] : items;
   return `${sorted.length === 1 ? "Row" : "Rows"} ${listText(shown)}`;
+}
+
+/**
+ * A preview row as a screen reader hears it beside its fix boxes, so each box and
+ * Apply says which row it's for: "Gas furnace, row 5", or "row 9" with no name.
+ */
+export function rowLabel(row: Pick<PreviewRow, "row" | "sheetRows">): string {
+  const rows = rowNumbers(row.sheetRows);
+  const lower = `${rows.charAt(0).toLowerCase()}${rows.slice(1)}`;
+  const name = row.row.name.trim();
+  return name ? `${name}, ${lower}` : lower;
 }
 
 /** Skipped rows grouped by why: "Rows 1–2: above the headings". */
@@ -139,18 +150,18 @@ export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
 export function previewHints(preview: Preview): string[] {
   const hints: string[] = [];
   if (preview.missingItemColumn) hints.push("Choose which column has the item names.");
-  // While the units question is open, it says what happens instead.
-  if (preview.noQuantityColumn && !preview.missingItemColumn && preview.unitsQuestion?.answer !== null) {
+  // While the quantity question is open, it says what happens instead.
+  if (preview.noQuantityColumn && !preview.missingItemColumn && preview.quantityQuestion?.answer !== null) {
+    const area = preview.areaColumn ? " Items priced per sq ft use the Square feet column instead." : "";
+    const question = preview.quantityQuestion;
+    const units = question && question.kind !== "numbers" && question.answer === "each_one" ? question : null;
+    const whose = units?.kind === "building" ? "each building's" : "the building's";
     hints.push(
-      preview.quantityFromTotals
-        ? "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up."
-        : "There's no quantity column, so each row counts as one, and identical rows are added up.",
-    );
-  }
-  if (preview.doubtfulQuantity) {
-    const { column, heading } = preview.doubtfulQuantity;
-    hints.push(
-      `We used column ${columnLetter(column)}, ${quote(heading)}, as the quantity. If it numbers the rows or apartments instead, set it to Ignore.`,
+      units !== null
+        ? `Column ${columnLetter(units.column)} is ${whose} unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.${area}`
+        : preview.quantityFromTotals
+          ? `There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.${area}`
+          : `There's no quantity column, so each row counts as one, and identical rows are added up.${area}`,
     );
   }
   if (preview.noYearColumn && !preview.missingItemColumn) {
@@ -166,6 +177,11 @@ export function previewHints(preview: Preview): string[] {
         : `We read ${named}, as the year to replace each item by. If it's when each item was last replaced, choose Install year for it above.`,
     );
   }
+  for (const { column, heading, kept, name } of preview.sameItems) {
+    hints.push(
+      `We left out column ${columnLetter(column)}, ${quote(heading)}, since column ${columnLetter(kept)} already gives each apartment's ${name}. If they're separate items, choose ${name} for column ${columnLetter(column)} above.`,
+    );
+  }
   if (preview.withoutCost > 0) {
     hints.push(
       `${plural(preview.withoutCost, "row has", "rows have")} no cost yet. Add costs after importing to include ${
@@ -176,20 +192,72 @@ export function previewHints(preview: Preview): string[] {
   return hints;
 }
 
-/** The calculator re-draws every row as you type, so past this many rows it starts to lag. */
-export const SLOW_ROWS = 300;
+/**
+ * Past this many rows, typing in the calculator can lag on a slower computer: it
+ * redraws only the row being edited, but the forecast still works through every row.
+ */
+export const SLOW_ROWS = 500;
 
 /** The warning above Add when the list would get long enough to slow the calculator, or "" when it won't. */
 export function longListText(rowsNow: number, adding: number): string {
   const total = rowsNow + adding;
   if (adding === 0 || total <= SLOW_ROWS) return "";
   const makes = rowsNow > 0 ? `Adding these makes ${plural(total, "row")} in your list` : `That's ${plural(total, "row")}`;
-  return `${makes}, and the calculator gets slow past about ${SLOW_ROWS}. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.`;
+  return `${makes}, and the calculator gets slow past about ${SLOW_ROWS.toLocaleString("en-US")}. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.`;
 }
 
-/** The units question: "Column B, "Units", says 12 on every row. What is it?" */
-export function unitsQuestionText(question: NonNullable<Preview["unitsQuestion"]>): string {
-  return `Column ${columnLetter(question.column)}, ${quote(question.heading)}, says ${question.value} on every row. What is it?`;
+/**
+ * The quantity question: "Column B, "Units", says 12 on every row. What is it?",
+ * "Column B, "# of units", has one number for each building, like 12 and 8. What is
+ * it?" or "Column A, "#", has numbers like 1, 2 and 4. What are they?"
+ */
+export function quantityQuestionText(question: Pick<QuantityQuestion, "column" | "heading" | "kind" | "values">): string {
+  const column = `Column ${columnLetter(question.column)}, ${quote(question.heading)},`;
+  if (question.kind === "same") return `${column} says ${question.values[0]} on every row. What is it?`;
+  if (question.kind === "building") return `${column} has one number for each building, like ${listText(question.values)}. What is it?`;
+  if (question.values.length === 1) return `${column} has the number ${question.values[0]}. What is it?`;
+  return `${column} has numbers like ${listText(question.values)}. What are they?`;
+}
+
+/**
+ * The two answers to the quantity question, in order: it's the quantity, or it isn't.
+ * One number on every row (or on every row of each building) is then the building's
+ * unit count, so items the library counts per unit get one in each unit; other
+ * numbers number the rows.
+ */
+export function quantityAnswers(
+  question: Pick<QuantityQuestion, "kind">,
+): readonly (readonly ["quantity" | "each_one", string])[] {
+  return [
+    ["quantity", "How many of each item there are"],
+    [
+      "each_one",
+      question.kind === "same"
+        ? "The number of units in the building. Items like fridges count one per unit, and the rest count as one."
+        : question.kind === "building"
+          ? "Each building's unit count. Items like fridges count one per unit, and the rest count as one."
+          : "Row or apartment numbers, so each row counts as one",
+    ],
+  ];
+}
+
+/** Under the Needs you heading, and above Add while any row still needs the owner. */
+export const NEEDS_YOU_TEXT = {
+  section:
+    "Fix these here if you can. If you add them as they are, the calculator flags anything missing or unreadable, and the rest go in as each one says.",
+  /** On My properties, where rows are saved straight away, so none is saved as a guess. */
+  beforeCreate: "Answer or fix each of these. A property can't be created while any of its rows still need you.",
+  beforeAdd:
+    "Rows that still need you are added too. The calculator flags anything missing or unreadable, and the rest go in as each one says.",
+};
+
+/**
+ * An issue's words where a row that needs the owner can't be saved as it is (My
+ * properties): what would happen if it were left goes, since it can't be left.
+ * "…or type the quantity. If you don't, it's added as 12." ends "…or type the quantity."
+ */
+export function issueBeforeCreate(text: string): string {
+  return text.replace(/\s*If you don't, [^.]*\.$/, "").replace(/, or it's added as its own item\.$/, ".");
 }
 
 /** The label of each field the preview lets the owner fix. */

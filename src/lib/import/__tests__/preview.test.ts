@@ -189,6 +189,51 @@ describe("a sheet with one row per apartment and a column per item", () => {
   });
 });
 
+describe("two columns about the same item, one row per apartment", () => {
+  const sheet = ["Apt,Water heater installed,Water heater age,Furnace installed", "101,2014,12,2012", "102,2016,10,2012", "103,2014,12,2010"].join("\n");
+
+  it("counts each apartment's item once, from the install year column", () => {
+    const opened = open(sheet);
+    expect(opened.layout).toBe("columns");
+    expect(opened.columns).toEqual(["location", "component:tank-water-heater", "ignore", "component:gas-furnace"]);
+    const p = preview(sheet);
+    const heaters = p.rows.filter((r) => r.row.librarySlug === "tank-water-heater");
+    expect(heaters.map((r) => [r.row.installYear, r.row.installYearIsGuess, r.row.quantity])).toEqual([
+      ["2014", false, "2"],
+      ["2016", false, "1"],
+    ]);
+    // Only the install years are read, so the sheet's year isn't asked for.
+    expect(p.usesSheetYear).toBe(false);
+    expect(p.sameItems).toEqual([{ column: 2, heading: "Water heater age", kept: 1, name: "Tank water heater" }]);
+  });
+
+  it("adds 3 water heaters to a 3-unit building, not 6", () => {
+    const rows = preview(sheet).rows.map((r) => r.row);
+    const draft = withImportedRows({ unitCount: "3", yearBuilt: "1985", rows: [] }, rows);
+    const heaters = draft.rows.filter((r) => r.librarySlug === "tank-water-heater");
+    expect(heaters.reduce((sum, r) => sum + Number(r.quantity), 0)).toBe(3);
+  });
+
+  it("uses the age column when it's the only one, wherever it is", () => {
+    const ageFirst = ["Apt,WH age,Water heater installed", "101,12,2014"].join("\n");
+    expect(open(ageFirst).columns).toEqual(["location", "ignore", "component:tank-water-heater"]);
+    const p = preview(ageFirst);
+    expect(p.sameItems).toEqual([{ column: 1, heading: "WH age", kept: 2, name: "Tank water heater" }]);
+  });
+
+  it("counts both when the owner says they're separate items", () => {
+    const both = preview(sheet, { columns: ["location", "component:tank-water-heater", "component:tank-water-heater", "component:gas-furnace"] });
+    expect(both.sameItems).toEqual([]);
+    expect(both.rows.filter((r) => r.row.librarySlug === "tank-water-heater").reduce((n, r) => n + Number(r.row.quantity), 0)).toBe(6);
+  });
+
+  it("keeps numbered columns as separate items", () => {
+    const two = ["Apt,Fridge 1,Fridge 2,Water heater installed", "101,2014,2019,2016"].join("\n");
+    expect(open(two).columns).toEqual(["location", "component:refrigerator", "component:refrigerator", "component:tank-water-heater"]);
+    expect(preview(two).sameItems).toEqual([]);
+  });
+});
+
 describe("a sheet with ages", () => {
   it("counts back from the year the sheet was last updated, marking guesses", () => {
     const p = preview(AGE_ROWS, { sheetYear: 2024 });
@@ -343,22 +388,93 @@ describe("a sheet with numbered rows", () => {
       ["Gas furnace", "12"],
       ["Boiler", "1"],
     ]);
-    expect(p.doubtfulQuantity).toBeNull();
+    expect(p.quantityQuestion).toBeNull();
   });
 
   it("skips the total at the foot, even with a number in front of it", () => {
     expect(p.skipped).toEqual([{ sheetRow: 5, reason: "total" }]);
   });
 
-  it("uses # as the quantity when nothing else is, and says so", () => {
-    const sheet = ["#,Item,Year", "12,Fridge,2018", "1,Roof,2008", "24,Smoke detector,2020"].join("\n");
+  it("asks whether # is the quantity when nothing else is, and holds the rows it changes", () => {
+    const sheet = ["#,Item,Year", "12,Fridge,2018", "1,Boiler,2008", "24,Smoke detector,2020"].join("\n");
     const counts = preview(sheet);
-    expect(counts.rows.map((r) => r.row.quantity)).toEqual(["12", "1", "24"]);
-    expect(counts.doubtfulQuantity).toEqual({ column: 0, heading: "#" });
+    expect(counts.quantityQuestion).toEqual({ column: 0, heading: "#", kind: "numbers", values: ["12", "1", "24"], answer: null });
+    expect(counts.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+      ["1", "needs_you"],
+      // Both answers give this row 1, so it doesn't wait.
+      ["1", "ready"],
+      ["1", "needs_you"],
+    ]);
+    const answered = preview(sheet, { columns: ["quantity", "item", "installYear"], quantityAnswered: true });
+    expect(answered.quantityQuestion?.answer).toBe("quantity");
+    // The smoke detector still needs a useful life, but no row waits on the question.
+    expect(answered.rows.map((r) => [r.row.quantity, r.issues.filter((i) => i.field === "quantity")])).toEqual([
+      ["12", []],
+      ["1", []],
+      ["24", []],
+    ]);
     const numbered = preview(["#,Item,Year", "1,Fridge,2018", "2,Roof,2008", "3,Smoke detector,2020"].join("\n"));
     expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
     expect(numbered.noQuantityColumn).toBe(true);
-    expect(numbered.doubtfulQuantity).toBeNull();
+    expect(numbered.quantityQuestion).toBeNull();
+  });
+
+  describe("row and apartment numbers that don't simply run 1, 2, 3", () => {
+    const status = (p: Preview) => p.rows.map((r) => [r.row.name, r.row.quantity, r.status]);
+
+    it("doesn't take a numbering with a gap for quantities", () => {
+      const sheet = ["#,Item,Year installed,Cost each", "1,Tank water heater,2016,1400", "2,Gas furnace,2012,4200", "4,Boiler,2010,60000", "5,Refrigerator,2018,900"].join("\n");
+      const p = preview(sheet);
+      expect(p.quantityQuestion).toMatchObject({ column: 0, kind: "numbers", answer: null });
+      expect(status(p)).toEqual([
+        ["Tank water heater", "1", "ready"],
+        ["Gas furnace", "1", "needs_you"],
+        ["Boiler", "1", "needs_you"],
+        ["Refrigerator", "1", "needs_you"],
+      ]);
+      expect(p.counts).toMatchObject({ ready: 1, needsYou: 3 });
+      expect(byName(p, "Boiler").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column A above, or type the quantity. If you don't, it's added as 1." },
+      ]);
+      const numbers = preview(sheet, { quantityAnswered: true });
+      expect(numbers.quantityQuestion?.answer).toBe("each_one");
+      expect(numbers.rows.every((r) => r.issues.length === 0 && r.row.quantity === "1")).toBe(true);
+      expect(numbers.counts.needsYou).toBe(0);
+    });
+
+    it("doesn't take numbers sorted by another column for quantities", () => {
+      const p = preview(["No.,Item,Year installed", "3,Fridge,2012", "1,Range,2015", "2,Dishwasher,2019"].join("\n"));
+      expect(p.quantityQuestion).toMatchObject({ column: 0, heading: "No.", kind: "numbers" });
+      expect(status(p).map(([, quantity]) => quantity)).toEqual(["1", "1", "1"]);
+      expect(p.counts.needsYou).toBe(2);
+    });
+
+    it("doesn't take apartment numbers for quantities, or add them up", () => {
+      const sheet = ["#,Item,Year installed", "101,Water heater,2016", "102,Water heater,2016", "201,Water heater,2016"].join("\n");
+      const p = preview(sheet);
+      expect(status(p)).toEqual([["Tank water heater", "3", "needs_you"]]);
+      expect(byName(p, "Tank water heater").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column A above, or type the quantity. If you don't, it's added as 3." },
+      ]);
+      // Taken as counts only once the owner says so.
+      const counts = preview(sheet, { columns: ["quantity", "item", "installYear"], quantityAnswered: true });
+      expect(status(counts)).toEqual([["Tank water heater", "404", "changed"]]);
+    });
+
+    it("asks about a sheet of two rows", () => {
+      const p = preview(["#,Item,Year installed", "1,Fridge,2012", "2,Range,2015"].join("\n"));
+      expect(p.quantityQuestion).toMatchObject({ kind: "numbers", values: ["1", "2"] });
+      expect(status(p)).toEqual([
+        ["Refrigerator", "1", "changed"],
+        ["Range / oven", "1", "needs_you"],
+      ]);
+    });
+
+    it("lets a typed quantity stand without the answer", () => {
+      const p = preview(["#,Item,Year installed", "4,Fridge,2012", "9,Range,2015"].join("\n"), { fixes: { r1: { quantity: "12" } } });
+      expect(byName(p, "Refrigerator")).toMatchObject({ issues: [], row: { quantity: "12" } });
+      expect(byName(p, "Range / oven").status).toBe("needs_you");
+    });
   });
 });
 
@@ -455,7 +571,10 @@ describe("a total that disagrees with the quantity and cost each", () => {
     const heater = byName(p, "Tank water heater");
     expect(heater.status).toBe("needs_you");
     expect(heater.issues).toEqual([
-      { field: "quantity", text: "The sheet's total, $16,800, isn't 1 × $1,400. Fix the quantity or the cost each, or ignore the Total column." },
+      {
+        field: "quantity",
+        text: "The sheet's total, $16,800, isn't 1 × $1,400. Fix the quantity or the cost each, or ignore the Total column. If you don't, the total isn't used.",
+      },
       { field: "costEach", text: "Leave this blank to keep $1,400." },
     ]);
     // Rounding is fine.
@@ -469,7 +588,7 @@ describe("a total that disagrees with the quantity and cost each", () => {
     const p = preview(["Item,Cost,Total", "Fridge,1100,2000"].join("\n"));
     expect(byName(p, "Refrigerator").issues[0]).toEqual({
       field: "quantity",
-      text: "The sheet's total, $2,000, isn't 1 × $1,100. Fix the quantity or the cost each, or ignore the Total column.",
+      text: "The sheet's total, $2,000, isn't 1 × $1,100. Fix the quantity or the cost each, or ignore the Total column. If you don't, the total isn't used.",
     });
   });
 
@@ -531,6 +650,31 @@ describe("fitting notes", () => {
     expect(notes.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
     expect(notes).toMatch(/\n…and \d+ more notes$/);
   });
+
+  it("keeps room for the sheet's notes when the list of apartments is long", () => {
+    const many = Array.from({ length: 400 }, (_, i) => ({ location: `${1000 + i}`, details: [`Note for ${1000 + i}`] }));
+    const notes = mergedNotes("Apt", many);
+    expect(notes.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+    const [places, ...rest] = notes.split("\n");
+    expect(places.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH / 2);
+    expect(places).toMatch(/^Apt: 1000, 1001, .* …and \d+ more$/);
+    expect(rest[0]).toBe("1000: Note for 1000");
+    expect(rest.at(-1)).toMatch(/^…and \d+ more notes$/);
+    // Without notes, the list of apartments can use all the room.
+    const plain = mergedNotes("Apt", many.map((m) => ({ ...m, details: [] })));
+    expect(plain.length).toBeGreaterThan(MAX_NOTES_LENGTH / 2);
+    expect(plain.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+  });
+
+  it("never cuts an emoji in half, which the database would refuse", () => {
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    // A long last note is cut to fit, and with an odd limit the cut lands inside an emoji.
+    const long = mergedNotes("Apt", [{ location: "", details: ["🚿".repeat(1500)] }]);
+    expect(long.length).toBeLessThanOrEqual(MAX_NOTES_LENGTH);
+    expect(long).not.toMatch(lone);
+    const places = mergedNotes("Apt", Array.from({ length: 900 }, (_, i) => ({ location: `🏠${i}`, details: [] })));
+    expect(places).not.toMatch(lone);
+  });
 });
 
 describe("service, inspection and replacement dates", () => {
@@ -577,6 +721,66 @@ describe("service, inspection and replacement dates", () => {
   });
 });
 
+describe("a Square feet column", () => {
+  it("asks whether the cost is per sq ft when the library prices the item that way and the sheet doesn't say", () => {
+    const sheet = ["Item,Area (SF),Unit cost", "Carpet,9600,$4"].join("\n");
+    expect(open(sheet).columns).toEqual(["item", "area", "cost"]);
+    expect(preview(sheet)).toMatchObject({ noQuantityColumn: true, areaColumn: true });
+    expect(preview(["Item,Unit cost", "Carpet,$4"].join("\n")).areaColumn).toBe(false);
+    const carpet = byName(preview(sheet), "Carpet");
+    expect(carpet.status).toBe("needs_you");
+    expect(carpet.issues).toEqual([
+      {
+        field: "costEach",
+        text: 'Column B says 9,600 sq ft. If $4 is per sq ft, type "4/sq ft" here. If it\'s for the whole area, type 4. If you don\'t, the square feet aren\'t used.',
+      },
+    ]);
+    expect(carpet.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "4", notes: "Area: 9,600 sq ft" });
+    // Per sq ft: the square feet are the quantity.
+    const perSqFt = byName(preview(sheet, { fixes: { r1: { costEach: "4/sq ft" } } }), "Carpet");
+    expect(perSqFt.issues).toEqual([]);
+    expect(perSqFt.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft", costEach: "4" });
+    // For the whole area: one, at that cost.
+    const whole = byName(preview(sheet, { fixes: { r1: { costEach: "38400" } } }), "Carpet");
+    expect(whole.issues).toEqual([]);
+    expect(whole.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "38400", notes: "Area: 9,600 sq ft" });
+  });
+
+  it("uses the square feet as the quantity when the cost is per sq ft", () => {
+    const heading = byName(preview(["Item,SF,Cost per sq ft", "Carpet,9600,4"].join("\n")), "Carpet");
+    expect(heading.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft", costEach: "4", notes: "" });
+    expect(heading.changes).toContain("Used the 9,600 sq ft in column B as the quantity, since the cost is per sq ft");
+    expect(heading.issues).toEqual([]);
+    const cell = byName(preview(["Item,Sq ft,Cost", "Hallway tile,800,$9/sf"].join("\n")), "Hallway tile");
+    expect(cell.row).toMatchObject({ quantity: "800", unitLabel: "per_sq_ft", costEach: "9" });
+    // A quantity that's a count gives way, and the row says so.
+    const counted = byName(preview(["Item,Qty,Sq ft,Cost per sq ft", "Carpet,12,9600,4"].join("\n")), "Carpet");
+    expect(counted.row).toMatchObject({ quantity: "9600", unitLabel: "per_sq_ft" });
+    expect(counted.changes).toContain("Used the 9,600 sq ft in column C as the quantity, not the quantity 12, since the cost is per sq ft");
+  });
+
+  it("uses the square feet for an item priced per sq ft with no cost yet", () => {
+    const lot = byName(preview(["Item,Sq ft,Year", "Parking lot resurface,20000,2010"].join("\n")), "Parking lot resurface");
+    expect(lot.row).toMatchObject({ quantity: "20000", unitLabel: "per_sq_ft", costEach: "" });
+    expect(lot.changes).toContain("Used the 20,000 sq ft in column B as the quantity, since Parking lot resurface is priced per sq ft");
+  });
+
+  it("keeps an area in the notes when the cost is for the whole item", () => {
+    const p = preview(["Item,Qty,Sq ft,Cost", "Asphalt shingle roof,1,8000,\"$45,000\"", "Carpet,12,9600,\"$2,500\""].join("\n"));
+    const roof = byName(p, "Asphalt shingle roof");
+    expect(roof.status).toBe("ready");
+    expect(roof.row).toMatchObject({ quantity: "1", unitLabel: "per_building", costEach: "45000", notes: "Area: 8,000 sq ft" });
+    const carpet = byName(p, "Carpet");
+    expect(carpet.issues).toEqual([]);
+    expect(carpet.row).toMatchObject({ quantity: "12", unitLabel: "per_building", notes: "Area: 9,600 sq ft" });
+  });
+
+  it("asks for the square feet when the cost is per sq ft and the area can't be read", () => {
+    const carpet = byName(preview(["Item,Sq ft,Cost", "Carpet,lots,$4/sf"].join("\n")), "Carpet");
+    expect(carpet.issues).toEqual([{ field: "quantity", text: 'Column B says "lots". Type the square feet.' }]);
+  });
+});
+
 describe("items the library counts in square feet", () => {
   it("keeps a count as a count, priced each, and says so", () => {
     const p = preview(["Item,Qty,Year,Cost each", "Carpet,12,2020,2500", "Parking lot resurface,1,2010,60000"].join("\n"));
@@ -612,7 +816,13 @@ describe("items the library counts in square feet", () => {
     const p = preview(["Item,Cost", "Carpet,$4/sf"].join("\n"));
     const carpet = byName(p, "Carpet");
     expect(carpet.status).toBe("needs_you");
-    expect(carpet.issues).toEqual([{ field: "quantity", text: "The cost is per sq ft. Type the square feet." }]);
+    expect(carpet.issues).toEqual([
+      { field: "quantity", text: "The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft." },
+    ]);
+    // Two rows like it, combined, are added as 2 sq ft.
+    expect(byName(preview(["Item,Cost", "Carpet,$4/sf", "Carpet,$4/sf"].join("\n")), "Carpet").issues).toEqual([
+      { field: "quantity", text: "The cost is per sq ft. Type the square feet. If you don't, it's added as 2 sq ft." },
+    ]);
     const fixed = byName(preview(["Item,Cost", "Carpet,$4/sf"].join("\n"), { fixes: { r1: { quantity: "900 sq ft" } } }), "Carpet");
     expect(fixed.issues).toEqual([]);
     expect(fixed.row).toMatchObject({ quantity: "900", unitLabel: "per_sq_ft" });
@@ -649,7 +859,7 @@ describe("a Units column with the same number on every row", () => {
   it("asks once whether it's the quantity, and holds the rows until it's answered", () => {
     const p = preview(sheet);
     expect(open(sheet).columns).toEqual(["item", "ignore", "installYear", "cost"]);
-    expect(p.unitsQuestion).toEqual({ column: 1, heading: "Units", value: "12", answer: null });
+    expect(p.quantityQuestion).toEqual({ column: 1, heading: "Units", kind: "same", values: ["12"], answer: null });
     expect(p.rows.map((r) => [r.row.quantity, r.status])).toEqual([
       ["1", "needs_you"],
       ["1", "needs_you"],
@@ -661,38 +871,143 @@ describe("a Units column with the same number on every row", () => {
   });
 
   it("uses it as the quantity when the owner says so", () => {
-    const p = preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], unitsAnswered: true });
-    expect(p.unitsQuestion?.answer).toBe("quantity");
+    const p = preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true });
+    expect(p.quantityQuestion?.answer).toBe("quantity");
     expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
       ["12", []],
       ["12", []],
       ["12", []],
     ]);
-    expect(p.doubtfulQuantity).toBeNull();
   });
 
-  it("counts each row as one when it's the building's unit count", () => {
-    const p = preview(sheet, { unitsAnswered: true });
-    expect(p.unitsQuestion?.answer).toBe("building");
-    expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
-      ["1", []],
-      ["1", []],
-      ["1", []],
+  // Answering "the number of units in the building" sets the column to the building's unit count.
+  const asUnits = { columns: ["item", "unitCount", "installYear", "cost"] as const, quantityAnswered: true };
+
+  it("gives an item in every unit the unit count when it's the building's unit count", () => {
+    const p = preview(sheet, asUnits);
+    expect(p.quantityQuestion?.answer).toBe("each_one");
+    expect(p.buildings).toMatchObject([{ key: "", unitCount: 12 }]);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.followsUnitCount, r.row.unitLabel, r.status, r.issues])).toEqual([
+      ["Tank water heater", "12", true, "per_unit", "changed", []],
+      ["Refrigerator", "12", true, "per_unit", "changed", []],
+      ["Range / oven", "12", true, "per_unit", "changed", []],
     ]);
+    expect(byName(p, "Refrigerator").changes).toEqual(['Matched "Fridge" to Refrigerator', "One in each unit, so used the unit count"]);
+    expect(detailsText(byName(p, "Refrigerator").row, true)).toMatch(/^Qty 12, the unit count · /);
+    // Set to Ignore instead, the sheet gives no unit count, so the list's is used.
+    const ignored = preview(sheet, { quantityAnswered: true });
+    expect(ignored.quantityQuestion?.answer).toBe("each_one");
+    expect(ignored.rows.map((r) => [r.row.quantity, r.row.followsUnitCount])).toEqual([
+      ["", true],
+      ["", true],
+      ["", true],
+    ]);
+  });
+
+  it("counts a building-wide item and the owner's own item as one when it's the building's unit count", () => {
+    const mixed = [
+      "Item,Units,Year,Cost",
+      "Asphalt shingle roof,8,2010,30000",
+      "Boiler,8,2012,60000",
+      "Zorbex,8,2019,700",
+      "Gas furnace,8,2014,4200",
+    ].join("\n");
+    const p = preview(mixed, asUnits);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.followsUnitCount ?? false, r.row.unitLabel])).toEqual([
+      ["Asphalt shingle roof", "1", false, "per_building"],
+      ["Boiler", "1", false, "per_building"],
+      ["Zorbex", "1", false, "per_building"],
+      ["Gas furnace", "8", true, "per_unit"],
+    ]);
+    // A total is divided by the sheet's unit count, and a typed quantity wins.
+    const totals = preview(["Item,Units,Total", "Refrigerator,8,7200", "Boiler,8,60000"].join("\n"), {
+      columns: ["item", "unitCount", "total"],
+      quantityAnswered: true,
+    });
+    expect(totals.rows.map((r) => [r.row.quantity, r.row.costEach])).toEqual([
+      ["8", "900"],
+      ["1", "60000"],
+    ]);
+    const typed = preview(mixed, { ...asUnits, fixes: { r4: { quantity: "2" } } });
+    expect(byName(typed, "Gas furnace").row.quantity).toBe("2");
+    expect(byName(typed, "Gas furnace").row.followsUnitCount).toBeUndefined();
+  });
+
+  it("goes in the draft at the list's unit count, and follows it", () => {
+    const rows = preview(sheet, asUnits).rows.map((r) => r.row);
+    const draft = withImportedRows({ unitCount: "10", yearBuilt: "1985", rows: [] }, rows);
+    expect(draft.rows.map((r) => [r.quantity, r.followsUnitCount, costLabel(r)])).toEqual([
+      ["10", true, "Cost per apartment"],
+      ["10", true, "Cost per apartment"],
+      ["10", true, "Cost per apartment"],
+    ]);
+  });
+
+  it("keeps row numbers out of it: each row counts as one", () => {
+    const numbered = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n7,Dishwasher,2019", { quantityAnswered: true });
+    expect(numbered.quantityQuestion).toMatchObject({ kind: "numbers", answer: "each_one" });
+    expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
+  });
+
+  it("takes the building's unit count from it when the column is set to that, answered or not", () => {
+    for (const quantityAnswered of [true, false]) {
+      const p = preview(sheet, { columns: ["item", "unitCount", "installYear", "cost"], quantityAnswered });
+      expect(p.quantityQuestion?.answer).toBe("each_one");
+      expect(p.rows.map((r) => [r.row.quantity, r.status === "needs_you"])).toEqual([
+        ["12", false],
+        ["12", false],
+        ["12", false],
+      ]);
+      expect(p.buildings).toMatchObject([{ key: "", unitCount: 12 }]);
+    }
   });
 
   it("doesn't hold a row whose quantity was typed or worked out from its total", () => {
     const typed = preview(sheet, { fixes: { r2: { quantity: "12" } } });
     expect(byName(typed, "Refrigerator")).toMatchObject({ issues: [], row: { quantity: "12" } });
     const totals = preview(["Item,Units,Unit cost,Total", "Water heater,12,1400,16800"].join("\n"));
-    expect(totals.unitsQuestion).not.toBeNull();
+    expect(totals.quantityQuestion).not.toBeNull();
     expect(byName(totals, "Tank water heater")).toMatchObject({ issues: [], row: { quantity: "12" } });
   });
 
   it("isn't asked when it says 1, or when another column is the quantity", () => {
-    expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).unitsQuestion).toBeNull();
-    expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).unitsQuestion).toBeNull();
-    expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).unitsQuestion).toBeNull();
+    expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).quantityQuestion).toBeNull();
+    expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).quantityQuestion).toBeNull();
+    expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).quantityQuestion).toBeNull();
+  });
+
+  it("asks the same about a quantity heading that says units, like \"# of units\"", () => {
+    for (const heading of ["# of units", "Unit count", "No. of units", "Total units"]) {
+      const units = preview([`Item,${heading},Year installed,Cost each`, "Asphalt shingle roof,12,2008,38000", "Boiler,12,2010,60000"].join("\n"));
+      expect(units.quantityQuestion).toMatchObject({ column: 1, kind: "same", values: ["12"], answer: null });
+      expect(units.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+        ["12", "needs_you"],
+        ["12", "needs_you"],
+      ]);
+      expect(byName(units, "Boiler").issues).toEqual([
+        { field: "quantity", text: "Answer the question about column B above, or type the quantity. If you don't, it's added as 12." },
+      ]);
+      // The building's unit count: each row counts as one.
+      const each = preview([`Item,${heading},Year installed,Cost each`, "Asphalt shingle roof,12,2008,38000", "Boiler,12,2010,60000"].join("\n"), {
+        columns: ["item", "ignore", "installYear", "cost"],
+        quantityAnswered: true,
+      });
+      expect(each.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
+        ["1", []],
+        ["1", []],
+      ]);
+    }
+  });
+
+  it("asks about a Qty column with one number on every row only when a row is something a building has one of", () => {
+    const roof = preview(["Item,Qty,Year installed", "Asphalt shingle roof,12,2008", "Refrigerator,12,2018"].join("\n"));
+    expect(roof.quantityQuestion).toMatchObject({ column: 1, kind: "same" });
+    const appliances = preview(["Item,Qty,Year installed", "Dishwasher,12,2015", "Refrigerator,12,2018"].join("\n"));
+    expect(appliances.quantityQuestion).toBeNull();
+    expect(appliances.rows.map((r) => [r.row.quantity, r.status])).toEqual([
+      ["12", "ready"],
+      ["12", "ready"],
+    ]);
   });
 });
 
@@ -711,6 +1026,14 @@ describe("a sheet in CapexClock's own columns", () => {
     );
     expect(p.rows.map((r) => r.row.unitLabel)).toEqual(["per_building", "per_sq_ft", "per_unit"]);
     expect(p.rows.every((r) => r.status === "ready")).toBe(true);
+  });
+
+  it("asks for the square feet of an item counted per sq ft with no quantity", () => {
+    const p = preview(sheet(",,,Carpet,Flooring,,sq ft,2020,,8,4,,,,"));
+    expect(p.rows[0].row).toMatchObject({ unitLabel: "per_sq_ft", quantity: "1" });
+    expect(p.rows[0].issues).toEqual([
+      { field: "quantity", text: "The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft." },
+    ]);
   });
 
   it("reads the guess and replace now columns, and keeps line breaks in notes", () => {
