@@ -135,10 +135,14 @@ export function previewHints(preview: Preview): string[] {
   // While the quantity question is open, it says what happens instead.
   if (preview.noQuantityColumn && !preview.missingItemColumn && preview.quantityQuestion?.answer !== null) {
     const area = preview.areaColumn ? " Items priced per sq ft use the Square feet column instead." : "";
+    const question = preview.quantityQuestion;
+    const units = question?.kind === "same" && question.answer === "each_one" ? columnLetter(question.column) : null;
     hints.push(
-      preview.quantityFromTotals
-        ? `There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.${area}`
-        : `There's no quantity column, so each row counts as one, and identical rows are added up.${area}`,
+      units !== null
+        ? `Column ${units} is the building's unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.${area}`
+        : preview.quantityFromTotals
+          ? `There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.${area}`
+          : `There's no quantity column, so each row counts as one, and identical rows are added up.${area}`,
     );
   }
   if (preview.noYearColumn && !preview.missingItemColumn) {
@@ -194,7 +198,11 @@ export function quantityQuestionText(question: Pick<QuantityQuestion, "column" |
   return `${column} has numbers like ${listText(question.values)}. What are they?`;
 }
 
-/** The two answers to the quantity question, in order: it's the quantity, or each row counts as one. */
+/**
+ * The two answers to the quantity question, in order: it's the quantity, or it isn't.
+ * One number on every row is then the building's unit count, so items the library
+ * counts per unit get one in each unit; other numbers number the rows.
+ */
 export function quantityAnswers(
   question: Pick<QuantityQuestion, "kind">,
 ): readonly (readonly ["quantity" | "each_one", string])[] {
@@ -203,7 +211,7 @@ export function quantityAnswers(
     [
       "each_one",
       question.kind === "same"
-        ? "The number of units in the building, so each row counts as one"
+        ? "The number of units in the building. Items like fridges count one per unit, and the rest count as one."
         : "Row or apartment numbers, so each row counts as one",
     ],
   ];

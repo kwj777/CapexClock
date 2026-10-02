@@ -204,7 +204,10 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
     setChoices((c) => c && { ...c, sheetYear: parseSheetYear(value, currentYear) });
   }
 
-  /** "quantity": the column is how many of each item; "each_one": it isn't, so each row counts as one. */
+  /**
+   * "quantity": the column is how many of each item. "each_one": it isn't. One number on
+   * every row is the building's unit count, so items in every unit take it (see buildPreview).
+   */
   function answerQuantity(column: number, value: "quantity" | "each_one") {
     setChoices(
       (c) =>

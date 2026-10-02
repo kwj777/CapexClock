@@ -855,14 +855,59 @@ describe("a Units column with the same number on every row", () => {
     ]);
   });
 
-  it("counts each row as one when it's the building's unit count", () => {
+  it("gives an item in every unit one per unit when it's the building's unit count", () => {
     const p = preview(sheet, { quantityAnswered: true });
     expect(p.quantityQuestion?.answer).toBe("each_one");
-    expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
-      ["1", []],
-      ["1", []],
-      ["1", []],
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.unitLabel, r.status, r.issues])).toEqual([
+      ["Tank water heater", "12", "per_unit", "changed", []],
+      ["Refrigerator", "12", "per_unit", "changed", []],
+      ["Range / oven", "12", "per_unit", "changed", []],
     ]);
+    expect(byName(p, "Refrigerator").changes).toEqual([
+      'Matched "Fridge" to Refrigerator',
+      "One in each unit, so used the 12 units in column B as the quantity",
+    ]);
+  });
+
+  it("counts a building-wide item and the owner's own item as one when it's the building's unit count", () => {
+    const mixed = [
+      "Item,Units,Year,Cost",
+      "Asphalt shingle roof,8,2010,30000",
+      "Boiler,8,2012,60000",
+      "Zorbex,8,2019,700",
+      "Gas furnace,8,2014,4200",
+    ].join("\n");
+    const p = preview(mixed, { quantityAnswered: true });
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.unitLabel])).toEqual([
+      ["Asphalt shingle roof", "1", "per_building"],
+      ["Boiler", "1", "per_building"],
+      ["Zorbex", "1", "per_building"],
+      ["Gas furnace", "8", "per_unit"],
+    ]);
+    // A cost given as a total is divided by the units, and a typed quantity wins.
+    const totals = preview(["Item,Units,Total", "Refrigerator,8,7200", "Boiler,8,60000"].join("\n"), { quantityAnswered: true });
+    expect(totals.rows.map((r) => [r.row.quantity, r.row.costEach])).toEqual([
+      ["8", "900"],
+      ["1", "60000"],
+    ]);
+    const typed = preview(mixed, { quantityAnswered: true, fixes: { r4: { quantity: "2" } } });
+    expect(byName(typed, "Gas furnace").row.quantity).toBe("2");
+  });
+
+  it("goes in the draft at the unit count, following it when the list has the same", () => {
+    const rows = preview(sheet, { quantityAnswered: true }).rows.map((r) => r.row);
+    const draft = withImportedRows({ unitCount: "12", yearBuilt: "1985", rows: [] }, rows);
+    expect(draft.rows.map((r) => [r.quantity, r.followsUnitCount, costLabel(r)])).toEqual([
+      ["12", true, "Cost per apartment"],
+      ["12", true, "Cost per apartment"],
+      ["12", true, "Cost per apartment"],
+    ]);
+  });
+
+  it("keeps row numbers out of it: each row counts as one", () => {
+    const numbered = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n7,Dishwasher,2019", { quantityAnswered: true });
+    expect(numbered.quantityQuestion).toMatchObject({ kind: "numbers", answer: "each_one" });
+    expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
   });
 
   it("doesn't hold a row whose quantity was typed or worked out from its total", () => {

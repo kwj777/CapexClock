@@ -136,7 +136,10 @@ export interface Preview {
 
 export interface QuantityQuestion extends QuantityDoubt {
   heading: string;
-  /** "each_one": it's the unit count or row numbers, so each row counts as one. */
+  /**
+   * "each_one": it's the building's unit count (kind "same"), so an item in every unit
+   * takes it and other rows count as one, or row numbers, so each row counts as one.
+   */
   answer: "quantity" | "each_one" | null;
 }
 
@@ -237,6 +240,11 @@ interface Context {
   currentYear: number;
   /** The column of a quantity question the owner hasn't answered, so rows it changes wait. */
   quantityPending: number | null;
+  /**
+   * The column the owner said is the building's unit count (one number on every row).
+   * An item in every unit, like a fridge, takes that number as its quantity.
+   */
+  unitsColumn: number | null;
   /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
   quantityInSqFt: boolean;
   costInSqFt: boolean;
@@ -443,6 +451,18 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   } else if (record.row.unitLabel === "per_sq_ft") {
     record.row.unitLabel = "per_building";
     record.changes.push(COUNTED_EACH);
+  }
+  // The building's unit count: an item the library counts per unit is one in each
+  // unit, not one for the whole building. Anything else counts as one.
+  if (ctx.unitsColumn !== null && quantityFix === undefined && !quantityGiven && record.row.unitLabel === "per_unit") {
+    const units = readQuantity(row[ctx.unitsColumn]).value;
+    if (units !== null && units > 1 && Number.isInteger(units)) {
+      record.quantity = units;
+      record.row.quantity = numberText(units);
+      quantityGiven = true;
+      const column = columnLetter(ctx.unitsColumn);
+      record.changes.push(`One in each unit, so used the ${units.toLocaleString("en-US")} units in column ${column} as the quantity`);
+    }
   }
 
   // Useful life: the sheet's, else the library's typical one.
@@ -859,6 +879,7 @@ export function buildPreview(
     choices,
     currentYear,
     quantityPending: doubt && quantityAnswer === null ? doubt.column : null,
+    unitsColumn: doubt?.kind === "same" && quantityAnswer === "each_one" ? doubt.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
   };
