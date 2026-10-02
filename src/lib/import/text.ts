@@ -1,5 +1,7 @@
+import { removeFormulaGuards } from "@/lib/export/formula-guard";
+
 /**
- * Cells come from pasted text, a CSV file or (later) an Excel file, so they can be
+ * Cells come from pasted text, a CSV file or an Excel file, so they can be
  * strings, numbers, dates, booleans or empty. Nothing about them is trusted until
  * it's checked here.
  */
@@ -14,11 +16,18 @@ export function isDate(cell: Cell): cell is Date {
 /** A cell as the owner would see it in their sheet, trimmed, with spaces tidied. */
 export function cellText(cell: Cell): string {
   if (cell === null || cell === undefined) return "";
-  if (typeof cell === "string") return cell.replace(/[\s ]+/g, " ").trim();
+  // Our own CSV downloads guard formulas with an apostrophe, which stays when the file is saved again.
+  if (typeof cell === "string") return removeFormulaGuards(cell).replace(/[\s ]+/g, " ").trim();
   if (typeof cell === "number") return Number.isFinite(cell) ? String(cell) : "";
   if (typeof cell === "boolean") return cell ? "TRUE" : "FALSE";
   if (isDate(cell)) return cell.toISOString().slice(0, 10);
   return "";
+}
+
+/** Like cellText, but line breaks stay, for notes: only the line endings and the ends are tidied. */
+export function cellLines(cell: Cell): string {
+  if (typeof cell !== "string") return cellText(cell);
+  return removeFormulaGuards(cell).replace(/\r\n?/g, "\n").replace(/\u00a0/g, " ").trim();
 }
 
 export function isBlankRow(row: readonly Cell[] | undefined): boolean {

@@ -1,4 +1,5 @@
 import { formatUnitPrice } from "@/components/calculator/format";
+import type { UnitLabel } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import { cellText, isDate, quote, type Cell } from "./text";
 
@@ -82,7 +83,8 @@ const LIMIT =
   /^(?:(?:pre|before|prior to|older than|earlier than|post|after|newer than|later than)(?:\s|-|$)|[<>≤≥])|\bor\s+(?:earlier|before|older|prior|later|after|newer)\b|\d\s*\+$/i;
 
 function findYear(cell: Cell): FoundYear {
-  if (isDate(cell)) return { year: cell.getFullYear(), guess: false, extraWords: false, unknown: false };
+  // Excel dates are read as midnight UTC, so the UTC year is the one the sheet shows.
+  if (isDate(cell)) return { year: cell.getUTCFullYear(), guess: false, extraWords: false, unknown: false };
   if (typeof cell === "number" && Number.isInteger(cell) && cell >= 1000 && cell <= 2999) {
     return { year: cell, guess: false, extraWords: false, unknown: false };
   }
@@ -455,4 +457,66 @@ export function readCondition(cell: Cell): Reading<ComponentCondition> & { keep?
     }
   }
   return { value: null, keep: text, note: `Put the condition ${quote(text)} in the notes` };
+}
+
+const YES_WORDS = /^(?:yes|y|true|x|✓|✔|1|guess|guessed|estimate|estimated|replace|now)$/i;
+const NO_WORDS = /^(?:no|n|false|0|-+|–|—)$/i;
+
+/** A cell that says yes or no, as a yes or no column would have it. */
+export function isYesNo(text: string): boolean {
+  return YES_WORDS.test(text) || NO_WORDS.test(text);
+}
+
+/** A yes or no column, like "Install year is a guess" or "Replace now". Blank is no. */
+export function readYesNo(cell: Cell): Reading<boolean> {
+  if (typeof cell === "boolean") return { value: cell };
+  const text = cellText(cell);
+  if (text === "" || NO_WORDS.test(text)) return { value: false };
+  if (YES_WORDS.test(text)) return { value: true };
+  return { value: false, note: `Read ${quote(text)} as no` };
+}
+
+const COUNTED: [UnitLabel, RegExp][] = [
+  ["per_sq_ft", /^(?:per\s+)?(?:sq\.?\s*ft\.?|square\s+(?:foot|feet)|sf|sqft|ft2|ft²)$/i],
+  ["per_unit", /^(?:per\s+|each\s+)?(?:unit|apt|apartment|door|suite)s?$/i],
+  ["per_building", /^(?:per\s+|whole\s+|the\s+)?(?:building|bldg|property|each|item|one)s?$/i],
+];
+
+/** "Counted per": unit, building or sq ft. Null for a blank, or a word that isn't one of them. */
+export function readCountedPer(cell: Cell): Reading<UnitLabel> {
+  const text = cellText(cell);
+  if (text === "") return { value: null };
+  const found = COUNTED.find(([, words]) => words.test(text));
+  if (found) return { value: found[0] };
+  return { value: null, note: `Couldn't read ${quote(text)} as unit, building or sq ft, so used the usual way of counting it` };
+}
+
+/** Most units a property can have, matching the save limit. */
+const MAX_UNITS = 100_000;
+
+/** A building's unit count: a whole number like 12, "12" or "12 units". */
+export function readUnitCount(cell: Cell): Reading<number> {
+  const text = cellText(cell);
+  if (text === "") return { value: null };
+  const m = text.match(/^(\d{1,3}(?:,\d{3})+|\d+)(?:\.0+)?\s*(?:units?|apts?\.?|apartments?|doors?)?$/i);
+  const value = m ? Number(m[1].replace(/,/g, "")) : Number.NaN;
+  if (!Number.isInteger(value) || value < 1 || value > MAX_UNITS) {
+    return { value: null, problem: `Couldn't read ${quote(text)} as a number of units.` };
+  }
+  return { value };
+}
+
+/** Earliest year built, matching the calculator. */
+const EARLIEST_YEAR_BUILT = 1800;
+
+/** A building's year built: 1998, "approx 1998", or an Excel date. */
+export function readYearBuilt(cell: Cell, currentYear: number): Reading<number> {
+  const text = cellText(cell);
+  if (text === "") return { value: null };
+  const found = findYear(cell);
+  if (found.unknown) return { value: null };
+  if (found.year === null || found.problem || found.year < EARLIEST_YEAR_BUILT || found.year > currentYear) {
+    return { value: null, problem: `Couldn't read ${quote(text)} as the year built.` };
+  }
+  return { value: found.year, guess: found.guess };
 }

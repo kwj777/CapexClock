@@ -1,4 +1,5 @@
 import {
+  buildingValues,
   columnValues,
   componentSlug,
   doubtfulQuantity,
@@ -72,11 +73,25 @@ describe("guessing a column from its heading", () => {
     ["Comments", "notes"],
     ["Model", "notes"],
     ["Category", "category"],
+    ["Year built", "yearBuilt"],
+    ["Yr. built", "yearBuilt"],
+    ["Building", "building"],
+    ["Bldg", "building"],
+    ["Property name", "building"],
+    ["Units in building", "unitCount"],
+    ["Counted per", "countedPer"],
+    ["Install year is a guess", "guess"],
+    ["Guess?", "guess"],
+    ["Guessed", "guess"],
+    ["Is a guess", "guess"],
+    ["Replace now", "replaceNow"],
+    ["Replace this year", "replaceNow"],
+    ["CapexClock ID", "id"],
   ])("reads %p as %p", (heading, field) => {
     expect(guessField(heading)).toBe(field);
   });
 
-  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Year built", "Warranty", "Units", "Building", "", "Whatever", "constructor", "#", "No.", "Item #", "Item no.", "Line", "Ref #", "ID"])(
+  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Built-in microwave", "Warranty", "Units", "Address", "", "Whatever", "constructor", "#", "No.", "Item #", "Item no.", "Line", "Ref #", "ID"])(
     "leaves %p unguessed",
     (heading) => {
       expect(guessField(heading)).toBeNull();
@@ -260,6 +275,33 @@ describe("guessing the layout and every column", () => {
       "ignore",
     ]);
   });
+
+  it("reads a heading with \"guess\" in it by what's under it", () => {
+    const grid = [
+      ["Item", "Year installed (guess)", "Install year guess", "Useful life (guess)", "Cost (guess)"],
+      ["Water heater", "2014", "yes", "10", "1400"],
+      ["Furnace", "2010", "", "18", "4200"],
+      ["Roof", "2008", "no", "22", "38000"],
+    ];
+    const heads = grid[0];
+    // Years under it: the install year, as before. Yes and no under it: which years are guesses.
+    expect(guessColumns(heads, match, "rows", columnValues(grid, 0))).toEqual(["item", "installYear", "guess", "life", "cost"]);
+    // A yes or no column ahead of the install years doesn't take their place.
+    const [first, ...rest] = [heads[2], heads[0], heads[1]];
+    const swapped = grid.map((r) => [r[2], r[0], r[1]]);
+    expect(guessColumns([first, ...rest], match, "rows", columnValues(swapped, 0))).toEqual(["guess", "item", "installYear"]);
+    // Excel's TRUE and FALSE are yes and no too.
+    const ticks = [["Item", "Install year", "Year is a guess"], ["Furnace", "2010", true], ["Roof", "2008", false]];
+    expect(guessColumns(ticks[0] as string[], match, "rows", columnValues(ticks, 0))).toEqual(["item", "installYear", "guess"]);
+  });
+
+  it.each(["Year installed (guess)", "Install yr - best guess", "Install year (guessed)"])(
+    "reads %p as the install year from its heading alone",
+    (heading) => {
+      expect(guessField(heading)).toBe("installYear");
+      expect(guessColumns(["Item", heading], match, "rows")).toEqual(["item", "installYear"]);
+    },
+  );
 
   it("keeps a sheet with an item column one row per item, even with item headings", () => {
     expect(guessLayout(["Item", "Water heater", "Furnace"], match)).toBe("rows");
@@ -454,6 +496,59 @@ describe("guessing the layout and every column", () => {
       expect(ask(["Item", "Units", "#"], ["item", "quantity", "quantity"], { 1: ["12"], 2: ["12"] })).toBeNull();
     });
 
+    describe("in a sheet of several buildings", () => {
+      // Elm has 12 units and Oak 8, given on each of their rows.
+      const grid = (heading: string, cells = ["12", "12", "8", "8"]) => [
+        ["Building", heading, "Item"],
+        ["Elm", cells[0], "Asphalt shingle roof"],
+        ["Elm", cells[1], "Tank water heater"],
+        ["Oak", cells[2], "Asphalt shingle roof"],
+        ["Oak", cells[3], "Tank water heater"],
+      ];
+      const askEach = (rows: string[][], roles: ColumnRole[], buildingWide = no) =>
+        quantityQuestionColumn(rows[0], roles, columnValues(rows, 0), buildingWide, buildingValues(rows, 0, 0));
+
+      it("asks about a number that's the same on every row of each building", () => {
+        for (const heading of ["# of units", "Unit count", "No. of units", "Total units", "Number of apartments"]) {
+          expect(askEach(grid(heading), ["building", "quantity", "item"])).toEqual({ column: 1, kind: "building", values: ["12", "8"] });
+        }
+        // "Units" too, which would otherwise be asked about as numbers.
+        expect(askEach(grid("Units"), ["building", "ignore", "item"])).toEqual({ column: 1, kind: "building", values: ["12", "8"] });
+        // "Qty" only when a row is something a building has one of.
+        expect(askEach(grid("Qty"), ["building", "quantity", "item"])).toBeNull();
+        expect(askEach(grid("Qty"), ["building", "quantity", "item"], () => true)).toMatchObject({ kind: "building" });
+        // One number for every building is still "the same on every row".
+        expect(askEach(grid("# of units", ["12", "12", "12", "12"]), ["building", "quantity", "item"])).toMatchObject({ kind: "same" });
+      });
+
+      it("carries a building's name down to the rows under it, as merged cells do", () => {
+        const merged = grid("Unit count").map((row, i) => (i === 2 || i === 4 ? ["", ...row.slice(1)] : row));
+        expect(askEach(merged, ["building", "quantity", "item"])).toMatchObject({ kind: "building", values: ["12", "8"] });
+        expect(buildingValues(merged, 0, 0)(1)).toEqual([
+          ["12", "12"],
+          ["8", "8"],
+        ]);
+      });
+
+      it("asks about a lone row for each building only when the heading says units", () => {
+        const lone = [
+          ["Building", "# of units", "Item"],
+          ["Elm", "12", "Asphalt shingle roof"],
+          ["Oak", "8", "Asphalt shingle roof"],
+        ];
+        expect(askEach(lone, ["building", "quantity", "item"])).toMatchObject({ kind: "building" });
+        const qty = lone.map((row, i) => (i === 0 ? ["Building", "Qty", "Item"] : row));
+        expect(askEach(qty, ["building", "quantity", "item"], () => true)).toBeNull();
+      });
+
+      it("leaves numbers that differ within a building to the usual rules", () => {
+        expect(askEach(grid("# of units", ["12", "6", "8", "8"]), ["building", "quantity", "item"])).toBeNull();
+        expect(askEach(grid("Units", ["12", "6", "8", "8"]), ["building", "ignore", "item"])).toMatchObject({ kind: "numbers" });
+        // Without the buildings, a Units column of 12s and 8s is just numbers.
+        expect(ask(["Units", "Item"], ["ignore", "item"], { 0: ["12", "12", "8", "8"] })).toMatchObject({ kind: "numbers" });
+      });
+    });
+
     it("looks past a numbering column to a Units column", () => {
       expect(ask(["#", "Item", "Units"], ["ignore", "item", "ignore"], { 0: ["1", "2", "3"], 2: ["12", "12", "12"] })).toMatchObject({
         column: 2,
@@ -477,5 +572,85 @@ describe("guessing the layout and every column", () => {
   it("shows a few different values from a column", () => {
     const grid = [["Year"], ["2014"], [""], ["2014"], ["approx 2012"], ["orig"], ["1999"]];
     expect(samples(grid, 0, 0)).toEqual(["2014", "approx 2012", "orig"]);
+  });
+});
+
+describe("CapexClock's own template and downloads", () => {
+  const heads = [
+    "Building",
+    "Units",
+    "Year built",
+    "Component",
+    "Category",
+    "Quantity",
+    "Counted per",
+    "Install year",
+    "Install year is a guess",
+    "Useful life",
+    "Cost each",
+    "Condition",
+    "Replace now",
+    "Notes",
+    "CapexClock ID",
+  ];
+
+  it("reads every heading as exactly what it says", () => {
+    expect(guessColumns(heads, match, "rows")).toEqual([
+      "building",
+      "unitCount",
+      "yearBuilt",
+      "item",
+      "category",
+      "quantity",
+      "countedPer",
+      "installYear",
+      "guess",
+      "life",
+      "cost",
+      "condition",
+      "replaceNow",
+      "notes",
+      "id",
+    ]);
+  });
+
+  it("never asks what its Units column means", () => {
+    const grid = [heads, ["", "12", "1998", "Fridge", "", "12", "unit", "2019", "", "13", "900", "", "", "", ""]];
+    expect(quantityQuestionColumn(heads, guessColumns(heads, match, "rows"), columnValues(grid, 0), () => true)).toBeNull();
+  });
+});
+
+describe("a Units column beside the building's name or year built", () => {
+  it("is the building's unit count when another column is the quantity", () => {
+    expect(guessColumns(["Building", "Units", "Item", "Qty"], match, "rows")).toEqual(["building", "unitCount", "item", "quantity"]);
+    // "Unit count" and "# of units" too, even though either alone may be a quantity.
+    expect(guessColumns(["Building", "Unit count", "Item", "Qty"], match, "rows")).toEqual(["building", "unitCount", "item", "quantity"]);
+    expect(guessColumns(["Year built", "# of units", "Item", "Quantity"], match, "rows")).toEqual([
+      "yearBuilt",
+      "unitCount",
+      "item",
+      "quantity",
+    ]);
+    // Alone, "Unit count" is the quantity, for the preview to ask about.
+    expect(guessColumns(["Building", "Unit count", "Item"], match, "rows")).toEqual(["building", "quantity", "item"]);
+    expect(guessColumns(["Year built", "Units", "Item", "Qty"], match, "rows")).toEqual(["yearBuilt", "unitCount", "item", "quantity"]);
+  });
+
+  it("is left to the usual rules otherwise", () => {
+    expect(guessColumns(["Item", "Units", "Qty"], match, "rows")).toEqual(["item", "ignore", "quantity"]);
+  });
+
+  it("is left out when it holds units of measure, not a number of units", () => {
+    const heads = ["Item", "Qty", "Units", "Year built", "Year installed", "Cost"];
+    const grid = [
+      heads,
+      ["Carpet", "900", "sf", "1998", "2015", "4"],
+      ["Window", "40", "ea", "1998", "2010", "450"],
+    ];
+    const roles = guessColumns(heads, match, "rows", columnValues(grid, 0));
+    expect(roles).toEqual(["item", "quantity", "ignore", "yearBuilt", "installYear", "cost"]);
+    // "12 units" and "12" both read as a unit count.
+    const counted = [heads, ["Carpet", "900", "12 units", "1998", "2015", "4"], ["Window", "40", "12", "1998", "2010", "450"]];
+    expect(guessColumns(heads, match, "rows", columnValues(counted, 0))[2]).toBe("unitCount");
   });
 });

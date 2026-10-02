@@ -10,6 +10,8 @@ import {
   EMPTY_DRAFT,
   exampleDraft,
   hasEntries,
+  importReplaces,
+  importUndoFor,
   neighborRowId,
   notesLeftText,
   notesTooLong,
@@ -22,12 +24,14 @@ import {
   STORAGE_KEY,
   toComponents,
   upgradeDraft,
+  withImport,
   withImportedRows,
   withLibraryItem,
   withUnitCount,
   type Draft,
   type DraftRow,
 } from "../draft";
+import type { ImportedRow } from "@/lib/import/preview";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import { DRAFT_STORAGE_KEY } from "../storage-key";
 
@@ -538,6 +542,7 @@ describe("adding rows from a spreadsheet", () => {
     costEach: "1400",
     condition: "fair" as const,
     notes: "Apt: 101 and 102",
+    replaceNow: false,
   });
 
   it("adds after the rows already there and never replaces them", () => {
@@ -567,5 +572,90 @@ describe("adding rows from a spreadsheet", () => {
   it("starts a new forecast when the draft was empty", () => {
     const next = withImportedRows({ ...EMPTY_DRAFT, forecastTracked: true }, [imported("1")]);
     expect(next.forecastTracked).toBe(false);
+  });
+});
+
+describe("importing a component list download", () => {
+  const sheetRow = (over: Partial<ImportedRow> = {}): ImportedRow => ({
+    librarySlug: "tank-water-heater",
+    category: "Plumbing",
+    name: "Tank water heater",
+    quantity: "12",
+    unitLabel: "per_unit",
+    installYear: "2016",
+    installYearIsGuess: false,
+    usefulLife: "10",
+    costEach: "1400",
+    condition: "good",
+    notes: "",
+    replaceNow: false,
+    ...over,
+  });
+
+  it("changes matched rows in place, keeping their ids and order, then adds new rows after", () => {
+    const draft = exampleDraft();
+    const [first, second] = draft.rows;
+    const next = withImport(draft, {
+      add: [sheetRow({ name: "Boiler", librarySlug: null, category: "HVAC" })],
+      update: [{ id: second.id, row: sheetRow({ installYear: "2020", replaceNow: true, notes: "New quote" }) }],
+      remove: [],
+    });
+    expect(next.rows).toHaveLength(draft.rows.length + 1);
+    expect(next.rows[0]).toEqual(first);
+    expect(next.rows[1]).toMatchObject({
+      id: second.id,
+      installYear: "2020",
+      scenario: "replace_now",
+      notes: "New quote",
+      condition: "good",
+      followsUnitCount: true,
+    });
+    expect(next.rows.at(-1)).toMatchObject({ name: "Boiler", category: "HVAC" });
+  });
+
+  it("removes only the rows the owner chose", () => {
+    const draft = exampleDraft();
+    const gone = draft.rows[2].id;
+    const next = withImport(draft, { add: [], update: [], remove: [gone] });
+    expect(next.rows.map((r) => r.id)).toEqual(draft.rows.filter((r) => r.id !== gone).map((r) => r.id));
+  });
+
+  it("takes the building's unit count and year built first, so per-unit rows follow the new count", () => {
+    const draft = exampleDraft();
+    const next = withImport(draft, { add: [sheetRow({ quantity: "14" })], update: [], remove: [], unitCount: "14", yearBuilt: "2001" });
+    expect(next.unitCount).toBe("14");
+    expect(next.yearBuilt).toBe("2001");
+    expect(next.rows.at(-1)?.followsUnitCount).toBe(true);
+    const followed = draft.rows.filter((r) => r.followsUnitCount).map((r) => r.id);
+    expect(followed.length).toBeGreaterThan(0);
+    for (const id of followed) expect(next.rows.find((r) => r.id === id)?.quantity).toBe("14");
+  });
+});
+
+describe("undoing an import from the template page", () => {
+  const draft = exampleDraft();
+  const gone = draft.rows[0].id;
+  const after = withImport(draft, { add: [], update: [], remove: [gone] });
+  // As kept in storage and read back.
+  const kept = JSON.parse(JSON.stringify({ before: draft, after })) as unknown;
+
+  it("is kept only for an import that changes or removes rows, or the building's details", () => {
+    expect(importReplaces({ add: [], update: [], remove: [gone] })).toBe(true);
+    expect(importReplaces({ add: [], update: [{ id: gone, row: {} as ImportedRow }], remove: [] })).toBe(true);
+    expect(importReplaces({ add: [], update: [], remove: [], unitCount: "14" })).toBe(true);
+    expect(importReplaces({ add: [{} as ImportedRow], update: [], remove: [] })).toBe(false);
+  });
+
+  it("brings back the list as it was while the list is what the import left", () => {
+    const back = importUndoFor(kept, after, 2026);
+    expect(back?.rows.map((r) => r.id)).toEqual(draft.rows.map((r) => r.id));
+    expect(back?.unitCount).toBe(draft.unitCount);
+  });
+
+  it("isn't offered once the list has changed since, or for a damaged copy", () => {
+    expect(importUndoFor(kept, withUnitCount(after, "20"), 2026)).toBeNull();
+    expect(importUndoFor(kept, draft, 2026)).toBeNull();
+    expect(importUndoFor({ before: "x", after }, after, 2026)).toBeNull();
+    expect(importUndoFor(null, after, 2026)).toBeNull();
   });
 });

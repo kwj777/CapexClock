@@ -65,9 +65,14 @@ describe("reading pasted rows and CSV files", () => {
     expect(fileKind("components.csv", "")).toBe("text");
     expect(fileKind("export.TSV", "")).toBe("text");
     expect(fileKind("noext", "text/csv")).toBe("text");
-    expect(fileKind("Capex.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("spreadsheet");
+    expect(fileKind("Capex.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("xlsx");
+    expect(fileKind("Capex.XLSM", "")).toBe("xlsx");
+    expect(fileKind("download", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("xlsx");
     expect(fileKind("old.xls", "")).toBe("spreadsheet");
     expect(fileKind("plan.numbers", "")).toBe("spreadsheet");
+    expect(fileKind("libre.ods", "")).toBe("spreadsheet");
+    // Windows calls CSV files "application/vnd.ms-excel"; the name says what they are.
+    expect(fileKind("list.csv", "application/vnd.ms-excel")).toBe("text");
     expect(fileKind("photo.jpg", "image/jpeg")).toBe("other");
   });
 });
@@ -75,6 +80,30 @@ describe("reading pasted rows and CSV files", () => {
 describe("opening a sheet", () => {
   it("says when there are no headings", () => {
     expect(openSheet([["Water heater", "12", "2016"]], match, 2026)).toBe("no_header");
+  });
+
+  it("says which file to use when given the forecast download, which can't be read back", () => {
+    const grid = [
+      ["Year", "Component", "Category", "Quantity", "Unit", "Cost each", "Total cost", "Forecast note", "Condition", "Notes"],
+      ["2027", "Tank water heater", "Plumbing", "12", "per apartment", "1400.00", "16800.00", "", "", ""],
+    ];
+    expect(openSheet(grid, match, 2026)).toBe("forecast_file");
+    expect(failedReason("forecast_file")).toBe("forecast_file");
+    expect(PROBLEM_TEXT.forecast_file).toMatch(/Download component list \(CSV\)/);
+  });
+
+  it("says the same for a forecast downloaded from the live site before condition and notes were added", () => {
+    // A forecast CSV as capexclock.com wrote it before Phase 3: the last column was "Note".
+    const text = [
+      "Year,Component,Category,Quantity,Unit,Cost each,Total cost,Note",
+      "2026,Tank water heater,Plumbing,12,each,1400.00,16800.00,Past its expected life; Install year estimated",
+      "2027,Asphalt shingle roof,Roofing,1,each,38000.00,38000.00,",
+      ",Boiler,HVAC,,,,,Not included yet: details missing",
+      "",
+    ].join("\r\n");
+    const grid = readText(text, parse, "file");
+    if (typeof grid === "string") throw new Error(grid);
+    expect(openSheet(grid, match, 2026)).toBe("forecast_file");
   });
 
   it("stops at 2,000 rows under the headings", () => {

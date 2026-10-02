@@ -4,6 +4,7 @@ import type { UnitLabel } from "@/lib/forecast";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import {
+  buildingValues,
   columnValues,
   componentSlug,
   doubtfulYearColumns,
@@ -18,16 +19,20 @@ import {
   type QuantityDoubt,
 } from "./columns";
 import { nameKey, type NameMatcher } from "./names";
-import { cellText, clip, columnLetter, isBlankRow, listText, quote, type Cell, type Grid } from "./text";
+import { cellLines, cellText, clip, columnLetter, isBlankRow, listText, quote, words, type Cell, type Grid } from "./text";
 import {
   readAge,
   readCondition,
+  readCountedPer,
   readInstallYear,
   readLife,
   readMoney,
   readQuantity,
   readRemaining,
   readReplaceBy,
+  readUnitCount,
+  readYearBuilt,
+  readYesNo,
   saysPerSqFt,
   type Reading,
 } from "./values";
@@ -45,6 +50,14 @@ export interface ImportedRow {
   costEach: string;
   condition: ComponentCondition | null;
   notes: string;
+  /** "Replace now" said yes: plan its replacement this year. */
+  replaceNow: boolean;
+  /**
+   * Counted per unit with no quantity: one in each unit, so its quantity is the
+   * unit count of the list it goes into, and follows it. `quantity` is the sheet's
+   * unit count for the preview to show, or blank when the sheet doesn't give one.
+   */
+  followsUnitCount?: boolean;
 }
 
 /** Fields the owner can fix in the preview. */
@@ -73,6 +86,10 @@ export interface PreviewRow {
   question: string | null;
   /** The useful life is the library's typical one, not the sheet's. */
   lifeIsTypical: boolean;
+  /** The building it's in: its key in Preview.buildings ("" when the sheet doesn't say). */
+  building: string;
+  /** The row's CapexClock ID, from a component list download; null when it has none. */
+  capexclockId: string | null;
 }
 
 export type SkipReason =
@@ -97,6 +114,20 @@ export interface NameQuestion {
   text: string;
   rows: number;
   suggestions: string[];
+}
+
+/** A building the sheet names, with its unit count and year built when the sheet gives them. */
+export interface BuildingInfo {
+  /** Its name in a form that ignores case and punctuation; "" for rows that name no building. */
+  key: string;
+  /** As the sheet first writes it; "" for rows that name no building. */
+  name: string;
+  unitCount: number | null;
+  yearBuilt: number | null;
+  /** Rows of items, before identical ones are combined. */
+  records: number;
+  /** What the owner should know about its unit count or year built, e.g. two different values. */
+  notes: string[];
 }
 
 export interface Preview {
@@ -131,14 +162,26 @@ export interface Preview {
   sameItems: { column: number; heading: string; kept: number; name: string }[];
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
-  counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
+  /**
+   * Every building the sheet names, in sheet order, even when only one is shown.
+   * A sheet without a building column has one, with the key "".
+   */
+  buildings: BuildingInfo[];
+  /** The sheet has a CapexClock ID column, so it came from a component list download. */
+  idColumn: boolean;
+  /**
+   * Rows to add by mark, and rows skipped. otherBuildings counts the buildings whose
+   * rows aren't shown, when one building is chosen; their rows aren't skipped.
+   */
+  counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number; otherBuildings: number };
 }
 
 export interface QuantityQuestion extends QuantityDoubt {
   heading: string;
   /**
-   * "each_one": it's the building's unit count (kind "same"), so an item in every unit
-   * takes it and other rows count as one, or row numbers, so each row counts as one.
+   * "each_one": it's the building's unit count (kind "same" or "building"), so an item
+   * in every unit takes it and other rows count as one, or it's row numbers, so each
+   * row counts as one.
    */
   answer: "quantity" | "each_one" | null;
 }
@@ -160,6 +203,15 @@ export interface ImportChoices {
    * Quantity, or Ignore for "each row counts as one".
    */
   quantityAnswered: boolean;
+  /** Only this building's rows (a BuildingInfo key); null or missing for every row. */
+  building?: string | null;
+}
+
+/** A row already in the list, by its id, so a row with its CapexClock ID keeps the same item. */
+export interface KnownRow {
+  name: string;
+  librarySlug: string | null;
+  category: string;
 }
 
 export interface Sheet {
@@ -196,6 +248,7 @@ const ABSENT = /^(?:no|n|none|n\/a|na|not present|-+|–|—|0)$/i;
 const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
 const NO_QUANTITY = "No quantity, so counted as 1";
+const EACH_UNIT = "One in each unit, so used the unit count";
 const COUNTED_EACH = "Kept the quantity as a count, not sq ft, so the cost is for each one";
 const COUNTED_APARTMENTS = "Counted apartments, not sq ft, so the cost is for each apartment";
 
@@ -213,6 +266,10 @@ interface Record_ {
   key: string;
   sheetRow: number;
   location: string;
+  /** The building's key, set once the row is read. */
+  building: string;
+  /** Its CapexClock ID, if the sheet gives one. */
+  id: string | null;
   row: ImportedRow;
   changes: string[];
   issues: Issue[];
@@ -225,6 +282,8 @@ interface Record_ {
   details: string[];
   /** The quantity, when it's a number, so merged rows can add up. */
   quantity: number | null;
+  /** Counted per unit with a blank quantity, so it takes the unit count (see ImportedRow). */
+  followsUnits: boolean;
   /**
    * The row's quantity was guessed and the owner should say: it waits on the quantity
    * question, or its cost is per sq ft with no square feet. The issue is added when
@@ -241,13 +300,15 @@ interface Context {
   /** The column of a quantity question the owner hasn't answered, so rows it changes wait. */
   quantityPending: number | null;
   /**
-   * The column the owner said is the building's unit count (one number on every row).
-   * An item in every unit, like a fridge, takes that number as its quantity.
+   * The column the owner said is the building's unit count. An item in every unit,
+   * like a fridge, takes the unit count of the list it goes into.
    */
   unitsColumn: number | null;
   /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
   quantityInSqFt: boolean;
   costInSqFt: boolean;
+  /** Rows already in the list, by id. */
+  known: ReadonlyMap<string, KnownRow>;
 }
 
 /** The first column with this role that has something in this row (or the first with the role). */
@@ -283,8 +344,14 @@ function fixed(ctx: Context, key: string, field: FixField): string | undefined {
 function resolveName(
   ctx: Context,
   original: string,
-  record: Pick<Record_, "changes" | "details" | "asked" | "pending">,
+  record: Pick<Record_, "changes" | "details" | "asked" | "pending" | "id">,
 ): { slug: string | null; name: string } {
+  // A row from a component list download that still has its name stays the same item.
+  const known = record.id ? ctx.known.get(record.id) : undefined;
+  if (known && known.name.trim() === original) {
+    const slug = known.librarySlug && ctx.library.has(known.librarySlug) ? known.librarySlug : null;
+    return { slug, name: clip(original, 200) };
+  }
   const found = ctx.match(original);
   let slug: string | null = null;
   if (found.kind === "exact" || found.kind === "matched") slug = found.slug;
@@ -349,10 +416,13 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   const key = `r${index}`;
   const cell = (role: FieldKind) => cellFor(row, columns, role);
   const original = fixed(ctx, key, "name") ?? cellText(cell("item"));
+  const id = cellText(cell("id"));
   const record: Record_ = {
     key,
     sheetRow: index + 1,
     location: cellText(cell("location")),
+    building: "",
+    id: id === "" ? null : clip(id, 100),
     row: {
       librarySlug: null,
       category: "Other",
@@ -365,6 +435,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       costEach: "",
       condition: null,
       notes: "",
+      replaceNow: false,
     },
     changes: [],
     issues: [],
@@ -373,6 +444,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     lifeIsTypical: false,
     details: [],
     quantity: 1,
+    followsUnits: false,
     quantityWaits: null,
   };
 
@@ -425,24 +497,31 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       record.row.unitLabel = item.unitLabel;
     } else {
       const category = clip(cellText(cell("category")), 100);
-      record.row.category = category || section || "Other";
+      const known = record.id ? ctx.known.get(record.id) : undefined;
+      record.row.category = category || (known && known.name.trim() === original ? known.category : "") || section || "Other";
     }
   }
-  // Square feet, in the quantity or the cost, are counted per sq ft. Anything else is
-  // a count priced each, even for an item the library counts in square feet.
+  // "Counted per" says how it's counted. Without it, square feet in the quantity or
+  // the cost are counted per sq ft, and anything else is a count priced each, even
+  // for an item the library counts in square feet.
   const costFix = fixed(ctx, key, "costEach");
   const costCell = costFix ?? cell("cost");
   const costPerSqFt = saysPerSqFt(costCell) || ctx.costInSqFt;
+  const counted = hasRole(columns, "countedPer") ? readCountedPer(cell("countedPer")) : null;
+  if (counted?.value) record.row.unitLabel = counted.value;
   if (quantityFix === undefined && !squareFeet) {
     const area = readArea(ctx, record, cell("area"), {
-      costPerSqFt,
+      // Counted per sq ft with no quantity: the square feet are the quantity.
+      costPerSqFt: costPerSqFt || (counted?.value === "per_sq_ft" && !quantityGiven),
       quantityGiven,
       cost: cellText(costCell),
       costFixed: costFix !== undefined,
     });
     if (area !== null) [quantityGiven, squareFeet] = [true, true];
   }
-  if (squareFeet || costPerSqFt) {
+  if (counted?.value) {
+    // The sheet says how it's counted.
+  } else if (squareFeet || costPerSqFt) {
     if (squareFeet && record.row.librarySlug && record.row.unitLabel !== "per_sq_ft") {
       record.changes.push("Counted in square feet, as the sheet does");
     }
@@ -452,16 +531,26 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     record.row.unitLabel = "per_building";
     record.changes.push(COUNTED_EACH);
   }
-  // The building's unit count: an item the library counts per unit is one in each
-  // unit, not one for the whole building. Anything else counts as one.
-  if (ctx.unitsColumn !== null && quantityFix === undefined && !quantityGiven && record.row.unitLabel === "per_unit") {
-    const units = readQuantity(row[ctx.unitsColumn]).value;
-    if (units !== null && units > 1 && Number.isInteger(units)) {
-      record.quantity = units;
-      record.row.quantity = numberText(units);
-      quantityGiven = true;
-      const column = columnLetter(ctx.unitsColumn);
-      record.changes.push(`One in each unit, so used the ${units.toLocaleString("en-US")} units in column ${column} as the quantity`);
+  if (counted?.note) record.changes.push(counted.note);
+  // One in each unit, as the calculator counts it, not 1 for the whole building: a row
+  // counted per unit with the quantity left blank, as in our template, or an item the
+  // library counts per unit when the owner said a column is the building's unit count.
+  // It takes the unit count of the list it goes into. Anything else counts as one. A
+  // blank quantity counted per unit is what our format asks for, so it's no change.
+  const blankPerUnit = counted?.value === "per_unit" && hasRole(columns, "quantity") && cellText(quantityCell) === "";
+  const inEachUnit = ctx.unitsColumn !== null && !counted?.value && !quantityGiven && record.row.unitLabel === "per_unit";
+  if ((blankPerUnit || inEachUnit) && quantityFix === undefined && !squareFeet) {
+    record.followsUnits = true;
+    record.quantity = null;
+    record.row.quantity = "";
+    record.row.followsUnitCount = true;
+    record.changes = record.changes.filter((c) => c !== NO_QUANTITY);
+    if (inEachUnit && ctx.unitsColumn !== null) {
+      // A total is divided by the sheet's unit count, and one that disagrees is flagged.
+      const units = readQuantity(row[ctx.unitsColumn]).value;
+      record.quantity = units !== null && units > 0 ? units : null;
+      quantityGiven = record.quantity !== null;
+      record.changes.push(EACH_UNIT);
     }
   }
 
@@ -487,6 +576,12 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
 
   const timing = { installYear: cell("installYear"), age: cell("age"), replaceBy: cell("replaceBy"), remaining: cell("remaining") };
   applyTiming(record, readTiming(ctx, key, timing, life));
+  if (hasRole(columns, "guess")) {
+    const guess = readYesNo(cell("guess"));
+    // "approx 2014" is a guess even when this column is blank.
+    if (guess.value) record.row.installYearIsGuess = true;
+    if (guess.note) record.changes.push(`${guess.note}: the install year isn't marked a guess`);
+  }
 
   // Cost each, or a total divided by the quantity.
   const totalCell = cell("total");
@@ -527,7 +622,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     }
   }
 
-  if (!quantityGiven && record.quantity === 1 && costPerSqFt) {
+  if (!quantityGiven && record.quantity === 1 && (costPerSqFt || counted?.value === "per_sq_ft")) {
     // Nothing gave the square feet, so the row counts as 1 sq ft.
     record.quantityWaits = "sq_ft";
   } else if (ctx.quantityPending !== null && quantityFix === undefined && !fromTotal) {
@@ -541,9 +636,22 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   if (condition.note) record.changes.push(condition.note);
   if (condition.keep) record.details.push(`Condition: ${condition.keep}`);
 
+  if (hasRole(columns, "replaceNow")) {
+    const now = readYesNo(cell("replaceNow"));
+    record.row.replaceNow = now.value === true;
+    if (now.note) record.changes.push(`${now.note}, so it isn't planned for this year`);
+  }
+
+  // Line breaks in notes are kept.
   for (const [i, role] of columns.entries()) {
-    const text = role === "notes" ? cellText(row[i]) : "";
+    const text = role === "notes" ? cellLines(row[i]) : "";
     if (text !== "") record.details.push(text);
+  }
+
+  // The calculator needs a useful life to forecast it, and an account to save it.
+  // (A row with no name may get one from the owner, and the library's typical life with it.)
+  if (record.row.name !== "" && record.row.usefulLife === "" && !record.issues.some((i) => i.field === "usefulLife")) {
+    record.issues.push({ field: "usefulLife", text: "No useful life yet. Type how many years it lasts." });
   }
   return record;
 }
@@ -663,6 +771,8 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       key,
       sheetRow: index + 1,
       location,
+      building: "",
+      id: null,
       row: {
         librarySlug: item.slug,
         category: item.category,
@@ -675,6 +785,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
         costEach: "",
         condition: null,
         notes: "",
+        replaceNow: false,
       },
       changes: sqFt ? [COUNTED_APARTMENTS] : [],
       issues: [],
@@ -683,6 +794,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       lifeIsTypical: true,
       details: [],
       quantity: 1,
+      followsUnits: false,
       quantityWaits: null,
     };
     const fix = fixed(ctx, key, "installYear");
@@ -753,6 +865,11 @@ export function mergedNotes(label: string, members: readonly { location: string;
 function mergeKey(r: Record_): string {
   const { row } = r;
   return JSON.stringify([
+    // A row with a CapexClock ID stands for one row of the list, so it stays on its own,
+    // and so does one that takes the unit count, which can't be added up.
+    r.id === null && !r.followsUnits ? "" : r.key,
+    r.building,
+    row.replaceNow,
     row.librarySlug ?? `own:${row.name.trim().toLowerCase()}`,
     row.category,
     row.unitLabel,
@@ -818,8 +935,50 @@ function merge(records: Record_[], locationLabel: string, questionColumn: number
       issues,
       question: question?.key ?? null,
       lifeIsTypical: first.lifeIsTypical,
+      building: first.building,
+      capexclockId: first.id,
     };
   });
+}
+
+/** A building's name in a form that ignores case, spaces and punctuation, so "Bldg A" and "bldg a." match. */
+export function buildingKey(name: string): string {
+  return words(name);
+}
+
+/**
+ * Counts a row toward its building, and takes the building's unit count and year
+ * built from the first row that gives them. Rows that give different ones are noted.
+ */
+function noteBuilding(
+  buildings: Map<string, BuildingInfo>,
+  building: { key: string; name: string },
+  row: readonly Cell[],
+  columns: readonly ColumnRole[],
+  records: number,
+  currentYear: number,
+) {
+  let info = buildings.get(building.key);
+  if (!info) {
+    info = { key: building.key, name: building.name, unitCount: null, yearBuilt: null, records: 0, notes: [] };
+    buildings.set(building.key, info);
+  }
+  info.records += records;
+  const note = (text: string) => {
+    if (!info.notes.includes(text)) info.notes.push(text);
+  };
+  if (columns.includes("unitCount")) {
+    const units = readUnitCount(cellFor(row, columns, "unitCount"));
+    if (units.problem) note(units.problem);
+    else if (units.value !== null && info.unitCount === null) info.unitCount = units.value;
+    else if (units.value !== null && units.value !== info.unitCount) note(`Rows give more than one unit count. We used the first, ${info.unitCount}.`);
+  }
+  if (columns.includes("yearBuilt")) {
+    const year = readYearBuilt(cellFor(row, columns, "yearBuilt"), currentYear);
+    if (year.problem) note(year.problem);
+    else if (year.value !== null && info.yearBuilt === null) info.yearBuilt = year.value;
+    else if (year.value !== null && year.value !== info.yearBuilt) note(`Rows give more than one year built. We used the first, ${info.yearBuilt}.`);
+  }
 }
 
 /** A row names a library item a building has one of, like a roof or a boiler. */
@@ -861,27 +1020,37 @@ export function buildPreview(
   library: readonly LibraryComponent[],
   match: NameMatcher,
   currentYear: number,
+  known: ReadonlyMap<string, KnownRow> = new Map(),
 ): Preview {
   const { grid, headerRow } = sheet;
   const heads = headings(grid, headerRow);
   const { columns, layout } = choices;
   const libraryBySlug = new Map(library.map((c) => [c.slug, c]));
+  const buildingColumn = columns.indexOf("building");
   const doubt =
     layout === "rows"
-      ? quantityQuestionColumn(heads, columns, columnValues(grid, headerRow), () =>
-          namesBuildingWideItem(sheet, columns, libraryBySlug, match),
+      ? quantityQuestionColumn(
+          heads,
+          columns,
+          columnValues(grid, headerRow),
+          () => namesBuildingWideItem(sheet, columns, libraryBySlug, match),
+          buildingColumn >= 0 ? buildingValues(grid, headerRow, buildingColumn) : undefined,
         )
       : null;
-  const quantityAnswer = !doubt || !choices.quantityAnswered ? null : columns[doubt.column] === "quantity" ? "quantity" : "each_one";
+  // Choosing "Building's unit count" for the column answers the question too.
+  const doubtRole = doubt ? columns[doubt.column] : null;
+  const quantityAnswer =
+    !doubt || (!choices.quantityAnswered && doubtRole !== "unitCount") ? null : doubtRole === "quantity" ? "quantity" : "each_one";
   const ctx: Context = {
     library: libraryBySlug,
     match,
     choices,
     currentYear,
     quantityPending: doubt && quantityAnswer === null ? doubt.column : null,
-    unitsColumn: doubt?.kind === "same" && quantityAnswer === "each_one" ? doubt.column : null,
+    unitsColumn: doubt && doubt.kind !== "numbers" && quantityAnswer === "each_one" ? doubt.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
+    known,
   };
   const skipped: Skipped[] = [];
   const records: Record_[] = [];
@@ -889,9 +1058,16 @@ export function buildPreview(
 
   let section: string | null = null;
   const last = lastFilledRow(grid);
+  const buildings = new Map<string, BuildingInfo>();
+  // Rows under a building's name belong to it until the next name, as with merged cells.
+  let building = { key: "", name: "" };
+  const only = choices.building ?? null;
   for (let i = headerRow + 1; i <= last; i++) {
     const row = grid[i] ?? [];
-    const skip = (reason: SkipReason) => skipped.push({ sheetRow: i + 1, reason });
+    // Rows of a building that isn't shown aren't skipped, just not shown: the summary says so.
+    const skip = (reason: SkipReason) => {
+      if (only === null || building.key === only) skipped.push({ sheetRow: i + 1, reason });
+    };
     if (isBlankRow(row)) {
       skip("blank");
       continue;
@@ -900,17 +1076,22 @@ export function buildPreview(
       skip("repeated_headings");
       continue;
     }
+    let result: Record_[] | SkipReason;
     if (layout === "columns") {
-      if (isTotalRow(row, cellText(cellFor(row, columns, "location")))) {
-        skip("total");
-        continue;
+      if (isTotalRow(row, cellText(cellFor(row, columns, "location")))) result = "total";
+      else {
+        const found = columnRecords(ctx, row, i, heads);
+        result = found.length > 0 ? found : "nothing_listed";
       }
-      const found = columnRecords(ctx, row, i, heads);
-      if (found.length === 0) skip("nothing_listed");
-      records.push(...found);
-      continue;
+    } else {
+      const found = rowRecord(ctx, row, i, section);
+      result = typeof found === "string" ? found : [found];
     }
-    const result = rowRecord(ctx, row, i, section);
+    if (result !== "total") {
+      const named = cellText(cellFor(row, columns, "building"));
+      if (named !== "") building = { key: buildingKey(named), name: clip(named, 200) };
+      noteBuilding(buildings, building, row, columns, typeof result === "string" ? 0 : result.length, currentYear);
+    }
     if (typeof result === "string") {
       skip(result);
       if (result === "section") {
@@ -920,7 +1101,15 @@ export function buildPreview(
       }
       continue;
     }
-    records.push(result);
+    if (only !== null && building.key !== only) continue;
+    for (const r of result) r.building = building.key;
+    records.push(...result);
+  }
+
+  // A row that takes the unit count shows the building's, when the sheet gives one.
+  for (const r of records) {
+    const units = r.followsUnits ? buildings.get(r.building)?.unitCount : undefined;
+    if (units != null) r.row.quantity = String(units);
   }
 
   const locationColumn = columns.indexOf("location");
@@ -942,6 +1131,7 @@ export function buildPreview(
       ? columns.some((role, c) => componentSlug(role) !== null && headingTiming(heads[c]) === "age")
       : used.has("age") || used.has("remaining") || used.has("replaceBy");
   const count = (status: RowStatus) => rows.filter((r) => r.status === status).length;
+  const named = [...buildings.values()].filter((b) => b.records > 0);
   return {
     rows,
     skipped,
@@ -964,12 +1154,15 @@ export function buildPreview(
           }))
         : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
+    buildings: named,
+    idColumn: used.has("id"),
     counts: {
       rows: rows.length,
       ready: count("ready"),
       changed: count("changed"),
       needsYou: count("needs_you"),
       skipped: skipped.length,
+      otherBuildings: only === null ? 0 : named.filter((b) => b.key !== only).length,
     },
   };
 }

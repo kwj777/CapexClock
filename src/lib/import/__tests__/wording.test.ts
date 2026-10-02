@@ -6,6 +6,7 @@ import {
   detailsText,
   duplicates,
   duplicateText,
+  issueBeforeCreate,
   longListText,
   previewHints,
   previewSummary,
@@ -29,6 +30,7 @@ const row = (overrides: Partial<ImportedRow> = {}): ImportedRow => ({
   costEach: "1400",
   condition: null,
   notes: "",
+  replaceNow: false,
   ...overrides,
 });
 
@@ -40,6 +42,8 @@ const previewRow = (id: string, overrides: Partial<ImportedRow> = {}): PreviewRo
   row: row(overrides),
   changes: [],
   issues: [],
+  building: "",
+  capexclockId: null,
   question: null,
   lifeIsTypical: false,
 });
@@ -67,14 +71,23 @@ describe("import wording", () => {
   });
 
   it("sums up the preview for the live region", () => {
-    expect(previewSummary({ rows: 23, ready: 15, changed: 5, needsYou: 3, skipped: 2 })).toBe(
+    expect(previewSummary({ rows: 23, ready: 15, changed: 5, needsYou: 3, skipped: 2, otherBuildings: 0 })).toBe(
       "23 rows to add: 15 ready, 5 changed, 3 need you. 2 rows skipped.",
     );
-    expect(previewSummary({ rows: 1, ready: 0, changed: 0, needsYou: 1, skipped: 1 })).toBe(
+    expect(previewSummary({ rows: 1, ready: 0, changed: 0, needsYou: 1, skipped: 1, otherBuildings: 0 })).toBe(
       "1 row to add: 1 needs you. 1 row skipped.",
     );
-    expect(previewSummary({ rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 4 })).toBe("No rows to add. 4 rows skipped.");
-    expect(previewSummary({ rows: 2000, ready: 2000, changed: 0, needsYou: 0, skipped: 0 })).toBe("2,000 rows to add: 2,000 ready.");
+    expect(previewSummary({ rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 4, otherBuildings: 0 })).toBe("No rows to add. 4 rows skipped.");
+    expect(previewSummary({ rows: 2000, ready: 2000, changed: 0, needsYou: 0, skipped: 0, otherBuildings: 0 })).toBe("2,000 rows to add: 2,000 ready.");
+  });
+
+  it("says rows of other buildings aren't shown, without calling them skipped", () => {
+    expect(previewSummary({ rows: 75, ready: 0, changed: 0, needsYou: 75, skipped: 0, otherBuildings: 19 })).toBe(
+      "75 rows to add: 75 need you. Rows for 19 other buildings aren't shown.",
+    );
+    expect(previewSummary({ rows: 3, ready: 3, changed: 0, needsYou: 0, skipped: 1, otherBuildings: 1 })).toBe(
+      "3 rows to add: 3 ready. 1 row skipped. Rows for another building aren't shown.",
+    );
   });
 
   it("labels the Add button with the count", () => {
@@ -138,7 +151,9 @@ describe("import wording", () => {
       doubtfulYears: [],
       sameItems: [],
       withoutCost: 0,
-      counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
+      buildings: [],
+      idColumn: false,
+      counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0, otherBuildings: 0 },
     };
     expect(previewHints(base)).toEqual([]);
     expect(previewHints({ ...base, missingItemColumn: true, noQuantityColumn: true })).toEqual([
@@ -195,6 +210,31 @@ describe("import wording", () => {
     expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true }))).toEqual([]);
   });
 
+  it("asks what a column with one number for each building is, and says what the answer does", () => {
+    const sheet = [
+      "Building,# of units,Item,Year installed,Cost each",
+      "Elm,12,Asphalt shingle roof,2010,38000",
+      "Elm,12,Tank water heater,2015,1400",
+      "Oak,8,Asphalt shingle roof,2008,30000",
+      "Oak,8,Tank water heater,2016,1400",
+      "Ash,24,Tank water heater,2016,1400",
+      "Fir,6,Tank water heater,2016,1400",
+    ].join("\n");
+    const asked = preview(sheet);
+    if (!asked.quantityQuestion) throw new Error("No quantity question");
+    expect(quantityQuestionText(asked.quantityQuestion)).toBe(
+      'Column B, "# of units", has one number for each building, like 12, 8 and 24. What is it?',
+    );
+    expect(quantityAnswers(asked.quantityQuestion)).toEqual([
+      ["quantity", "How many of each item there are"],
+      ["each_one", "Each building's unit count. Items like fridges count one per unit, and the rest count as one."],
+    ]);
+    const answered = preview(sheet, { columns: ["building", "unitCount", "item", "installYear", "cost"], quantityAnswered: true });
+    expect(previewHints(answered)).toEqual([
+      "Column B is each building's unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.",
+    ]);
+  });
+
   it("asks what a # column's numbers are, naming a few of them", () => {
     const asked = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n4,Stove,2015\n7,Dishwasher,2019");
     if (!asked.quantityQuestion) throw new Error("No quantity question");
@@ -228,5 +268,19 @@ describe("import wording", () => {
 
   it("names columns the way spreadsheets do", () => {
     expect([0, 1, 25, 26, 27, 51, 52, 701, 702].map(columnLetter)).toEqual(["A", "B", "Z", "AA", "AB", "AZ", "BA", "ZZ", "AAA"]);
+  });
+});
+
+describe("an issue on My properties, where a row can't be saved as a guess", () => {
+  it("drops what would happen if it were left", () => {
+    expect(issueBeforeCreate("Answer the question about column B above, or type the quantity. If you don't, it's added as 12.")).toBe(
+      "Answer the question about column B above, or type the quantity.",
+    );
+    expect(issueBeforeCreate("The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft.")).toBe(
+      "The cost is per sq ft. Type the square feet.",
+    );
+    expect(issueBeforeCreate('Which item is "Roof"? Answer above, or it\'s added as its own item.')).toBe('Which item is "Roof"? Answer above.');
+    // Words without such an ending stay as they are.
+    expect(issueBeforeCreate("No useful life yet. Type how many years it lasts.")).toBe("No useful life yet. Type how many years it lasts.");
   });
 });

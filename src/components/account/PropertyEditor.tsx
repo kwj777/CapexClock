@@ -14,7 +14,6 @@ import {
   toSaveInput,
   type SaveInput,
 } from "@/lib/properties/convert";
-import { fetchAllRows } from "@/lib/properties/load";
 import {
   compareSaved,
   detailsDropped,
@@ -30,6 +29,7 @@ import {
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
 import type { ComponentRow } from "@/lib/supabase/database.types";
+import { isSignedOut, readBack } from "./read-back";
 import {
   clearUnsaved,
   keepUnsaved,
@@ -89,37 +89,6 @@ export interface PropertyEditorProps {
   userId: string | null;
   /** The account's email, filled in on the paid-idea "tell me first" forms. */
   userEmail?: string | null;
-}
-
-/** Reads a property and its components from the database; null if that fails. */
-async function readBack(id: string): Promise<ReadBack | null> {
-  const supabase = createClient();
-  try {
-    // The property (with its version) first, then its components. If another save
-    // lands in between, the older version goes with the newer components, so the
-    // next save is refused instead of overwriting that save.
-    const { data: property, error } = await supabase.from("properties").select("*").eq("id", id).maybeSingle();
-    if (error) return null;
-    if (!property) return { property: null, components: [] };
-    const components = await fetchAllRows((from, to) =>
-      supabase
-        .from("components")
-        .select("*", { count: "exact" })
-        .eq("property_id", id)
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    );
-    return { property, components };
-  } catch {
-    return null;
-  }
-}
-
-/** True only when the browser has definitely lost its session (not when it's offline). */
-async function isSignedOut(): Promise<boolean> {
-  const { data, error } = await createClient().auth.getSession();
-  return !error && !data.session;
 }
 
 export default function PropertyEditor({
@@ -635,6 +604,9 @@ export default function PropertyEditor({
         setDraft={updateDraft}
         header={header}
         exportName={name.trim() || "My property"}
+        listName={name.trim()}
+        importWhere="editor"
+        accountsEnabled
         library={library}
         rowNotes={rowNotes}
         where="property"

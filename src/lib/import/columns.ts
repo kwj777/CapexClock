@@ -1,13 +1,18 @@
+import { formatField, isCapexClockFormat } from "./format";
 import type { NameMatcher } from "./names";
 import { cellText, isBlankRow, words, type Grid } from "./text";
+import { isYesNo, readUnitCount } from "./values";
 
 /** What a column holds. */
 export type FieldKind =
   | "item"
+  | "category"
   | "quantity"
+  | "countedPer"
   | "area"
   | "location"
   | "installYear"
+  | "guess"
   | "age"
   | "life"
   | "remaining"
@@ -15,8 +20,12 @@ export type FieldKind =
   | "cost"
   | "total"
   | "condition"
+  | "replaceNow"
   | "notes"
-  | "category";
+  | "building"
+  | "unitCount"
+  | "yearBuilt"
+  | "id";
 
 /** A column's use: a field, nothing, or (each column is a component) one library item. */
 export type ColumnRole = "ignore" | FieldKind | `component:${string}`;
@@ -30,10 +39,13 @@ export type Layout = "rows" | "columns";
 /** The choices in each column's dropdown, in order, with what the owner reads. */
 export const FIELD_TEXT: Record<FieldKind, string> = {
   item: "Item name",
+  category: "Category",
   quantity: "Quantity",
+  countedPer: "Counted per (unit, building or sq ft)",
   area: "Square feet",
   location: "Apartment or location",
   installYear: "Install year",
+  guess: "Install year is a guess (yes or no)",
   age: "Age in years",
   life: "Useful life",
   remaining: "Years of life left",
@@ -41,14 +53,21 @@ export const FIELD_TEXT: Record<FieldKind, string> = {
   cost: "Cost each",
   total: "Total cost",
   condition: "Condition",
+  replaceNow: "Replace now (yes or no)",
   notes: "Notes",
-  category: "Category",
+  building: "Building",
+  unitCount: "Building's unit count",
+  yearBuilt: "Year built",
+  id: "CapexClock ID",
 };
 
 export const FIELDS = Object.keys(FIELD_TEXT) as FieldKind[];
 
+/** Fields about the building, not each item: one value per building. */
+export const BUILDING_FIELDS: readonly FieldKind[] = ["building", "unitCount", "yearBuilt"];
+
 /** Fields the "each column is a component" layout reads besides the components. */
-export const COLUMN_LAYOUT_FIELDS: readonly FieldKind[] = ["location"];
+export const COLUMN_LAYOUT_FIELDS: readonly FieldKind[] = ["location", "building"];
 
 // Whole headings, after words(): checked before the keyword rules below. Null means
 // the heading is about something else (the building, a tenant), so it's left out.
@@ -85,6 +104,23 @@ const EXACT: Record<string, FieldKind | null> = {
   "rating": "condition",
   "what": "item",
   "name": "item",
+  // Our own template's headings (see format.ts), and ways of saying the same.
+  "counted per": "countedPer",
+  "counted": "countedPer",
+  "per": "countedPer",
+  "install year is a guess": "guess",
+  "guess": "guess",
+  "guessed": "guess",
+  "replace now": "replaceNow",
+  "replace this year": "replaceNow",
+  "capexclock id": "id",
+  "building": "building",
+  "building name": "building",
+  "bldg": "building",
+  "bldg name": "building",
+  "property": "building",
+  "property name": "building",
+  "units in building": "unitCount",
   // Row and reference numbers, not items or quantities.
   "item #": null,
   "item no": null,
@@ -97,11 +133,9 @@ const EXACT: Record<string, FieldKind | null> = {
   "ref": null,
   "ref #": null,
   "id": null,
-  // Step 5 reads these for the property itself; here they're left out.
+  // "Units" may count items or the building's units: see doubtfulQuantity. An
+  // address may be each apartment's, so it isn't read as the building.
   "units": null,
-  "building": null,
-  "bldg": null,
-  "property": null,
   "address": null,
 };
 
@@ -168,6 +202,9 @@ const RULES: [FieldKind | null, string[] | ((have: readonly string[]) => boolean
   [null, ["rent"]],
   [null, ["lease"]],
   [null, ["move"]],
+  ["yearBuilt", ["year", "built"]],
+  ["yearBuilt", ["yr", "built"]],
+  ["yearBuilt", ["date", "built"]],
   [null, ["built"]],
   [null, ["warranty"]],
   // A cost or quantity in square feet is read, and so is an item's area ("Area (SF)"),
@@ -285,6 +322,14 @@ const EVENT_WORDS = new Set(
 );
 const EVENT_BLOCKS = new Set<FieldKind>(["installYear", "replaceBy", "age", "cost", "total", "quantity"]);
 
+// Words that say a value is a guess: "Year installed (guess)", or a yes or no column like "Guess?".
+const GUESS_WORDS = new Set(["guess", "guessed"]);
+
+/** The heading says "guess": "Year installed (guess)", "Install year guess", "Guessed?". */
+export function headingSaysGuess(heading: string): boolean {
+  return words(heading).split(" ").some((w) => GUESS_WORDS.has(w));
+}
+
 /** A heading's field and how sure it is, or null for a heading that isn't read. */
 export function guessHeading(heading: string): { field: FieldKind | null; strength: Strength } {
   const text = words(heading);
@@ -292,6 +337,14 @@ export function guessHeading(heading: string): { field: FieldKind | null; streng
   const exact = EXACT_HEADINGS.get(text);
   if (exact !== undefined) return { field: exact, strength: EXACT_STRENGTH.get(text) ?? "sure" };
   const have = text.split(" ");
+  if (have.some((w) => GUESS_WORDS.has(w))) {
+    // "Year installed (guess)" and "Install yr - best guess" hold years. A heading
+    // that names nothing else, like "Guess?", is a yes or no next to the install
+    // year, and so is "Install year guess" when its cells say yes or no (see guessColumns).
+    const rest = have.filter((w) => !GUESS_WORDS.has(w)).join(" ");
+    const other = rest === "" ? null : guessHeading(rest);
+    return other && other.field !== null ? other : { field: "guess", strength: "sure" };
+  }
   for (const [field, needed, strength = "sure"] of RULES) {
     if (typeof needed === "function" ? !needed(have) : !needed.every((w) => have.includes(w))) continue;
     // "Service" in "Years in service" is the rule's own word; in "Service date" it isn't.
@@ -484,6 +537,36 @@ export function columnValues(grid: Grid, headerRow: number): ColumnValues {
   };
 }
 
+/** Each building's filled cells in a column, building by building, for guesses that compare buildings. */
+export type BuildingValues = (column: number) => readonly (readonly string[])[];
+
+/**
+ * Every filled cell under the headings, split by the building in `buildingColumn`. A
+ * row belongs to the building it names, or to the last one named above it, as with
+ * merged cells. Names match whatever their case and punctuation.
+ */
+export function buildingValues(grid: Grid, headerRow: number, buildingColumn: number): BuildingValues {
+  // The building each row belongs to, worked out once.
+  const owners: string[] = [];
+  let building = "";
+  for (let i = headerRow + 1; i < grid.length; i++) {
+    const named = cellText(grid[i]?.[buildingColumn]);
+    if (named !== "") building = words(named);
+    owners.push(building);
+  }
+  return (column) => {
+    const groups = new Map<string, string[]>();
+    owners.forEach((owner, k) => {
+      const text = cellText(grid[headerRow + 1 + k]?.[column]);
+      if (text === "") return;
+      const group = groups.get(owner);
+      if (group) group.push(text);
+      else groups.set(owner, [text]);
+    });
+    return [...groups.values()];
+  };
+}
+
 /** Every year named in a column is before this year, so none of them can still be due. */
 export function yearsHavePassed(values: readonly string[], currentYear: number): boolean {
   let found = false;
@@ -500,6 +583,11 @@ export function yearsHavePassed(values: readonly string[], currentYear: number):
   return found;
 }
 
+/** Every filled cell says yes or no, and there's at least one. */
+function isYesNoColumn(values: readonly string[]): boolean {
+  return values.length > 0 && values.every(isYesNo);
+}
+
 /** Numbers only, like "12" or "1,200". */
 const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
 
@@ -511,11 +599,14 @@ function isAreaColumn(values: readonly string[]): boolean {
 /**
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
- * ones, so "Year installed" wins over a bare "Date". A "#", "No." or "Units" column
- * is left out here, and the preview asks whether it's the quantity.
+ * ones, so "Year installed" wins over a bare "Date". In our own format (format.ts)
+ * every heading is read as the format says, so "Units" is the building's unit count.
+ * Elsewhere a "#", "No." or "Units" column is left out here, and the preview asks
+ * whether it's the quantity.
  * With no item column, a "System" column holds the item names. A "Replacement year"
  * column whose years have all gone by (before `currentYear`) is read as when each
- * item was last replaced.
+ * item was last replaced. A heading with "guess" in it is the yes or no beside the
+ * install year when its cells say yes or no, and otherwise what the rest of it says.
  */
 export function guessColumns(
   heads: readonly string[],
@@ -525,7 +616,11 @@ export function guessColumns(
   currentYear?: number,
 ): ColumnRole[] {
   const items = componentColumns(heads, match);
+  // Our own template and downloads: their headings mean exactly what they say.
+  const ours = layout === "rows" && isCapexClockFormat(heads);
   const guesses = heads.map((heading, i): { role: ColumnRole; rank: number } => {
+    const own = ours ? formatField(heading) : null;
+    if (own) return { role: own, rank: RANK.sure };
     const { field, strength } = guessHeading(heading);
     let role: ColumnRole;
     if (layout === "columns") {
@@ -534,6 +629,8 @@ export function guessColumns(
     } else {
       // A heading that names an item belongs to the other layout.
       role = items[i] ? "ignore" : (field ?? "ignore");
+      // "Install year guess" with yes and no under it says which years are guesses.
+      if (role !== "guess" && headingSaysGuess(heading) && isYesNoColumn(values(i))) return { role: "guess", rank: RANK.sure };
     }
     return { role, rank: RANK[strength] };
   });
@@ -561,6 +658,25 @@ export function guessColumns(
     const at = heads.findIndex((h, i) => roles[i] === "ignore" && words(h) === "area" && isAreaColumn(values(i)));
     if (at >= 0) roles[at] = "area";
   }
+  // Beside another quantity column and the building's name or year built, "Units",
+  // "Unit count" or "# of units" is the building's unit count when its cells read as
+  // one ("12", "12 units"). One that holds units of measure ("sf", "ea") is left out.
+  if (!roles.includes("unitCount") && (roles.includes("building") || roles.includes("yearBuilt"))) {
+    const saysUnits = (i: number) =>
+      doubtfulQuantity(heads[i]) === "units" || (guesses[i].role === "quantity" && hasUnitWords(heads[i]));
+    const other = guesses.findIndex((g, i) => g.role === "quantity" && !saysUnits(i));
+    const at = heads.findIndex(
+      (h, i) =>
+        i !== other &&
+        (roles[i] === "ignore" || roles[i] === "quantity") &&
+        saysUnits(i) &&
+        values(i).every((v) => readUnitCount(v).value !== null),
+    );
+    if (other >= 0 && at >= 0) {
+      roles[at] = "unitCount";
+      roles[other] = "quantity";
+    }
+  }
   if (!roles.includes("item")) {
     const at = heads.findIndex(
       (h, i) => (roles[i] === "category" || roles[i] === "ignore") && guessField(h) === "category" && /\bsystems?\b/.test(words(h)),
@@ -585,15 +701,36 @@ export interface QuantityDoubt {
   column: number;
   /**
    * "same": one number on every row, which may be the building's unit count.
+   * "building": in a sheet of several buildings, one number on every row of each
+   * building, which may be each building's unit count.
    * "numbers": numbers that may count items, or number the rows or apartments.
    */
-  kind: "same" | "numbers";
-  /** The number on every row, or the first few different ones. */
+  kind: "same" | "building" | "numbers";
+  /** The number on every row, each building's first few, or the first few different ones. */
   values: string[];
 }
 
 // Words in a quantity heading that say it counts apartments: "# of units", "Unit count".
 const UNIT_WORDS = new Set(["unit", "units", "apt", "apts", "apartment", "apartments", "door", "doors"]);
+
+/** A heading that says it counts apartments: "# of units", "Unit count". */
+function hasUnitWords(heading: string): boolean {
+  return words(heading)
+    .split(" ")
+    .some((w) => UNIT_WORDS.has(w));
+}
+
+/**
+ * In a sheet of several buildings, each building has one number on every one of its
+ * rows, and they aren't all the same. A building's lone row counts only when the
+ * heading says units, since one row says nothing about repeats.
+ */
+function sameInEachBuilding(groups: readonly (readonly string[])[], saysUnits: boolean): boolean {
+  if (groups.length < 2) return false;
+  const number = (v: string) => Number(v.replace(/,/g, ""));
+  if (!groups.every((g) => g.every((v) => number(v) === number(g[0])))) return false;
+  return saysUnits || groups.some((g) => g.length > 1);
+}
 
 /**
  * The column to ask about, if any, when no other column is the quantity:
@@ -602,21 +739,30 @@ const UNIT_WORDS = new Set(["unit", "units", "apt", "apts", "apartment", "apartm
  * - A quantity column with the same number (not 1) on every row, when its heading
  *   says units ("# of units", "Unit count") or `buildingWide()` says a row is an
  *   item a building has one of, like a roof. It may be the building's unit count.
- * A column of 1s isn't asked about, since both answers give the same rows.
+ * - The same, in a sheet of several buildings (`byBuilding`, from its Building
+ *   column), for a number that's the same on every row of each building. It may be
+ *   each building's unit count.
+ * A column of 1s isn't asked about, since both answers give the same rows. Our own
+ * format says which column is which, so it never asks.
  */
 export function quantityQuestionColumn(
   heads: readonly string[],
   columns: readonly ColumnRole[],
   values: ColumnValues,
   buildingWide: () => boolean,
+  byBuilding?: BuildingValues,
 ): QuantityDoubt | null {
+  if (isCapexClockFormat(heads)) return null;
   const quantities = columns.flatMap((role, i) => (role === "quantity" ? [i] : []));
   if (quantities.length > 1) return null;
   const candidates =
     quantities.length === 1
       ? quantities
       : heads.flatMap((h, i) =>
-          columns[i] === "ignore" && (doubtfulQuantity(h) !== null || guessField(h) === "quantity") ? [i] : [],
+          // A column the owner set to the building's unit count shows the question answered.
+          (columns[i] === "ignore" || columns[i] === "unitCount") && (doubtfulQuantity(h) !== null || guessField(h) === "quantity")
+            ? [i]
+            : [],
         );
   for (const column of candidates) {
     const heading = heads[column] ?? "";
@@ -625,14 +771,16 @@ export function quantityQuestionColumn(
     const numbers = cells.map((v) => Number(v.replace(/,/g, "")));
     if (numbers.every((n) => n === 1)) continue;
     const same = cells.length > 1 && numbers.every((n) => n === numbers[0]);
+    const groups = !same && byBuilding ? byBuilding(column) : [];
+    const each = sameInEachBuilding(groups, hasUnitWords(heading));
+    const sameDoubt: QuantityDoubt = { column, kind: "same", values: [cells[0]] };
+    const eachDoubt: QuantityDoubt = { column, kind: "building", values: [...new Set(groups.map((g) => g[0]))].slice(0, 3) };
     if (doubtfulQuantity(heading) !== null) {
       if (isCounting(cells)) continue;
-      return same ? { column, kind: "same", values: [cells[0]] } : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
+      if (same) return sameDoubt;
+      return each ? eachDoubt : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
     }
-    const saysUnits = words(heading)
-      .split(" ")
-      .some((w) => UNIT_WORDS.has(w));
-    if (same && (saysUnits || buildingWide())) return { column, kind: "same", values: [cells[0]] };
+    if ((same || each) && (hasUnitWords(heading) || buildingWide())) return same ? sameDoubt : eachDoubt;
   }
   return null;
 }

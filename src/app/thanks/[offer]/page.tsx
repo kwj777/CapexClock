@@ -63,7 +63,7 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
         Email {CONTACT_EMAIL}
       </a>{" "}
       with your spreadsheet, or with a PDF or CSV from the calculator: under your forecast, click Download PDF or
-      Download CSV and attach the file. Please remove tenant names first.
+      Download component list (CSV) and attach the file. Please remove tenant names first.
     </>
   );
 
