@@ -40,6 +40,11 @@ export interface SheetReviewProps {
   listNotes?: ReadonlyMap<string, string>;
   /** On My properties: a row that needs the owner holds its property back (see PreviewRows). */
   beforeCreate?: boolean;
+  /**
+   * On My properties, once some of this sheet's properties are created: which building
+   * each row is in can't change, so the Building column and the layout stay as they are.
+   */
+  lockBuildings?: boolean;
 }
 
 /**
@@ -58,6 +63,7 @@ export default function SheetReview({
   duplicateIds,
   listNotes,
   beforeCreate = false,
+  lockBuildings = false,
 }: SheetReviewProps) {
   const baseId = useId();
   const summaryId = `${baseId}-summary`;
@@ -129,11 +135,18 @@ export default function SheetReview({
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           We guessed what each column holds. Change any guess, or choose Ignore to leave a column out.
         </p>
+        {lockBuildings && (
+          <p id={`${baseId}-locked`} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Some of these buildings are created, so the Building column and the layout stay as they are.
+          </p>
+        )}
         {opened.offersColumnLayout && (
           <label className="mt-3 flex items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
             <input
               type="checkbox"
               checked={choices.layout === "columns"}
+              disabled={lockBuildings}
+              aria-describedby={lockBuildings ? `${baseId}-locked` : undefined}
               onChange={(e) => setLayout(e.target.checked ? "columns" : "rows")}
               className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
             />
@@ -149,6 +162,7 @@ export default function SheetReview({
         <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
           {columnList.map(({ heading, i, examples }) => {
             const selectId = `${baseId}-column-${i}`;
+            const fixed = lockBuildings && choices.columns[i] === "building";
             return (
               <li key={i} className="grid gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-center">
                 <div className="min-w-0">
@@ -165,12 +179,14 @@ export default function SheetReview({
                   id={selectId}
                   aria-label={`Column ${columnLetter(i)}, ${heading || "(no heading)"}`}
                   value={choices.columns[i] ?? "ignore"}
+                  disabled={fixed}
+                  aria-describedby={fixed ? `${baseId}-locked` : undefined}
                   onChange={(e) => setColumn(i, parseRole(e.target.value))}
-                  className={inputClass}
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 dark:disabled:bg-slate-800 dark:disabled:text-slate-300`}
                 >
                   <option value="ignore">Ignore</option>
                   {(choices.layout === "columns" ? COLUMN_LAYOUT_FIELDS : FIELDS).map((f) => (
-                    <option key={f} value={f}>
+                    <option key={f} value={f} disabled={lockBuildings && f === "building"}>
                       {FIELD_TEXT[f]}
                     </option>
                   ))}

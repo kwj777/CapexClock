@@ -21,12 +21,13 @@ import {
   MAX_PROPERTIES,
   NO_NAME_TEXT,
   NO_UNITS_TEXT,
+  planAnnouncement,
   planProperties,
   plannedProblems,
   plannedSave,
-  portfolioSummary,
   propertyFieldProblems,
   propertyNameKey,
+  sentTabs,
   startingPicks,
   withEdits,
   type CreateResult,
@@ -143,6 +144,8 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
   const blockedFor = (list: readonly PlannedProperty[]) => list.some((p) => (problems.get(p.id) ?? []).length > 0) || sheetYearBad;
   const fromDownload = plans.some((p) => p.preview.idColumn);
   const review = plans.find((p) => p.tab === reviewTab) ?? plans[0];
+  // Tabs with a property already sent: which building each row is in stays as it is.
+  const sent = useMemo(() => sentTabs(planned, results), [planned, results]);
 
   /** The first tab with a ticked property whose rows wait on the owner, or with no year for the sheet. */
   function waitingTab(list: readonly PlannedProperty[]): number | undefined {
@@ -167,13 +170,17 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
   }, [runs]);
 
   // Screen readers hear what will be created once the plan settles (after reading the
-  // sheet, ticking a tab or changing a column or answer), not on every key press.
-  const planSummary = read && !started && !running ? portfolioSummary(pending, planned.length) : "";
+  // sheet, ticking a tab or changing a column or answer), not on every key press. That
+  // includes buildings ticked after some are created. With nothing to say, the region
+  // is emptied, so it never holds a plan that's gone.
+  const planSummary = planAnnouncement({ read: read !== null, running, started }, pending, planned.length);
   useEffect(() => {
-    if (!planSummary) return;
     const timer = window.setTimeout(
-      () => setAnnouncement((current) => (current === planSummary ? `${planSummary}\u00a0` : planSummary)),
-      600,
+      () =>
+        setAnnouncement((current) =>
+          planSummary === "" ? "" : current === planSummary ? `${planSummary}\u00a0` : planSummary,
+        ),
+      planSummary === "" ? 0 : 600,
     );
     return () => window.clearTimeout(timer);
   }, [planSummary, plans]);
@@ -388,7 +395,8 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
 
       {read && (
         <div className="mt-6 space-y-6 border-t border-slate-200 pt-5 dark:border-slate-800">
-          <fieldset disabled={started || running} className="space-y-6">
+          {/* Usable after some are created, for the ones that aren't yet. */}
+          <fieldset disabled={running} className="space-y-6">
             {read.tabs.length > 1 && (
               <div>
                 <p className={headingClass} id={`${baseId}-tabs`}>
@@ -397,6 +405,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   Each ticked tab becomes a property, or one for each building when it has a Building column.
                   {anyHidden ? " Tabs hidden in your spreadsheet are marked hidden and start unticked." : ""}
+                  {sent.size > 0 ? " Tabs with properties already created stay ticked." : ""}
                 </p>
                 <div role="group" aria-labelledby={`${baseId}-tabs`} className="mt-2 flex flex-col gap-1.5">
                   {read.tabs.map((tab, i) => (
@@ -404,7 +413,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       <input
                         type="checkbox"
                         checked={ticked.includes(i)}
-                        disabled={typeof tabs[i] !== "object"}
+                        disabled={typeof tabs[i] !== "object" || sent.has(i)}
                         onChange={(e) => tick(i, e.target.checked)}
                         className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
                       />
@@ -455,6 +464,11 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                   {plans.length > 1 ? `${read.tabs[review.tab]?.name}: ` : ""}
                   {previewSummary(review.preview.counts)}
                 </p>
+                {started && (
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Properties already created stay as they are. What you change here is for the ones not created yet.
+                  </p>
+                )}
                 {reviewOpen && typeof tabs[review.tab] === "object" && sheets[review.tab] && (
                   <div id={`${baseId}-review-panel`} className="mt-4">
                     <SheetReview
@@ -468,6 +482,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       summary={previewSummary(review.preview.counts)}
                       duplicateIds={NO_DUPLICATES}
                       beforeCreate
+                      lockBuildings={sent.has(review.tab)}
                     />
                   </div>
                 )}
@@ -512,6 +527,8 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
               {planned.map((p, i) => {
                 const result = results[p.id];
                 const created = result?.status === "created";
+                // A created property's count is what was saved, whatever the review says now.
+                const components = result?.status === "created" ? result.components : p.rows.length;
                 const lines = problems.get(p.id) ?? [];
                 const on = isIncluded(p);
                 const twin = !created && existingNames.has(propertyNameKey(p.name));
@@ -593,7 +610,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       </div>
                     </div>
                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                      {p.rows.length} {p.rows.length === 1 ? "component" : "components"}
+                      {components} {components === 1 ? "component" : "components"}
                       {plans.length > 1 || (read.source === "xlsx" && read.tabs.length > 1) ? `, from the ${read.tabs[p.tab]?.name} tab` : ""}
                     </p>
                     {twin && (

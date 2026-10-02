@@ -5,8 +5,10 @@ import {
   planProperty,
   plannedProblems,
   plannedSave,
+  planAnnouncement,
   portfolioSummary,
   propertyNameKey,
+  sentTabs,
   startingPicks,
   withEdits,
 } from "../buildings";
@@ -186,5 +188,55 @@ describe("what the live region says about the plan", () => {
     // Every building is already in My properties, so none starts ticked.
     expect(portfolioSummary([], 23)).toBe("None of the 23 buildings are ticked to create. Tick the ones to make.");
     expect(portfolioSummary([], 1)).toBe("The property isn't ticked to create. Tick it to make it.");
+  });
+});
+
+describe("after the first 20 of 23 buildings are created", () => {
+  // Building 22 has a "Roof" row, which could be either kind of roof.
+  const sheet = [
+    "Building,Units,Item,Qty,Year installed,Life,Cost each",
+    ...Array.from({ length: 23 }, (_, i) => `Bldg ${i + 1},4,${i === 21 ? "Roof" : "Boiler"},1,2010,25,9000`),
+  ].join("\n");
+  const planned = planProperties(0, preview(sheet), names);
+  const results = Object.fromEntries(planned.slice(0, 20).map((p) => [p.id, { status: "created" }]));
+  const rest = planned.slice(20);
+
+  it("keeps which building each row is in, and leaves the rest of the review open", () => {
+    expect(planned).toHaveLength(23);
+    expect([...sentTabs(planned, results)]).toEqual([0]);
+    expect(sentTabs(planned, {}).size).toBe(0);
+    // A tab whose properties weren't sent stays free to change.
+    expect([...sentTabs([...planned, { id: "1:", tab: 1 }], results)]).toEqual([0]);
+  });
+
+  it("says what's held back, by name, until it's answered there", () => {
+    expect(rest.map((p) => [p.name, p.waiting])).toEqual([
+      ["Bldg 21", []],
+      ["Bldg 22", [0]],
+      ["Bldg 23", []],
+    ]);
+    expect(plannedProblems(rest[1], CURRENT_YEAR)).toEqual([
+      "Roof needs you. Answer or fix it under Check the columns and rows first.",
+    ]);
+    const answer = preview(sheet).questions[0];
+    const answered = planProperties(0, preview(sheet, { answers: { [answer.key]: "asphalt-shingle-roof" } }), names);
+    // The answer changes only the rows of the building that waited.
+    expect(answered.slice(0, 20).map((p) => p.rows)).toEqual(planned.slice(0, 20).map((p) => p.rows));
+    expect(answered[21].waiting).toEqual([]);
+    expect(answered[21].rows[0].name).toBe("Asphalt shingle roof");
+    expect(plannedProblems(answered[21], CURRENT_YEAR)).toEqual([]);
+  });
+
+  it("announces the buildings ticked next, and nothing while there are none", () => {
+    const state = { read: true, running: false, started: true };
+    expect(planAnnouncement(state, [], 23)).toBe("");
+    expect(planAnnouncement(state, rest, 23)).toBe("3 properties to create from 3 rows. 1 row needs you.");
+    expect(planAnnouncement({ ...state, running: true }, rest, 23)).toBe("");
+    // Before any are created, the plan is read out as before.
+    expect(planAnnouncement({ ...state, started: false }, planned.slice(0, 20), 23)).toBe("20 properties to create from 20 rows.");
+    expect(planAnnouncement({ ...state, started: false }, [], 23)).toBe(
+      "None of the 23 buildings are ticked to create. Tick the ones to make.",
+    );
+    expect(planAnnouncement({ read: false, running: false, started: false }, [], 0)).toBe("");
   });
 });

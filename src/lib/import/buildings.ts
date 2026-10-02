@@ -199,6 +199,31 @@ export function portfolioSummary(properties: readonly Pick<PlannedProperty, "row
   return waiting > 0 ? `${made} ${count(waiting, "row needs", "rows need")} you.` : made;
 }
 
+/**
+ * What the live region reads about the plan, or "" for nothing: the properties ticked
+ * and not created yet, once the sheet is read. While properties are being created, and
+ * after, until more are ticked, the progress and the result say what happened instead.
+ */
+export function planAnnouncement(
+  state: { read: boolean; running: boolean; started: boolean },
+  pending: readonly Pick<PlannedProperty, "rows" | "waiting">[],
+  planned: number,
+): string {
+  if (!state.read || state.running || (state.started && pending.length === 0)) return "";
+  return portfolioSummary(pending, planned);
+}
+
+/**
+ * Tabs with a property already sent to be created. Which building each of their rows
+ * is in can't change any more (the tab can't be unticked, and its Building column and
+ * layout stay as they are), or a building already created could be planned again
+ * under another name and made twice. Everything else in their review can change, for
+ * the properties not created yet.
+ */
+export function sentTabs(planned: readonly Pick<PlannedProperty, "id" | "tab">[], results: Readonly<Record<string, unknown>>): Set<number> {
+  return new Set(planned.filter((p) => results[p.id] !== undefined).map((p) => p.tab));
+}
+
 function count(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 }
