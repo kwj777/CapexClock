@@ -96,7 +96,8 @@ export default async function SpreadsheetTemplatePage() {
             </p>
             <div
               role="region"
-              aria-labelledby="example-heading"
+              // Its own name, not the section's again, so the two regions can be told apart.
+              aria-label="Example rows (scrolls sideways)"
               tabIndex={0}
               className="mt-5 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
             >

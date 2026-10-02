@@ -48,9 +48,12 @@ describe("the spreadsheet template page", () => {
   });
 
   it("shows the filled-in example's rows, with Quantity blank on the ones counted per unit, as in the download", async () => {
-    const { visible } = await render();
+    const { html, visible } = await render();
     for (const r of exampleRows()) expect(visible).toContain(r.name);
     expect(visible.match(/Blank: one per unit/g)).toHaveLength(exampleRows().filter((r) => r.unitLabel === "per_unit").length);
+    // The scrolling table has its own name, not its section's again.
+    expect(html).toContain('aria-label="Example rows (scrolls sideways)"');
+    expect(html.match(/aria-labelledby="example-heading"/g)).toHaveLength(1);
   });
 
   it("writes copy without em or en dashes", async () => {
