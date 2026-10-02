@@ -103,6 +103,9 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   const dup = useMemo(() => duplicates(draft.rows, added), [draft.rows, added]);
   const building = preview?.buildings.find((b) => b.key === (result?.building ?? "")) ?? (preview?.buildings.length === 1 ? preview.buildings[0] : undefined);
   const details = sheetDetails(building, draft);
+  // A detail the list already has a different value for changes only if the owner keeps it ticked.
+  const takesDetail = (field: "unitCount" | "yearBuilt") => detailAnswers[field] ?? plan?.matched === true;
+  const applied = [...details.fill, ...details.ask.filter((a) => takesDetail(a.field))];
 
   // Counts only: never names or anything from the sheet.
   useEffect(() => {
@@ -114,7 +117,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
 
   // Screen readers hear the summary once choices settle, not on every key press. For
   // a component list download, it says what the import updates, adds and removes.
-  const summary = preview && plan ? importSummary(preview.counts, plan, removeMissing) : "";
+  const summary = preview && plan ? importSummary(preview.counts, plan, removeMissing, applied) : "";
   useEffect(() => {
     if (!summary) return;
     const timer = window.setTimeout(
@@ -163,14 +166,13 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   }
 
   const sheetYearBad = preview?.usesSheetYear === true && sheet?.choices.sheetYear === null;
-  const takesDetail = (field: "unitCount" | "yearBuilt") => detailAnswers[field] ?? plan?.matched === true;
-  const label = plan ? applyLabel(plan, removeMissing) : null;
-  const detailsChange = details.fill.length > 0 || details.ask.some((a) => takesDetail(a.field));
-  const canApply = preview !== null && plan !== null && !sheetYearBad && (label !== null || detailsChange);
+  // Says the rows and the building details it changes: "Update 1 row and set rental units to 14".
+  const label = plan ? applyLabel(plan, removeMissing, applied) : null;
+  const canApply = preview !== null && plan !== null && !sheetYearBad && label !== null;
 
   function apply() {
     if (!plan || !canApply || !read) return;
-    const values = [...details.fill, ...details.ask.filter((a) => takesDetail(a.field))];
+    const values = applied;
     const remove = removeMissing ? plan.missing.map((m) => m.id) : [];
     void track("import_completed", {
       rows_added: plan.add.length,
@@ -179,7 +181,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
       source: read.source,
       where,
     });
-    const said = label === null ? "Updated the building details from your spreadsheet." : doneText(plan, remove.length);
+    const said = doneText(plan, remove.length, values);
     onApply(
       {
         add: plan.add,
@@ -381,7 +383,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
                 disabled={!canApply}
                 className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {label ?? (detailsChange ? "Update the building details" : "Nothing to change")}
+                {label ?? "Nothing to change"}
               </button>
               <button type="button" onClick={onClose} className={secondaryButton}>
                 Cancel
