@@ -39,3 +39,12 @@ const moneyWithCents = new Intl.NumberFormat("en-US", {
 export function formatUnitPrice(value: number): string {
   return Number.isInteger(value) ? money.format(value) : moneyWithCents.format(value);
 }
+
+/**
+ * A typical cost range, like "$800–$2,300" or "$0.15–$0.30". Both ends keep cents
+ * when either has them, so "$2.50–$4.00" doesn't read as two kinds of number.
+ */
+export function formatCostRange(low: number, high: number): string {
+  const format = Number.isInteger(low) && Number.isInteger(high) ? money : moneyWithCents;
+  return low === high ? format.format(low) : `${format.format(low)}–${format.format(high)}`;
+}

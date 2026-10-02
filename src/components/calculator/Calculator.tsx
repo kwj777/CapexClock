@@ -26,13 +26,16 @@ import { guessedYear, installYearNote } from "@/lib/export/rows";
 import type { PaidWhere } from "@/lib/paid-ideas";
 import {
   COMPONENT_LIBRARY,
+  TYPICAL_COSTS,
   UNIT_LABEL_TEXT,
   type LibraryComponent,
+  type TypicalCost,
 } from "@/lib/library/components";
 import {
   badYearBuilt,
   CONDITION_TEXT,
   CONDITIONS,
+  costHint,
   costLabel,
   customRow,
   detailsShown,
@@ -114,9 +117,11 @@ const textButton =
 export default function Calculator({
   accountsEnabled = false,
   library = COMPONENT_LIBRARY,
+  typicalCosts = TYPICAL_COSTS,
 }: {
   accountsEnabled?: boolean;
   library?: LibraryComponent[];
+  typicalCosts?: TypicalCost[];
 }) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
   // An import on the template page that changed the list leaves a copy to undo.
@@ -143,6 +148,7 @@ export default function Calculator({
       draft={draft}
       setDraft={setDraft}
       library={library}
+      typicalCosts={typicalCosts}
       trackEvents
       showExample
       accountsEnabled={accountsEnabled}
@@ -189,6 +195,8 @@ export interface CalculatorViewProps {
   accountsEnabled?: boolean;
   /** Components offered in the picker; defaults to the built-in library. */
   library?: LibraryComponent[];
+  /** Typical costs shown as hints under the cost fields; defaults to the built-in list. */
+  typicalCosts?: TypicalCost[];
   /**
    * Notes by row id that replace the row's forecast note, e.g. why it can't be saved,
    * with the fields they're about (marked invalid and pointed at the note).
@@ -242,10 +250,12 @@ function CalculatorBody({
   importWhere = "calculator",
   accountsEnabled = false,
   library = COMPONENT_LIBRARY,
+  typicalCosts = TYPICAL_COSTS,
   rowNotes,
   initialUndo = null,
 }: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
+  const typicalBySlug = useMemo(() => new Map(typicalCosts.map((c) => [c.slug, c])), [typicalCosts]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
   const [startYear] = useState(() => new Date().getFullYear());
   const tracked = useRef({ started: !trackEvents || draft.rows.length > 0 });
@@ -626,6 +636,7 @@ function CalculatorBody({
                   idPrefix={rowIdPrefix(row.id)}
                   yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
                   lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
+                  typical={row.librarySlug ? typicalBySlug.get(row.librarySlug) : undefined}
                   note={rowNotes?.[row.id]}
                   problem={problems[row.id]}
                   onRowChange={updateRow}
@@ -758,6 +769,7 @@ const ListedRow = memo(function ListedRow({
   idPrefix: string;
   yearBuilt: string;
   lib: LibraryComponent | undefined;
+  typical: TypicalCost | undefined;
   /** A note from the page, e.g. why the row can't be saved; it replaces the forecast's. */
   note: RowNote | undefined;
   problem: RowProblem | undefined;
@@ -780,6 +792,7 @@ function ComponentRow({
   idPrefix,
   yearBuilt,
   lib,
+  typical,
   problem,
   onChange,
   onRemove,
@@ -789,17 +802,21 @@ function ComponentRow({
   idPrefix: string;
   yearBuilt: string;
   lib: LibraryComponent | undefined;
+  typical: TypicalCost | undefined;
   problem: RowNote | null;
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
   const label = row.name.trim() || "this component";
   const problemId = `${idPrefix}-problem`;
+  const hintId = `${idPrefix}-cost-hint`;
+  const hint = costHint(row, lib, typical);
   const detailsId = `${idPrefix}-details`;
   const notesLeftId = `${idPrefix}-notes-left`;
   // Marks the field the row's note is about and points it at the note.
   const flag = (field: RowField) =>
     problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
+  const costFlag = flag("costEach");
   const summary = detailsSummary(row);
   const notes = row.notes ?? "";
   const notesLeft = notesLeftText(notes);
@@ -915,11 +932,17 @@ function ComponentRow({
               value={row.costEach}
               placeholder="Quote or estimate"
               aria-label={`${costLabel(row)}, ${label}`}
-              {...flag("costEach")}
+              {...costFlag}
+              aria-describedby={[costFlag["aria-describedby"], hint && hintId].filter(Boolean).join(" ") || undefined}
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
           <CostNote row={row} />
+          {hint && (
+            <span id={hintId} className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+              {hint}
+            </span>
+          )}
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-700 lg:justify-center dark:text-slate-300">
           <input

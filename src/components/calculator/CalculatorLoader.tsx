@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import { placeholderHeight, placeholderScript } from "./placeholder";
 import { DRAFT_STORAGE_KEY } from "./storage-key";
 
@@ -42,9 +42,11 @@ const Calculator = dynamic(() => import("./Calculator"), {
 export default function CalculatorLoader({
   accountsEnabled,
   library,
+  typicalCosts,
 }: {
   accountsEnabled: boolean;
   library: LibraryComponent[];
+  typicalCosts: TypicalCost[];
 }) {
-  return <Calculator accountsEnabled={accountsEnabled} library={library} />;
+  return <Calculator accountsEnabled={accountsEnabled} library={library} typicalCosts={typicalCosts} />;
 }

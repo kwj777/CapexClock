@@ -110,9 +110,9 @@ export default function PrivacyPage() {
               <li>the pages you visit and the site that sent you,</li>
               <li>clicks, without the text of what you clicked,</li>
               <li>
-                steps like starting the calculator, getting a forecast, creating an account, saving a property,
-                exporting, importing a spreadsheet (how many rows, never what&apos;s in them), and coming back on a later
-                day,
+                steps like starting the calculator, getting a forecast or a quick estimate (how many systems were
+                ticked, not your numbers), creating an account, saving a property, exporting, importing a spreadsheet
+                (how many rows, never what&apos;s in them), and coming back on a later day,
               </li>
               <li>
                 your answers to our short survey (one question, and a second one if you answer Yes or Maybe), and which buttons for ideas we haven&apos;t built yet you saw,

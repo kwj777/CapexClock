@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import PropertyEditorLoader from "@/components/account/PropertyEditorLoader";
-import { getLibrary } from "@/lib/library/source";
+import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { draftFromRows } from "@/lib/properties/convert";
 import { fetchAllRows } from "@/lib/properties/load";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +38,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
   const property = await getProperty(id);
   // Row Level Security returns nothing for someone else's property, so this is also the access check.
   if (!property) notFound();
-  const [components, library, account] = await Promise.all([
+  const [components, library, typicalCosts, account] = await Promise.all([
     fetchAllRows((from, to) =>
       supabase
         .from("components")
@@ -49,6 +49,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
         .range(from, to),
     ),
     getLibrary(),
+    getTypicalCosts(),
     getAccount(),
   ]);
 
@@ -60,6 +61,7 @@ export default async function PropertyPage({ params }: PageProps<"/app/propertie
       <h1 className="mt-2 mb-6 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{property.name}</h1>
       <PropertyEditorLoader
         library={library}
+        typicalCosts={typicalCosts}
         // Keeps its own state after a save; a new mount only for another property.
         key={property.id}
         userId={account.id}

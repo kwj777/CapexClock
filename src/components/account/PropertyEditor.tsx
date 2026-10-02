@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalculatorView, type RowNote } from "@/components/calculator/Calculator";
 import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import {
   draftFromRows,
   SAVE_PROBLEM_TEXT,
@@ -85,6 +85,7 @@ export interface PropertyEditorProps {
   /** New property started from the public calculator's work in this browser. */
   importFromCalculator?: boolean;
   library: LibraryComponent[];
+  typicalCosts: TypicalCost[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
   /** The account's email, filled in on the paid-idea "tell me first" forms. */
@@ -98,6 +99,7 @@ export default function PropertyEditor({
   initialDraft,
   importFromCalculator = false,
   library,
+  typicalCosts,
   userId,
   userEmail,
 }: PropertyEditorProps) {
@@ -608,6 +610,7 @@ export default function PropertyEditor({
         importWhere="editor"
         accountsEnabled
         library={library}
+        typicalCosts={typicalCosts}
         rowNotes={rowNotes}
         where="property"
         ownerEmail={userEmail}

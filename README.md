@@ -5,9 +5,9 @@ Free CapEx forecaster for small rental property owners. Live at capexclock.com.
 ## Phase 1: early-access landing page
 
 - Next.js (App Router), TypeScript strict, Tailwind v4
-- Not a static site any more: `/`, `/pricing`, `/terms`, `/privacy`, `/thanks/*` and
-  `/reserve-calculator` are fully static, the
-  pages built from the lifespan library (`/capex-calculator`, `/lifespan`, `/lifespan/<slug>` and
+- Not a static site any more: `/`, `/pricing`, `/terms`, `/privacy` and `/thanks/*` are fully
+  static, the pages built from the component library (`/capex-calculator`, `/reserve-calculator`,
+  `/capex-spreadsheet-template`, `/lifespan`, `/lifespan/<slug>` and
   the sitemap) are rebuilt at most once an hour (ISR), `/app` and `/auth` render on each request,
   and `src/proxy.ts` checks the session on `/app` only
 - A `/lifespan/<slug>` that doesn't exist shows the 404 page, which is cached like the other
@@ -184,6 +184,18 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   "Run 0002_safer_saves.sql first" if that hasn't run. It's safe to run again. Don't run 0002
   again after it: that brings back the old save, which ignores condition and notes. If that
   happens, run 0004 again.
+- `0005_typical_costs.sql`: adds a typical cost range to each component in the library
+  (`typical_cost_low`, `typical_cost_high`, and `typical_cost_per`: `apartment` or `sq_ft`) and
+  fills in the 25 built-in components. The quick estimate on /reserve-calculator uses them, and
+  the calculator shows them as gray hints under a per-apartment or per-sq-ft cost field (only for
+  items the library counts per unit or per sq ft, never building-wide ones); they're
+  never used in a forecast or saved to a property. It fills in costs only on the run that adds the
+  columns, so running it again changes no costs and never puts back one edited or blanked in the
+  dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
+  Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
+  says it isn't available and no hints show. The numbers, and how the quick estimate uses the
+  year built, are still waiting for Kevin's approval in `typical-costs.md` (phase 3 project
+  files); `SPREAD_REPLACEMENTS` in `src/lib/reserve/quick-estimate.ts` switches the method.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
@@ -464,6 +476,7 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Template page | `template_downloaded` (Total count) | `file` | Since step 5 |
 | Component list downloads | `component_list_exported` (Total count) | `where` | Since step 5 |
 | Comparison | `forecast_generated`, `compare_viewed`, `compare_applied` (Unique users), with the two compare events filtered to Path name = `/capex-calculator` | none | Since step 6 |
+| Quick estimate | A **Funnels** insight (not Trends): step 1 `quick_estimate_shown`, step 2 `$pageview` filtered to Path name = `/capex-calculator` (Unique users, conversion window 1 hour) | none | Since step 7 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
@@ -500,6 +513,14 @@ On **Comparison**, filter each compare series: click the filter icon on it, choo
 then **equals**, and type `/capex-calculator`. The filter matters because the comparison also
 runs in the property editor, while `forecast_generated` is only sent from the public calculator.
 The comparison is working when `compare_viewed` is at least a tenth of `forecast_generated`.
+
+**Quick estimate** shows how many people who got a quick estimate on /reserve-calculator went on
+to the CapEx calculator in the same visit. In **New insight**, pick **Funnels** instead of
+Trends. Add `quick_estimate_shown` as step 1 and `$pageview` as step 2, then filter step 2 to
+**Path name** equals `/capex-calculator`. Under the steps, set **Conversion window limit** to
+**1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
+`quick_estimate_shown` goes once per page view, after an estimate has been on screen for 2
+seconds, and carries only `systems`, how many systems were ticked.
 
 ### Weekly Supabase query
 

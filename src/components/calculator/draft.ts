@@ -1,8 +1,9 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
 import type { ImportedRow } from "@/lib/import/preview";
-import { defaultLife, type LibraryComponent } from "@/lib/library/components";
+import { defaultLife, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import { formatCostRange } from "./format";
 
 // Form state keeps raw strings so inputs can be empty or mid-edit.
 export interface DraftRow {
@@ -398,15 +399,56 @@ export function rowTotal(row: Pick<DraftRow, "quantity" | "costEach">): { quanti
   return { quantity, each, total: quantity * each };
 }
 
+/** What one "cost" pays for in a row. */
+export type CostBasis = "apartment" | "sq_ft" | "building" | "each";
+
 /**
- * The cost field's label: what one "cost" pays for, so the quantity × cost math
- * reads right. A per-unit row at the unit count is priced per apartment (all its
- * windows, say); once the owner types their own count it's priced each.
+ * What one "cost" pays for, so the quantity × cost math reads right. A per-unit
+ * row at the unit count is priced per apartment (all its windows, say); once the
+ * owner types their own count it's priced each.
  */
+export function costBasis(row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">): CostBasis {
+  if (row.unitLabel === "per_sq_ft") return "sq_ft";
+  if (row.unitLabel === "per_unit") return row.followsUnitCount ? "apartment" : "each";
+  return row.quantity.trim() === "1" ? "building" : "each";
+}
+
+const COST_LABELS: Record<CostBasis, string> = {
+  apartment: "Cost per apartment",
+  sq_ft: "Cost per sq ft",
+  building: "Cost for the building",
+  each: "Cost each",
+};
+
+/** The cost field's label (see costBasis). */
 export function costLabel(row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">): string {
-  if (row.unitLabel === "per_sq_ft") return "Cost per sq ft";
-  if (row.unitLabel === "per_unit") return row.followsUnitCount ? "Cost per apartment" : "Cost each";
-  return row.quantity.trim() === "1" ? "Cost for the building" : "Cost each";
+  return COST_LABELS[costBasis(row)];
+}
+
+/** What a cost means for a library item counted the library's way. */
+const LIBRARY_COST_BASIS: Record<UnitLabel, CostBasis> = {
+  per_unit: "apartment",
+  per_sq_ft: "sq_ft",
+  per_building: "building",
+};
+
+/**
+ * Gray help text under a cost field, from the library item's typical cost. Only
+ * while the field and the typical cost mean the same thing, per apartment or per
+ * sq ft. A cost each (the owner's own count: one window, not an apartment's
+ * eight) or for the building can't be compared with them, so those get no hint.
+ * Neither does a building-wide item counted per apartment: its typical cost is a
+ * 12-unit building's boiler or roof shared out, and one in each apartment costs
+ * far more. The hint is never used in the math.
+ */
+export function costHint(
+  row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">,
+  lib: LibraryComponent | undefined,
+  typical: TypicalCost | undefined,
+): string | null {
+  if (!lib || !typical || LIBRARY_COST_BASIS[lib.unitLabel] !== typical.per) return null;
+  if (costBasis(row) !== typical.per) return null;
+  return `Typical ${formatCostRange(typical.low, typical.high)}, use your quote`;
 }
 
 /**

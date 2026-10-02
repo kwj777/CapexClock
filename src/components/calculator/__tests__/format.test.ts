@@ -1,5 +1,5 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { formatReserve } from "../format";
+import { formatCostRange, formatReserve } from "../format";
 
 function dollars(text: string): number {
   return Number(text.replace(/[$,]/g, ""));
@@ -35,5 +35,18 @@ describe("reserve amounts on screen", () => {
       expect(balance).toBeGreaterThanOrEqual(0);
       expect(perUnitBalance).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("typical cost ranges", () => {
+  it("shows whole dollars, or cents on both ends when either has them", () => {
+    expect(formatCostRange(800, 2300)).toBe("$800–$2,300");
+    expect(formatCostRange(3, 6)).toBe("$3–$6");
+    expect(formatCostRange(0.15, 0.3)).toBe("$0.15–$0.30");
+    expect(formatCostRange(2.5, 4)).toBe("$2.50–$4.00");
+  });
+
+  it("shows one figure when low and high are the same", () => {
+    expect(formatCostRange(500, 500)).toBe("$500");
   });
 });
