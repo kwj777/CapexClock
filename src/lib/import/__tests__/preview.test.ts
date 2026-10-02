@@ -264,6 +264,25 @@ describe("mixed date formats", () => {
   });
 });
 
+describe("headings with \"guess\" in them", () => {
+  it("reads the years under \"Install yr - best guess\" as install years, not as yes or no", () => {
+    const p = preview(["Item,Qty,Install yr - best guess,Life,Cost", "Water heater,12,2014,10,1400", "Furnace,12,2010,18,4200"].join("\n"));
+    expect(p.rows.map((r) => [r.row.name, r.row.installYear, r.status])).toEqual([
+      ["Tank water heater", "2014", "changed"],
+      ["Gas furnace", "2010", "changed"],
+    ]);
+    expect(p.rows.flatMap((r) => r.changes).some((c) => c.includes("as no"))).toBe(false);
+  });
+
+  it("marks the guesses from a yes or no column beside the install years", () => {
+    const p = preview(["Item,Qty,Install year,Install year guess,Life,Cost", "Water heater,12,2014,yes,10,1400", "Furnace,12,2010,,18,4200"].join("\n"));
+    expect(p.rows.map((r) => [r.row.installYear, r.row.installYearIsGuess])).toEqual([
+      ["2014", true],
+      ["2010", false],
+    ]);
+  });
+});
+
 describe("totals, repeated headings and section headings", () => {
   const sheet = [
     "Item,Qty,Total,Category",

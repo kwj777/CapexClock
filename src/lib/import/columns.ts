@@ -1,6 +1,7 @@
 import { formatField, isCapexClockFormat } from "./format";
 import type { NameMatcher } from "./names";
 import { cellText, isBlankRow, words, type Grid } from "./text";
+import { isYesNo } from "./values";
 
 /** What a column holds. */
 export type FieldKind =
@@ -196,8 +197,6 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   ["replaceBy", ["budget", "year"]],
   ["cost", ["budget"]],
   ["cost", ["$"]],
-  // "Install year guess": a yes or no next to the install year.
-  ["guess", ["guess"]],
   ["remaining", ["remaining"]],
   ["remaining", ["left"]],
   ["remaining", ["rul"]],
@@ -288,6 +287,14 @@ const EVENT_WORDS = new Set(
 );
 const EVENT_BLOCKS = new Set<FieldKind>(["installYear", "replaceBy", "age", "cost", "total", "quantity"]);
 
+// Words that say a value is a guess: "Year installed (guess)", or a yes or no column like "Guess?".
+const GUESS_WORDS = new Set(["guess", "guessed"]);
+
+/** The heading says "guess": "Year installed (guess)", "Install year guess", "Guessed?". */
+export function headingSaysGuess(heading: string): boolean {
+  return words(heading).split(" ").some((w) => GUESS_WORDS.has(w));
+}
+
 /** A heading's field and how sure it is, or null for a heading that isn't read. */
 export function guessHeading(heading: string): { field: FieldKind | null; strength: Strength } {
   const text = words(heading);
@@ -295,6 +302,14 @@ export function guessHeading(heading: string): { field: FieldKind | null; streng
   const exact = EXACT_HEADINGS.get(text);
   if (exact !== undefined) return { field: exact, strength: EXACT_STRENGTH.get(text) ?? "sure" };
   const have = text.split(" ");
+  if (have.some((w) => GUESS_WORDS.has(w))) {
+    // "Year installed (guess)" and "Install yr - best guess" hold years. A heading
+    // that names nothing else, like "Guess?", is a yes or no next to the install
+    // year, and so is "Install year guess" when its cells say yes or no (see guessColumns).
+    const rest = have.filter((w) => !GUESS_WORDS.has(w)).join(" ");
+    const other = rest === "" ? null : guessHeading(rest);
+    return other && other.field !== null ? other : { field: "guess", strength: "sure" };
+  }
   for (const [field, needed, strength = "sure"] of RULES) {
     if (!needed.every((w) => have.includes(w))) continue;
     // "Service" in "Years in service" is the rule's own word; in "Service date" it isn't.
@@ -445,6 +460,11 @@ export function yearsHavePassed(values: readonly string[], currentYear: number):
   return found;
 }
 
+/** Every filled cell says yes or no, and there's at least one. */
+function isYesNoColumn(values: readonly string[]): boolean {
+  return values.length > 0 && values.every(isYesNo);
+}
+
 /** Numbers only, like "12" or "1,200". */
 const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
 
@@ -456,7 +476,8 @@ const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
  * is the quantity only when no heading names one and its values look like counts.
  * With no item column, a "System" column holds the item names. A "Replacement year"
  * column whose years have all gone by (before `currentYear`) is read as when each
- * item was last replaced.
+ * item was last replaced. A heading with "guess" in it is the yes or no beside the
+ * install year when its cells say yes or no, and otherwise what the rest of it says.
  */
 export function guessColumns(
   heads: readonly string[],
@@ -479,6 +500,8 @@ export function guessColumns(
     } else {
       // A heading that names an item belongs to the other layout.
       role = items[i] ? "ignore" : (field ?? "ignore");
+      // "Install year guess" with yes and no under it says which years are guesses.
+      if (role !== "guess" && headingSaysGuess(heading) && isYesNoColumn(values(i))) return { role: "guess", rank: RANK.sure };
     }
     return { role, rank: RANK[strength] };
   });

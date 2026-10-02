@@ -462,6 +462,11 @@ export function readCondition(cell: Cell): Reading<ComponentCondition> & { keep?
 const YES_WORDS = /^(?:yes|y|true|x|✓|✔|1|guess|guessed|estimate|estimated|replace|now)$/i;
 const NO_WORDS = /^(?:no|n|false|0|-+|–|—)$/i;
 
+/** A cell that says yes or no, as a yes or no column would have it. */
+export function isYesNo(text: string): boolean {
+  return YES_WORDS.test(text) || NO_WORDS.test(text);
+}
+
 /** A yes or no column, like "Install year is a guess" or "Replace now". Blank is no. */
 export function readYesNo(cell: Cell): Reading<boolean> {
   if (typeof cell === "boolean") return { value: cell };

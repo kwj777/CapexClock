@@ -80,7 +80,9 @@ describe("guessing a column from its heading", () => {
     ["Unit count", "unitCount"],
     ["Counted per", "countedPer"],
     ["Install year is a guess", "guess"],
-    ["Install year guess", "guess"],
+    ["Guess?", "guess"],
+    ["Guessed", "guess"],
+    ["Is a guess", "guess"],
     ["Replace now", "replaceNow"],
     ["Replace this year", "replaceNow"],
     ["CapexClock ID", "id"],
@@ -248,6 +250,33 @@ describe("guessing the layout and every column", () => {
       "ignore",
     ]);
   });
+
+  it("reads a heading with \"guess\" in it by what's under it", () => {
+    const grid = [
+      ["Item", "Year installed (guess)", "Install year guess", "Useful life (guess)", "Cost (guess)"],
+      ["Water heater", "2014", "yes", "10", "1400"],
+      ["Furnace", "2010", "", "18", "4200"],
+      ["Roof", "2008", "no", "22", "38000"],
+    ];
+    const heads = grid[0];
+    // Years under it: the install year, as before. Yes and no under it: which years are guesses.
+    expect(guessColumns(heads, match, "rows", columnValues(grid, 0))).toEqual(["item", "installYear", "guess", "life", "cost"]);
+    // A yes or no column ahead of the install years doesn't take their place.
+    const [first, ...rest] = [heads[2], heads[0], heads[1]];
+    const swapped = grid.map((r) => [r[2], r[0], r[1]]);
+    expect(guessColumns([first, ...rest], match, "rows", columnValues(swapped, 0))).toEqual(["guess", "item", "installYear"]);
+    // Excel's TRUE and FALSE are yes and no too.
+    const ticks = [["Item", "Install year", "Year is a guess"], ["Furnace", "2010", true], ["Roof", "2008", false]];
+    expect(guessColumns(ticks[0] as string[], match, "rows", columnValues(ticks, 0))).toEqual(["item", "installYear", "guess"]);
+  });
+
+  it.each(["Year installed (guess)", "Install yr - best guess", "Install year (guessed)"])(
+    "reads %p as the install year from its heading alone",
+    (heading) => {
+      expect(guessField(heading)).toBe("installYear");
+      expect(guessColumns(["Item", heading], match, "rows")).toEqual(["item", "installYear"]);
+    },
+  );
 
   it("keeps a sheet with an item column one row per item, even with item headings", () => {
     expect(guessLayout(["Item", "Water heater", "Furnace"], match)).toBe("rows");
