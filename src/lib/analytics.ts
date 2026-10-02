@@ -43,8 +43,9 @@ export type EventProperties = Record<string, string | number | boolean>;
 
 /**
  * PostHog's options for an event. `sendNow` is for a click that leaves the page
- * (Buy now): the event skips PostHog's batch and goes at once as a beacon, which
- * the browser delivers even as the page changes. An ordinary request cut off by
+ * (Buy now) or opens another app (the photo offer's email link): the event skips
+ * PostHog's batch and goes at once as a beacon, which the browser delivers even as
+ * the page changes or is paused. An ordinary request cut off by
  * the page change is sent again by PostHog, so one click could count twice.
  */
 export function captureOptions(sendNow: boolean): CaptureOptions | undefined {
