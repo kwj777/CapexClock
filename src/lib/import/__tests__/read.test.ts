@@ -92,6 +92,20 @@ describe("opening a sheet", () => {
     expect(PROBLEM_TEXT.forecast_file).toMatch(/Download component list \(CSV\)/);
   });
 
+  it("says the same for a forecast downloaded from the live site before condition and notes were added", () => {
+    // A forecast CSV as capexclock.com wrote it before Phase 3: the last column was "Note".
+    const text = [
+      "Year,Component,Category,Quantity,Unit,Cost each,Total cost,Note",
+      "2026,Tank water heater,Plumbing,12,each,1400.00,16800.00,Past its expected life; Install year estimated",
+      "2027,Asphalt shingle roof,Roofing,1,each,38000.00,38000.00,",
+      ",Boiler,HVAC,,,,,Not included yet: details missing",
+      "",
+    ].join("\r\n");
+    const grid = readText(text, parse, "file");
+    if (typeof grid === "string") throw new Error(grid);
+    expect(openSheet(grid, match, 2026)).toBe("forecast_file");
+  });
+
   it("stops at 2,000 rows under the headings", () => {
     const rows = (n: number) => [["Item", "Qty"], ...Array.from({ length: n }, () => ["Fridge", "1"])];
     expect(openSheet(rows(2001), match, 2026)).toBe("too_big");

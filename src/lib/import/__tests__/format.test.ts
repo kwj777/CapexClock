@@ -59,4 +59,19 @@ describe("CapexClock's own columns", () => {
     expect(isForecastCsv([...FORMAT_HEADINGS])).toBe(false);
     expect(isForecastCsv(["Year", "Item", "Total cost"])).toBe(false);
   });
+
+  it("know the forecast download owners already have, from before condition and notes were added", () => {
+    // The live site's forecast CSV before Phase 3, heading for heading.
+    const before = ["Year", "Component", "Category", "Quantity", "Unit", "Cost each", "Total cost", "Note"];
+    expect(isForecastCsv(before)).toBe(true);
+    // Saved again from Excel with the headings in other cases, or with Category taken out.
+    expect(isForecastCsv(before.map((h) => h.toUpperCase()))).toBe(true);
+    expect(isForecastCsv(before.filter((h) => h !== "Category"))).toBe(true);
+  });
+
+  it("don't take an owner's own sheet with a year and a total for the forecast download", () => {
+    expect(isForecastCsv(["Unit", "Component", "Year", "Cost each", "Total cost", "Notes"])).toBe(false);
+    expect(isForecastCsv(["Year", "Component", "Quantity", "Cost each", "Total cost", "Note"])).toBe(false);
+    expect(isForecastCsv(["Item", "Qty", "Unit", "Year", "Cost each", "Total cost", "Note"])).toBe(false);
+  });
 });

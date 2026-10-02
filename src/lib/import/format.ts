@@ -127,13 +127,22 @@ export function formatField(heading: string): FieldKind | null {
   return FORMAT_FIELDS.get(words(heading)) ?? null;
 }
 
-/** The forecast download's headings: one row per replacement, which can't be read back as a list. */
-const FORECAST_ONLY = ["forecast note", "total cost", "year"];
+/**
+ * The forecast download's headings, which every copy of it has had. Its last
+ * column was "Note" until condition and notes were added, and is "Forecast note" now.
+ */
+const FORECAST_HEADINGS = ["year", "component", "quantity", "unit", "cost each", "total cost"];
+const FORECAST_NOTE = ["forecast note", "note"];
 
-/** The headings are the forecast CSV's, which lists replacements, not components. */
+/**
+ * The headings are the forecast CSV's, old or new, which lists replacements, not
+ * components: its Year is when each one is due, not when it was installed. It
+ * takes all of them, so an owner's own sheet with a Year and a Total cost isn't
+ * mistaken for it.
+ */
 export function isForecastCsv(heads: readonly string[]): boolean {
   const have = new Set(heads.map(words));
-  return FORECAST_ONLY.every((h) => have.has(h)) && have.has("component");
+  return FORECAST_HEADINGS.every((h) => have.has(h)) && FORECAST_NOTE.some((h) => have.has(h));
 }
 
 /** "yes" in the files we write. Blank means no. */
