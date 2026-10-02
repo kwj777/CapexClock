@@ -49,12 +49,18 @@ export function words(text: string): string {
 
 /** Quotes a cell's text for a note, shortened so a long cell doesn't take over the preview. */
 export function quote(text: string, max = 40): string {
-  return `"${text.length > max ? `${text.slice(0, max - 1)}…` : text}"`;
+  return `"${clip(text, max)}"`;
 }
 
-/** Cuts text to fit a length limit, ending in "…" when it was cut. */
+/**
+ * Cuts text to fit a length limit, ending in "…" when it was cut. The limit counts
+ * UTF-16 units, as text boxes do. The cut never splits an emoji in half, since the
+ * database refuses text with half a character.
+ */
 export function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  return `${/[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut}…`;
 }
 
 /** "a, b and c" */

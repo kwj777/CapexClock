@@ -13,7 +13,7 @@ import {
 import type { NameMatcher } from "@/lib/import/names";
 import { columnsFor, parseSheetYear, type OpenedSheet } from "@/lib/import/open";
 import { KEEP_OWN, type FixField, type ImportChoices, type Preview, type PreviewRow } from "@/lib/import/preview";
-import { columnLetter, previewHints, unitsQuestionText } from "@/lib/import/wording";
+import { columnLetter, previewHints, quantityAnswers, quantityQuestionText } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
 import PreviewRows from "./PreviewRows";
 import { headingClass, inputClass } from "./SourcePicker";
@@ -67,24 +67,35 @@ export default function SheetReview({
   }
 
   function setColumn(index: number, role: ColumnRole) {
-    setChoices((c) => ({ ...c, columns: c.columns.map((r, i) => (i === index ? role : r)) }));
+    // Choosing Quantity or Ignore for the column the quantity question is about answers it.
+    const answers = preview.quantityQuestion?.column === index;
+    setChoices((c) => ({
+      ...c,
+      columns: c.columns.map((r, i) => (i === index ? role : r)),
+      quantityAnswered: c.quantityAnswered || answers,
+    }));
   }
 
   function setLayout(layout: Layout) {
     // Fixes were for the other layout's rows, so they start again.
-    setChoices((c) => ({ ...c, layout, columns: columnsFor(opened, match, layout, currentYear), fixes: {}, unitsAnswered: false }));
+    setChoices((c) => ({ ...c, layout, columns: columnsFor(opened, match, layout, currentYear), fixes: {}, quantityAnswered: false }));
   }
 
   function setSheetYear(value: string) {
     setState((s) => ({ sheetYearText: value, choices: { ...s.choices, sheetYear: parseSheetYear(value, currentYear) } }));
   }
 
-  /** "quantity": the Units column is how many of each item; "building": it's the building's unit count. */
-  function answerUnits(column: number, value: "quantity" | "building") {
+  /**
+   * "quantity": the column is how many of each item. "each_one": it isn't, so each row
+   * counts as one. One number on every row is then the building's unit count, and
+   * other numbers number the rows or apartments, so they're left out.
+   */
+  function answerQuantity(question: NonNullable<Preview["quantityQuestion"]>, value: "quantity" | "each_one") {
+    const role: ColumnRole = value === "quantity" ? "quantity" : question.kind === "same" ? "unitCount" : "ignore";
     setChoices((c) => ({
       ...c,
-      unitsAnswered: true,
-      columns: c.columns.map((r, i) => (i === column ? (value === "quantity" ? "quantity" : "unitCount") : r)),
+      quantityAnswered: true,
+      columns: c.columns.map((r, i) => (i === question.column ? role : r)),
     }));
   }
 
@@ -138,17 +149,17 @@ export default function SheetReview({
               <li key={i} className="grid gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-center">
                 <div className="min-w-0">
                   <label htmlFor={selectId} className="block text-sm font-medium wrap-anywhere text-slate-900 dark:text-white">
-                    <span className="sr-only">Column </span>
                     <span className="mr-1.5 text-xs font-normal text-slate-500 dark:text-slate-400">{columnLetter(i)}</span>
-                    <span className="sr-only">, </span>
                     {heading || "(no heading)"}
                   </label>
                   {examples.length > 0 && (
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">e.g. {examples.join(", ")}</p>
                   )}
                 </div>
+                {/* Named in full here: hidden words inside the label are read as their own block, with a stray space. */}
                 <select
                   id={selectId}
+                  aria-label={`Column ${columnLetter(i)}, ${heading || "(no heading)"}`}
                   value={choices.columns[i] ?? "ignore"}
                   onChange={(e) => setColumn(i, parseRole(e.target.value))}
                   className={inputClass}
@@ -200,23 +211,18 @@ export default function SheetReview({
         </div>
       )}
 
-      {preview.unitsQuestion && (
+      {preview.quantityQuestion && (
         <fieldset>
-          <legend className={`${headingClass} wrap-anywhere`}>{unitsQuestionText(preview.unitsQuestion)}</legend>
+          <legend className={`${headingClass} wrap-anywhere`}>{quantityQuestionText(preview.quantityQuestion)}</legend>
           <div className="mt-2 flex flex-col gap-1.5">
-            {(
-              [
-                ["quantity", "How many of each item there are"],
-                ["building", "The number of units in the building, so each row counts as one"],
-              ] as const
-            ).map(([value, text]) => (
+            {quantityAnswers(preview.quantityQuestion).map(([value, text]) => (
               <label key={value} className="flex items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
                 <input
                   type="radio"
-                  name={`${baseId}-units`}
+                  name={`${baseId}-quantity`}
                   value={value}
-                  checked={preview.unitsQuestion?.answer === value}
-                  onChange={() => preview.unitsQuestion && answerUnits(preview.unitsQuestion.column, value)}
+                  checked={preview.quantityQuestion?.answer === value}
+                  onChange={() => preview.quantityQuestion && answerQuantity(preview.quantityQuestion, value)}
                   className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
                 />
                 {text}

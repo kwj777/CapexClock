@@ -24,7 +24,7 @@ import {
   sheetDetails,
 } from "@/lib/import/reimport";
 import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
-import { duplicates, duplicateText, longListText } from "@/lib/import/wording";
+import { duplicates, duplicateText, longListText, NEEDS_YOU_TEXT } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
 import SheetReview, { type SheetState } from "./SheetReview";
 import SourcePicker, { headingClass, inputClass, labelClass, secondaryButton, type SourceRead } from "./SourcePicker";
@@ -187,7 +187,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   const longList = plan ? longListText(rowsAfter, plan.add.length) : "";
   const unanswered =
     (preview?.questions.filter((q) => sheet?.choices.answers[q.key] === undefined).length ?? 0) +
-    (preview?.unitsQuestion?.answer === null ? 1 : 0);
+    (preview?.quantityQuestion?.answer === null ? 1 : 0);
   const usable = tabs.filter((t) => typeof t === "object").length;
   const anyHidden = read?.tabs.some((t) => t.hidden) ?? false;
   const summaryLines = plan ? planSummary(plan) : [];
@@ -361,9 +361,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
               </p>
             )}
             {(preview.counts.needsYou > 0 || unanswered > 0) && (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Rows that need you are added as they are, and the calculator shows what to fix.
-              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{NEEDS_YOU_TEXT.beforeAdd}</p>
             )}
             {sheetYearBad && (
               <p className="text-sm text-amber-800 dark:text-amber-300">Fix the year the sheet was last updated to add these rows.</p>

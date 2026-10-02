@@ -76,7 +76,7 @@ describe("downloading the component list and importing it again", () => {
     const preview = previewOf(gridFromCsv(csv), draft);
     expect(preview.counts).toMatchObject({ rows: draft.rows.length, ready: draft.rows.length, needsYou: 0, skipped: 0 });
     expect(preview.idColumn).toBe(true);
-    expect(preview.unitsQuestion).toBeNull();
+    expect(preview.quantityQuestion).toBeNull();
     expect(preview.rows.map((r) => r.capexclockId)).toEqual(draft.rows.map((r) => r.id));
   });
 

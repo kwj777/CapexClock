@@ -9,6 +9,7 @@ export type FieldKind =
   | "category"
   | "quantity"
   | "countedPer"
+  | "area"
   | "location"
   | "installYear"
   | "guess"
@@ -41,6 +42,7 @@ export const FIELD_TEXT: Record<FieldKind, string> = {
   category: "Category",
   quantity: "Quantity",
   countedPer: "Counted per (unit, building or sq ft)",
+  area: "Square feet",
   location: "Apartment or location",
   installYear: "Install year",
   guess: "Install year is a guess (yes or no)",
@@ -118,7 +120,6 @@ const EXACT: Record<string, FieldKind | null> = {
   "bldg name": "building",
   "property": "building",
   "property name": "building",
-  "unit count": "unitCount",
   "units in building": "unitCount",
   // Row and reference numbers, not items or quantities.
   "item #": null,
@@ -163,11 +164,35 @@ const EXACT_STRENGTH = new Map<string, Strength>([
   ["when", "doubtful"],
 ]);
 
+// Words that make a heading in square feet a cost or a count, not an area: "Cost/SF", "Qty SF".
+const MONEY_OR_COUNT = new Set(["cost", "price", "$", "budget", "amount", "value", "qty", "quantity", "count"]);
+// Words that make it the size of an apartment or the building: "Unit SF", "Bldg sq ft".
+const PLACE_WORDS = new Set(
+  "apartment apartments apt apts unit units building bldg rentable leasable living gross suite property house home".split(" "),
+);
+
+/** The heading says square feet: "Sq ft", "SF", "Square footage", "ft²". */
+function inSquareFeet(have: readonly string[]): boolean {
+  const has = (w: string) => have.includes(w);
+  return (
+    ((has("sq") || has("square") || has("area")) && (has("ft") || has("feet") || has("foot") || has("footage"))) ||
+    has("sf") ||
+    has("sqft") ||
+    has("ft2")
+  );
+}
+
+/** An area in square feet, not a cost or a count in them. */
+function areaWords(have: readonly string[]): boolean {
+  return inSquareFeet(have) && !have.some((w) => MONEY_OR_COUNT.has(w));
+}
+
 /**
- * Keyword rules, in order: the first one whose words are all in the heading wins.
- * Null rules come first: tenant details and the year built are never read.
+ * Keyword rules, in order: the first one whose words are all in the heading wins
+ * (or, for a test, that passes it). Null rules come first: tenant details and the
+ * year built are never read.
  */
-const RULES: [FieldKind | null, string[], Strength?][] = [
+const RULES: [FieldKind | null, string[] | ((have: readonly string[]) => boolean), Strength?][] = [
   [null, ["tenant"]],
   [null, ["tenants"]],
   [null, ["resident"]],
@@ -182,13 +207,23 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   ["yearBuilt", ["date", "built"]],
   [null, ["built"]],
   [null, ["warranty"]],
-  // An apartment's or the building's size isn't read, but a cost or quantity in square feet is.
+  // A cost or quantity in square feet is read, and so is an item's area ("Area (SF)"),
+  // but not an apartment's or the building's size.
   ["cost", ["cost", "sq", "ft"]],
   ["cost", ["$", "sq", "ft"]],
   ["cost", ["price", "sq", "ft"]],
   ["quantity", ["qty", "sq", "ft"]],
   ["quantity", ["quantity", "sq", "ft"]],
-  [null, ["sq", "ft"]],
+  [null, (have) => areaWords(have) && have.some((w) => PLACE_WORDS.has(w))],
+  ["area", areaWords],
+  // "Total units" and "Total qty" count items; "Total cost (all units)" is money.
+  ["total", ["total", "cost"]],
+  ["total", ["total", "price"]],
+  ["total", ["total", "$"]],
+  ["quantity", ["total", "units"]],
+  ["quantity", ["total", "qty"]],
+  ["quantity", ["total", "quantity"]],
+  ["quantity", ["total", "count"]],
   ["total", ["total"]],
   ["total", ["extended"]],
   ["total", ["ext", "cost"]],
@@ -311,9 +346,10 @@ export function guessHeading(heading: string): { field: FieldKind | null; streng
     return other && other.field !== null ? other : { field: "guess", strength: "sure" };
   }
   for (const [field, needed, strength = "sure"] of RULES) {
-    if (!needed.every((w) => have.includes(w))) continue;
+    if (typeof needed === "function" ? !needed(have) : !needed.every((w) => have.includes(w))) continue;
     // "Service" in "Years in service" is the rule's own word; in "Service date" it isn't.
-    const event = have.some((w) => EVENT_WORDS.has(w) && !needed.includes(w));
+    const own = typeof needed === "function" ? [] : needed;
+    const event = have.some((w) => EVENT_WORDS.has(w) && !own.includes(w));
     if (field !== null && EVENT_BLOCKS.has(field) && event) return { field: null, strength: "sure" };
     return { field, strength };
   }
@@ -330,8 +366,8 @@ const NUMBER_HEADINGS = new Set(["#", "no", "number", "num", "nbr"]);
 
 /**
  * A heading that might be a quantity but might not: "#" or "No." often numbers the
- * rows, and "Units" can be the building's unit count. These are used only when no
- * heading names a quantity, and only if the values look like counts.
+ * rows, and "Units" can be the building's unit count or the apartment numbers. The
+ * guesses leave these out, and the preview asks about them (see quantityQuestionColumn).
  */
 export function doubtfulQuantity(heading: string): "number" | "units" | null {
   const text = words(heading);
@@ -359,6 +395,63 @@ export type Timing = "installYear" | "age";
 export function headingTiming(heading: string): Timing {
   const have = new Set(words(heading).split(" "));
   return have.has("age") || have.has("old") ? "age" : "installYear";
+}
+
+/** A component heading without its timing words: "Water heater 2 installed" is "water heater 2". */
+function itemWords(heading: string): string {
+  return words(heading)
+    .split(" ")
+    .filter((w) => !TIMING_WORDS.has(w))
+    .join(" ");
+}
+
+/** Two install-year columns whose names differ by a number, like "Fridge 1" and "Fridge 2", are separate items. */
+function separateItems(a: string, b: string): boolean {
+  if (headingTiming(a) !== "installYear" || headingTiming(b) !== "installYear") return false;
+  const [x, y] = [itemWords(a), itemWords(b)];
+  return x !== y && /\d/.test(`${x} ${y}`);
+}
+
+/**
+ * Two columns about one item, like "Water heater installed" and "Water heater age",
+ * would count it twice for each apartment. One is kept, an install year over an age,
+ * else the first, and the others are set to Ignore, where the owner can change them.
+ */
+function keepOneColumnPerItem(heads: readonly string[], roles: ColumnRole[]) {
+  const kept = new Map<string, number[]>();
+  roles.forEach((role, i) => {
+    const slug = componentSlug(role);
+    if (!slug) return;
+    const others = kept.get(slug) ?? [];
+    const same = others.find((k) => !separateItems(heads[k], heads[i]));
+    if (same === undefined) {
+      kept.set(slug, [...others, i]);
+    } else if (headingTiming(heads[same]) === "age" && headingTiming(heads[i]) === "installYear") {
+      roles[same] = "ignore";
+      kept.set(slug, others.map((k) => (k === same ? i : k)));
+    } else {
+      roles[i] = "ignore";
+    }
+  });
+}
+
+/**
+ * Columns left out because another column gives the same item for each apartment,
+ * for the preview to name. `kept` is that other column.
+ */
+export function sameItemColumns(
+  heads: readonly string[],
+  columns: readonly ColumnRole[],
+  match: NameMatcher,
+): { column: number; kept: number; slug: string }[] {
+  const found: { column: number; kept: number; slug: string }[] = [];
+  columns.forEach((role, column) => {
+    if (role !== "ignore") return;
+    const slug = headingItem(heads[column] ?? "", match);
+    const kept = slug ? columns.indexOf(`component:${slug}`) : -1;
+    if (slug && kept >= 0) found.push({ column, kept, slug });
+  });
+  return found;
 }
 
 /** The library item a heading names, if sure: "Water heater installed" is Tank water heater. */
@@ -468,12 +561,18 @@ function isYesNoColumn(values: readonly string[]): boolean {
 /** Numbers only, like "12" or "1,200". */
 const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
 
+/** Every filled cell is a number, perhaps in square feet ("9,600 sf"), and there's at least one. */
+function isAreaColumn(values: readonly string[]): boolean {
+  return values.length > 0 && values.every((v) => /^\d[\d,]*(?:\.\d+)?\s*(?:sq\.?\s*ft\.?|sf|sqft|square\s+f(?:ee|oo)t)?$/i.test(v));
+}
+
 /**
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
  * ones, so "Year installed" wins over a bare "Date". In our own format (format.ts)
- * every heading is read as the format says, so "Units" is the building's unit count. A "#", "No." or "Units" column
- * is the quantity only when no heading names one and its values look like counts.
+ * every heading is read as the format says, so "Units" is the building's unit count.
+ * Elsewhere a "#", "No." or "Units" column is left out here, and the preview asks
+ * whether it's the quantity.
  * With no item column, a "System" column holds the item names. A "Replacement year"
  * column whose years have all gone by (before `currentYear`) is read as when each
  * item was last replaced. A heading with "guess" in it is the yes or no beside the
@@ -520,29 +619,33 @@ export function guessColumns(
       const at = heads.findIndex((h, i) => roles[i] === "ignore" && doubtfulQuantity(h) === "number");
       if (at >= 0) roles[at] = "location";
     }
+    keepOneColumnPerItem(heads, roles);
     return roles;
   }
 
-  if (!roles.includes("quantity")) {
-    const at = heads.findIndex((h, i) => {
-      const kind = doubtfulQuantity(h);
-      if (roles[i] !== "ignore" || kind === null) return false;
-      const cells = values(i);
-      if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || isCounting(cells)) return false;
-      // The same number on every row may be the building's unit count: the preview asks.
-      return kind === "number" || new Set(cells).size > 1;
-    });
-    if (at >= 0) roles[at] = "quantity";
+  // A bare "Area" of numbers is square feet; one of words ("Basement") isn't read.
+  if (!roles.includes("area")) {
+    const at = heads.findIndex((h, i) => roles[i] === "ignore" && words(h) === "area" && isAreaColumn(values(i)));
+    if (at >= 0) roles[at] = "area";
   }
-  // Beside a quantity column and the building's name or year built, "Units" is the
-  // building's unit count when its cells read as one ("12", "12 units"). One that
-  // holds units of measure ("sf", "ea") is left out.
-  if (roles.includes("quantity") && !roles.includes("unitCount") && (roles.includes("building") || roles.includes("yearBuilt"))) {
-    const at = heads.findIndex((h, i) => {
-      if (roles[i] !== "ignore" || doubtfulQuantity(h) !== "units") return false;
-      return values(i).every((v) => readUnitCount(v).value !== null);
-    });
-    if (at >= 0) roles[at] = "unitCount";
+  // Beside another quantity column and the building's name or year built, "Units",
+  // "Unit count" or "# of units" is the building's unit count when its cells read as
+  // one ("12", "12 units"). One that holds units of measure ("sf", "ea") is left out.
+  if (!roles.includes("unitCount") && (roles.includes("building") || roles.includes("yearBuilt"))) {
+    const saysUnits = (i: number) =>
+      doubtfulQuantity(heads[i]) === "units" || (guesses[i].role === "quantity" && hasUnitWords(heads[i]));
+    const other = guesses.findIndex((g, i) => g.role === "quantity" && !saysUnits(i));
+    const at = heads.findIndex(
+      (h, i) =>
+        i !== other &&
+        (roles[i] === "ignore" || roles[i] === "quantity") &&
+        saysUnits(i) &&
+        values(i).every((v) => readUnitCount(v).value !== null),
+    );
+    if (other >= 0 && at >= 0) {
+      roles[at] = "unitCount";
+      roles[other] = "quantity";
+    }
   }
   if (!roles.includes("item")) {
     const at = heads.findIndex(
@@ -563,32 +666,70 @@ export function guessColumns(
   return roles;
 }
 
-/** The quantity column, when its heading only might be one ("#", "No.", "Units"). */
-export function doubtfulQuantityColumn(heads: readonly string[], columns: readonly ColumnRole[]): number | null {
-  const at = columns.indexOf("quantity");
-  return at >= 0 && guessField(heads[at] ?? "") === null && doubtfulQuantity(heads[at] ?? "") !== null ? at : null;
+/** A column that may or may not be the quantity, for the preview to ask about once. */
+export interface QuantityDoubt {
+  column: number;
+  /**
+   * "same": one number on every row, which may be the building's unit count.
+   * "numbers": numbers that may count items, or number the rows or apartments.
+   */
+  kind: "same" | "numbers";
+  /** The number on every row, or the first few different ones. */
+  values: string[];
+}
+
+// Words in a quantity heading that say it counts apartments: "# of units", "Unit count".
+const UNIT_WORDS = new Set(["unit", "units", "apt", "apts", "apartment", "apartments", "door", "doors"]);
+
+/** A heading that says it counts apartments: "# of units", "Unit count". */
+function hasUnitWords(heading: string): boolean {
+  return words(heading)
+    .split(" ")
+    .some((w) => UNIT_WORDS.has(w));
 }
 
 /**
- * A "Units" column with the same number (not 1) on every row, when no other column
- * is the quantity. It could be how many of each item there are, or the building's
- * unit count, so the preview asks which. Our own format says which, so it never asks.
+ * The column to ask about, if any, when no other column is the quantity:
+ * - "#", "No." or "Units" holding numbers that don't simply run 1, 2, 3 (or 101,
+ *   102, 103) down the sheet. They may be counts, or row or apartment numbers.
+ * - A quantity column with the same number (not 1) on every row, when its heading
+ *   says units ("# of units", "Unit count") or `buildingWide()` says a row is an
+ *   item a building has one of, like a roof. It may be the building's unit count.
+ * A column of 1s isn't asked about, since both answers give the same rows. Our own
+ * format says which column is which, so it never asks.
  */
-export function sameUnitsColumn(
+export function quantityQuestionColumn(
   heads: readonly string[],
   columns: readonly ColumnRole[],
   values: ColumnValues,
-): { column: number; value: string } | null {
+  buildingWide: () => boolean,
+): QuantityDoubt | null {
   if (isCapexClockFormat(heads)) return null;
-  const column = heads.findIndex(
-    (h, i) =>
-      doubtfulQuantity(h) === "units" &&
-      (columns[i] === "ignore" || columns[i] === "quantity" || columns[i] === "unitCount"),
-  );
-  if (column < 0 || columns.some((r, i) => r === "quantity" && i !== column)) return null;
-  const cells = values(column);
-  if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v)) || new Set(cells).size > 1) return null;
-  return Number(cells[0].replace(/,/g, "")) === 1 ? null : { column, value: cells[0] };
+  const quantities = columns.flatMap((role, i) => (role === "quantity" ? [i] : []));
+  if (quantities.length > 1) return null;
+  const candidates =
+    quantities.length === 1
+      ? quantities
+      : heads.flatMap((h, i) =>
+          // A column the owner set to the building's unit count shows the question answered.
+          (columns[i] === "ignore" || columns[i] === "unitCount") && (doubtfulQuantity(h) !== null || guessField(h) === "quantity")
+            ? [i]
+            : [],
+        );
+  for (const column of candidates) {
+    const heading = heads[column] ?? "";
+    const cells = values(column);
+    if (cells.length === 0 || !cells.every((v) => PLAIN_NUMBER.test(v))) continue;
+    const numbers = cells.map((v) => Number(v.replace(/,/g, "")));
+    if (numbers.every((n) => n === 1)) continue;
+    const same = cells.length > 1 && numbers.every((n) => n === numbers[0]);
+    if (doubtfulQuantity(heading) !== null) {
+      if (isCounting(cells)) continue;
+      return same ? { column, kind: "same", values: [cells[0]] } : { column, kind: "numbers", values: [...new Set(cells)].slice(0, 3) };
+    }
+    if (same && (hasUnitWords(heading) || buildingWide())) return { column, kind: "same", values: [cells[0]] };
+  }
+  return null;
 }
 
 /** Install-year and replace-by columns whose headings could mean something else, for the preview to name. */

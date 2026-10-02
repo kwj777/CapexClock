@@ -123,7 +123,7 @@ describe("opening a sheet", () => {
       sheetYear: 2026,
       answers: {},
       fixes: {},
-      unitsAnswered: false,
+      quantityAnswered: false,
     });
   });
 
