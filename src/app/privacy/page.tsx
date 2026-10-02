@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
 // src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
-const UPDATED = "October 1, 2026";
+const UPDATED = "October 2, 2026";
 
 // The sign-in check is mentioned only on deploys that have it switched on.
 const CAPTCHA_ON = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) !== null;
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
               The CapEx calculator keeps your work in your browser&apos;s local storage, so it&apos;s still there when you
               come back. It isn&apos;t sent to us. PDF and CSV exports are made in your browser too, and so is reading a
               spreadsheet you import: the file or pasted rows never leave your browser. We also remember in
-              your browser whether you&apos;ve answered our one-question survey, so we don&apos;t ask twice. Clearing your
+              your browser whether you&apos;ve answered our short survey, so we don&apos;t ask twice. Clearing your
               browser data removes all of this.
             </p>
           </Section>
@@ -92,10 +92,11 @@ export default function PrivacyPage() {
 
           <Section title="Files you email us">
             <p>
-              You might email us a spreadsheet, a PDF export or photos, for example to ask for a report or to have rows
-              filled in for you. We read these files, and so does Anthropic&apos;s Claude, an AI assistant that helps us
-              prepare reports and fill in rows. We delete them within 30 days of delivering what you asked for. To have
-              them deleted sooner, email{" "}
+              You might email us a spreadsheet, a PDF export or photos, for example to ask for a report, to have rows
+              filled in for you from a photo of a label, or to send a sample of how you track CapEx today. We read these
+              files, and so does Anthropic&apos;s Claude, an AI assistant that helps us prepare reports, fill in rows and
+              make sure our import can read sheets like yours. We delete them within 30 days of delivering what you asked
+              for, or within 30 days of getting them if you sent a sample. To have them deleted sooner, email{" "}
               <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
                 {CONTACT_EMAIL}
               </a>
@@ -113,7 +114,7 @@ export default function PrivacyPage() {
                 exporting, and coming back on a later day,
               </li>
               <li>
-                your answers to our one-question survey, and which buttons for ideas we haven&apos;t built yet you saw,
+                your answers to our short survey (one question, and a second one if you answer Yes or Maybe), and which buttons for ideas we haven&apos;t built yet you saw,
                 clicked or signed up for, but not the email or unit count you gave,
               </li>
               <li>clicks on Buy now and visits to a thank-you page after paying, with which offer it was and nothing else,</li>

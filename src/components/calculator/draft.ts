@@ -298,8 +298,32 @@ export function costLabel(row: Pick<DraftRow, "unitLabel" | "quantity" | "follow
   return row.quantity.trim() === "1" ? "Cost for the building" : "Cost each";
 }
 
-/** How many more characters the notes can take, once that's 200 or fewer; null before then. */
+/**
+ * Whether a row's condition and notes show on narrow screens: as the owner last
+ * chose with More or Less (null until they do), or else open while the notes need
+ * fixing. The row forgets the choice when a new problem comes up, so it opens again.
+ */
+export function detailsShown(chosen: boolean | null, notesNeedFixing: boolean): boolean {
+  return chosen ?? notesNeedFixing;
+}
+
+/**
+ * Notes longer than a save takes, counted as the database counts them (an emoji is
+ * one). The box stops typing at the limit, so only a kept draft or an import gets here.
+ */
+export function notesTooLong(notes: string): boolean {
+  return Array.from(notes).length > MAX_NOTES_LENGTH;
+}
+
+/**
+ * How many more characters the notes can take, once that's 200 or fewer, or how
+ * many too many once they're over the limit; null before then.
+ */
 export function notesLeftText(notes: string): string | null {
+  if (notesTooLong(notes)) {
+    const over = Array.from(notes).length - MAX_NOTES_LENGTH;
+    return `${over.toLocaleString("en-US")} character${over === 1 ? "" : "s"} over the ${MAX_NOTES_LENGTH.toLocaleString("en-US")} limit`;
+  }
   const left = Math.max(0, MAX_NOTES_LENGTH - notes.length);
   if (left > 200) return null;
   return `${left.toLocaleString("en-US")} character${left === 1 ? "" : "s"} left`;

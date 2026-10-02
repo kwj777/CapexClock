@@ -10,7 +10,7 @@ const TRACK_WAIT_MS = 600;
 /**
  * How long more clicks are ignored once the page is told to go to Stripe, so a
  * double click is one trip and one event. If the page stays (the property
- * editor's "leave page?" prompt was cancelled), Buy now works again after this,
+ * editor's "leave page?" prompt was canceled), Buy now works again after this,
  * without counting again.
  */
 const LEAVING_MS = 2000;
@@ -71,12 +71,18 @@ export default function BuyNow({ offer, link }: { offer: Offer; link: string }) 
       });
   }
 
+  // A middle click opens a new tab and fires auxclick, not click, in current browsers.
+  function onAuxClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button === 1) onClick(event);
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <a
           href={link}
           onClick={onClick}
+          onAuxClick={onAuxClick}
           // Starts with the visible words, so "click Buy now" works by voice, and
           // says which offer, since a page can have two.
           aria-label={`Buy now: ${name}`}
