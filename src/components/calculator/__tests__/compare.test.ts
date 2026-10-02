@@ -26,6 +26,7 @@ import {
   undoApplied,
   undoneText,
   viewedEvent,
+  viewedWhileOpen,
   withReplaceNow,
   withTick,
 } from "../compare";
@@ -156,6 +157,19 @@ describe("Apply and Undo in the panel", () => {
     expect(empty.state.viewed).toBe(false);
     const later = togglePanel(togglePanel(empty.state, 0).state, 2);
     expect(later.event).toEqual({ items: 2 });
+  });
+
+  it("sends compare_viewed once when something comes up to compare in a panel already open", () => {
+    // Opened while everything at risk was already set to replace this year.
+    const empty = togglePanel(NEW_COMPARE_STATE, 0).state;
+    expect(viewedWhileOpen(empty, 0)).toBeNull();
+    // Then an item is unticked in the form, so there's one to compare.
+    const shown = viewedWhileOpen(empty, 1);
+    expect(shown).toEqual({ state: { ...empty, viewed: true }, event: { items: 1 } });
+    expect(viewedWhileOpen(shown!.state, 2)).toBeNull();
+    // A closed panel, or one that already sent it, sends nothing.
+    expect(viewedWhileOpen(NEW_COMPARE_STATE, 3)).toBeNull();
+    expect(viewedWhileOpen(togglePanel(NEW_COMPARE_STATE, 3).state, 3)).toBeNull();
   });
 
   it("opens and closes without touching the ticks, the emergency box or Undo", () => {

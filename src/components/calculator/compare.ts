@@ -218,6 +218,20 @@ export function togglePanel(
   return { state: { ...state, open: !state.open, viewed: state.viewed || event !== null }, event };
 }
 
+/**
+ * compare_viewed for a panel that's already open when something comes up to compare:
+ * one opened while everything at risk was already set to replace this year, say, and
+ * then an item was unticked there. It goes once per page view, like togglePanel's.
+ * Null when there's nothing to send.
+ */
+export function viewedWhileOpen(
+  state: CompareState,
+  items: number,
+): { state: CompareState; event: { items: number } } | null {
+  const event = viewedEvent(state.open, state.viewed, items);
+  return event && { state: { ...state, viewed: true }, event };
+}
+
 /** Ticks or unticks one item in the panel's list. */
 export function withTick(state: CompareState, id: string, ticked: boolean): CompareState {
   const unticked = new Set(state.unticked);
