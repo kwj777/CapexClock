@@ -7,19 +7,29 @@ import { CalculatorView, type RowNote } from "@/components/calculator/Calculator
 import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import type { LibraryComponent } from "@/lib/library/components";
-import { SAVE_PROBLEM_TEXT, saveProblemFields, toSaveInput, type SaveInput } from "@/lib/properties/convert";
+import {
+  draftFromRows,
+  SAVE_PROBLEM_TEXT,
+  saveProblemFields,
+  toSaveInput,
+  type SaveInput,
+} from "@/lib/properties/convert";
 import { fetchAllRows } from "@/lib/properties/load";
 import {
+  compareSaved,
+  detailsDropped,
+  DETAILS_NOT_SAVED_TEXT,
   FUNCTION_NOT_FOUND,
-  matchesSaved,
   SAVE_FAILURE_TEXT,
   saveFailure,
+  sendsDetails,
   versionFromReadBack,
   withSavedIds,
   type ReadBack,
   type SaveFailure,
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
+import type { ComponentRow } from "@/lib/supabase/database.types";
 import {
   clearUnsaved,
   keepUnsaved,
@@ -35,6 +45,8 @@ type SaveState =
   | { kind: "idle" }
   | { kind: "saving"; creating: boolean }
   | { kind: "saved" }
+  // Saved, but the database has no update 0004, so condition and notes were dropped.
+  | { kind: "saved_without_details" }
   // A new property was saved and its own page is loading.
   | { kind: "opening" }
   | { kind: "failed"; failure: SaveFailure }
@@ -43,10 +55,25 @@ type SaveState =
 // These stay on screen while the owner keeps editing, until they act on them.
 const STICKY: SaveFailure[] = ["signed_out", "conflict", "deleted"];
 
+// How long after a page opens a status meant for it is set, so screen readers announce it.
+const ANNOUNCE_DELAY_MS = 500;
+
 // Set once the database turns out not to have migration 0002's version check.
 let versionCheckMissing = false;
 function noteVersionCheckMissing() {
   versionCheckMissing = true;
+}
+
+// A new property whose condition and notes the database dropped (no update 0004 yet).
+// Its own page opens next and says so.
+let detailsNotSavedFor: string | null = null;
+function noteDetailsNotSaved(propertyId: string | null) {
+  detailsNotSavedFor = propertyId;
+}
+
+/** Row ids as saved, in the order the rows were sent. */
+function savedIds(components: ComponentRow[]): string[] {
+  return [...components].sort((a, b) => a.sort_order - b.sort_order).map((c) => c.id);
 }
 
 export interface PropertyEditorProps {
@@ -132,6 +159,9 @@ export default function PropertyEditor({
     updatedAt: restored ? restored.baseUpdatedAt : (initialUpdatedAt ?? null),
   }));
   const [savedId, setSavedId] = useState(propertyId);
+  // A new property that just opened here after its condition and notes were dropped:
+  // the kept edits hold them, and the message replaces "We brought back changes".
+  const [arrivedDetailsDropped] = useState(() => propertyId !== undefined && detailsNotSavedFor === propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
   const busy = useRef(false);
@@ -222,6 +252,19 @@ export default function PropertyEditor({
     };
   }, [dirty, backupKey]);
 
+  // Said once: opening this property again later starts as usual. The message is set
+  // just after the page appears, not in its first render, because a live region reads
+  // out what changes in it, not what it starts with.
+  useEffect(() => {
+    if (!arrivedDetailsDropped) return;
+    noteDetailsNotSaved(null);
+    const timer = window.setTimeout(
+      () => setSave((s) => (s.kind === "idle" ? { kind: "saved_without_details" } : s)),
+      ANNOUNCE_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [arrivedDetailsDropped]);
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -267,6 +310,7 @@ export default function PropertyEditor({
   function edited() {
     setSave((s) =>
       s.kind === "saved" ||
+      s.kind === "saved_without_details" ||
       (s.kind === "failed" && !STICKY.includes(s.failure)) ||
       (s.kind === "delete_failed" && !s.signedOut)
         ? { kind: "idle" }
@@ -337,16 +381,35 @@ export default function PropertyEditor({
     // The kept copy goes once nothing is unsaved (see the effect above).
     setRestored(null);
 
+    // A database without update 0004 drops condition and notes without an error. For a
+    // new property they're kept in this browser for its own page, which says so.
+    let droppedFromNew: Omit<UnsavedEdits, "keptAt"> | null = null;
+    if (!id && sendsDetails(input)) {
+      const back = await readBack(newId);
+      if (back?.property && compareSaved(input, back.property, back.components) === "without_details") {
+        droppedFromNew = {
+          name: sent.name,
+          draft: withSavedIds(sent.draft, sent.draft, savedIds(back.components)),
+          baseUpdatedAt: back.property.updated_at,
+        };
+      }
+    }
+
     if (!mounted.current && !id) {
       // The owner left while it saved, and the form was locked, so the copy kept on
       // the way out is what was just saved. Stay where they went.
       busy.current = false;
       if (!leaving.current) clearUnsaved(backupKey);
+      if (droppedFromNew) keepUnsaved(unsavedKey(userId, newId), droppedFromNew);
       router.refresh();
       return;
     }
 
     if (!id) {
+      if (droppedFromNew) {
+        keepUnsaved(unsavedKey(userId, newId), droppedFromNew);
+        noteDetailsNotSaved(newId);
+      }
       // The form stays locked until the property's own page opens, so nothing typed is lost.
       setSavedId(newId);
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
@@ -367,15 +430,30 @@ export default function PropertyEditor({
     if (!back?.property) {
       // Saved, but its new version is unknown. The next save checks it first.
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
-    } else if (!matchesSaved(input, back.property, back.components)) {
-      // Another tab or device saved right after this one.
-      setSave({ kind: "failed", failure: "conflict" });
-      return;
     } else {
-      const ids = [...back.components].sort((a, b) => a.sort_order - b.sort_order).map((c) => c.id);
+      const match = compareSaved(input, back.property, back.components);
+      const lastSaved = toSaveInput(saved.name, saved.draft, currentYear, id);
+      if (match === "different" || (match === "without_details" && !detailsDropped(lastSaved, back.components))) {
+        // Another tab or device saved right after this one, maybe only condition or notes.
+        setSave({ kind: "failed", failure: "conflict" });
+        return;
+      }
+      const ids = savedIds(back.components);
       const savedDraft = withSavedIds(sent.draft, sent.draft, ids);
-      setSaved({ name: sent.name, draft: savedDraft, updatedAt: back.property.updated_at });
       setDraft((current) => (current === sent.draft ? savedDraft : withSavedIds(current, sent.draft, ids)));
+      if (match === "without_details") {
+        // The database holds everything but the condition and notes. They stay on
+        // screen as unsaved changes (kept in this browser), to save once it's updated.
+        setSaved({
+          name: sent.name,
+          draft: draftFromRows(back.property, back.components),
+          updatedAt: back.property.updated_at,
+        });
+        setSave({ kind: "saved_without_details" });
+        router.refresh();
+        return;
+      }
+      setSaved({ name: sent.name, draft: savedDraft, updatedAt: back.property.updated_at });
     }
     setSave({ kind: "saved" });
     router.refresh();
@@ -389,13 +467,14 @@ export default function PropertyEditor({
   function settleAfterLeaving(input: SaveInput, sent: { name: string; draft: Draft }, back: ReadBack | null) {
     const left = lastKept.current;
     if (leaving.current || !left) return;
-    if (left.name === sent.name && left.draft === sent.draft) {
+    const match = back?.property ? compareSaved(input, back.property, back.components) : null;
+    if (left.name === sent.name && left.draft === sent.draft && match !== "without_details") {
       clearUnsaved(backupKey);
-    } else if (back?.property && matchesSaved(input, back.property, back.components)) {
-      const ids = [...back.components].sort((a, b) => a.sort_order - b.sort_order).map((c) => c.id);
+    } else if (back?.property && match !== "different") {
+      // Edits made during the save, or condition and notes the database dropped.
       keepUnsaved(backupKey, {
         ...left,
-        draft: withSavedIds(left.draft, sent.draft, ids),
+        draft: withSavedIds(left.draft, sent.draft, savedIds(back.components)),
         baseUpdatedAt: back.property.updated_at,
       });
     }
@@ -445,11 +524,13 @@ export default function PropertyEditor({
       ? "Saving…"
       : save.kind === "opening"
         ? "Saved. Opening it…"
-        : dirty
-          ? "Unsaved changes"
-          : save.kind === "saved"
-            ? "Saved"
-            : "";
+        : save.kind === "saved_without_details"
+          ? DETAILS_NOT_SAVED_TEXT
+          : dirty
+            ? "Unsaved changes"
+            : save.kind === "saved"
+              ? "Saved"
+              : "";
   const actionClass =
     "mt-2 inline-block rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-red-800 ring-1 ring-red-300 hover:bg-red-100 dark:bg-transparent dark:text-red-200 dark:ring-red-400/40 dark:hover:bg-red-500/10";
 
@@ -469,8 +550,16 @@ export default function PropertyEditor({
           className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
         />
       </label>
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-500 dark:text-slate-400" aria-live="polite">
+      {/* Wraps, so a long status (the 0004 message) moves the button below it on phones. */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <span
+          className={`max-w-xs text-sm ${
+            save.kind === "saved_without_details"
+              ? "font-medium text-amber-800 dark:text-amber-300"
+              : "text-slate-500 dark:text-slate-400"
+          }`}
+          aria-live="polite"
+        >
           {status}
         </span>
         <button
@@ -485,7 +574,7 @@ export default function PropertyEditor({
           {propertyId ? "Save changes" : "Save property"}
         </button>
       </div>
-      {restored && (
+      {restored && !arrivedDetailsDropped && (
         <div className="w-full rounded-lg bg-amber-50 p-3 text-sm text-slate-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-slate-200 dark:ring-amber-500/30">
           <p>We brought back changes you hadn&apos;t saved. Save to keep them.</p>
           <button

@@ -1,6 +1,17 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
-import { exportDetails, exportRows, leftOutSummary, sumTotals, toCents, type ExportFormRow } from "../rows";
+import { breakLongWords, formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
+import {
+  ESTIMATED_NOTE,
+  exportDetails,
+  exportRows,
+  GUESS_NOTE,
+  guessedYear,
+  installYearNote,
+  leftOutSummary,
+  sumTotals,
+  toCents,
+  type ExportFormRow,
+} from "../rows";
 
 const components: ForecastComponent[] = [
   { id: "furnace", category: "HVAC", name: "Gas furnace", quantity: 12, installYear: 2012, installYearIsEstimate: true, usefulLifeYears: 18, replacementCostEach: 4200 },
@@ -87,6 +98,34 @@ describe("money in exports", () => {
   });
 });
 
+describe("long words in PDF notes", () => {
+  it("leaves ordinary words, spaces and line breaks as they are", () => {
+    const text = "Leaks a little.\nQuote from  ABC Plumbing, 555-0100.";
+    expect(breakLongWords(text, 36)).toBe(text);
+    expect(breakLongWords("x".repeat(36), 36)).toBe("x".repeat(36));
+  });
+
+  it("breaks a long link into lines that fit, adding nothing to it", () => {
+    const link = "https://example.com/a-very-long-link-without-any-spaces-at-all-to-test-wrapping/abc.jpg";
+    const text = `See ${link} for the label`;
+    const broken = breakLongWords(text, 36);
+    expect(broken.replace(/\n/g, "")).toBe(text);
+    const lines = broken.split("\n");
+    expect(lines.every((l) => Array.from(l.replace(/^See |for the label$/g, "")).length <= 36)).toBe(true);
+    expect(lines).toHaveLength(Math.ceil(link.length / 36));
+    expect(broken).not.toMatch(/--/);
+  });
+
+  it("gives wider characters more room, and never splits one in half", () => {
+    // Outside Latin-1, a character may be up to 1.75em wide, so 20 fit in 36em.
+    const broken = breakLongWords("Ж".repeat(41), 36);
+    expect(broken.split("\n").map((l) => l.length)).toEqual([20, 20, 1]);
+    const emoji = breakLongWords("🙂".repeat(25), 36);
+    expect(emoji.split("\n").map((l) => Array.from(l).length)).toEqual([20, 5]);
+    expect(emoji.replace(/\n/g, "")).toBe("🙂".repeat(25));
+  });
+});
+
 describe("export details", () => {
   const formRows: ExportFormRow[] = [
     { id: "furnace", name: "Gas furnace", category: "HVAC", unitLabel: "per_unit" },
@@ -98,8 +137,8 @@ describe("export details", () => {
 
   it("lists the form rows the forecast left out, in form order", () => {
     expect(details.leftOut).toEqual([
-      { name: "Boiler", category: "HVAC" },
-      { name: "Unnamed component", category: "Other" },
+      { name: "Boiler", category: "HVAC", condition: null, notes: "" },
+      { name: "Unnamed component", category: "Other", condition: null, notes: "" },
     ]);
     expect(exportDetails(formRows.slice(0, 2), [{ id: "furnace" }, { id: "carpet" }]).leftOut).toEqual([]);
   });
@@ -109,6 +148,67 @@ describe("export details", () => {
     const withUnits = exportRows(forecast, components, details.unitLabels);
     expect(withUnits.find((r) => r.name === "Carpet")?.unit).toBe("sq ft");
     expect(withUnits.find((r) => r.name === "Gas furnace")?.unit).toBe("each");
+  });
+});
+
+describe("condition, notes and guessed install years in exports", () => {
+  const formRows: ExportFormRow[] = [
+    { id: "furnace", name: "Gas furnace", category: "HVAC", unitLabel: "per_unit", installYear: "2012", installYearIsGuess: true, condition: "fair", notes: "  Noisy fan.  " },
+    { id: "carpet", name: "Carpet", category: "Flooring", unitLabel: "per_sq_ft", installYear: "2020" },
+    // Ticked, but no year typed: year built stands in, so it's "estimated", not a guess.
+    { id: "wh", name: "Water heater", category: "Plumbing", unitLabel: "per_unit", installYear: " ", installYearIsGuess: true, condition: "poor" },
+    { id: "boiler", name: "Boiler", category: "HVAC", unitLabel: "per_building", notes: "Get a quote\nbefore winter", condition: null },
+    { id: "dw", name: "Dishwasher", category: "Appliances", unitLabel: "per_unit", notes: "   " },
+  ];
+  const details = exportDetails(formRows, components);
+  const withDetails = exportRows(forecast, components, details.unitLabels, details.rowDetails);
+
+  it("counts a ticked guess only when an install year was typed", () => {
+    expect(guessedYear({ installYear: "2012", installYearIsGuess: true })).toBe(true);
+    expect(guessedYear({ installYear: "", installYearIsGuess: true })).toBe(false);
+    expect(guessedYear({ installYear: "2012", installYearIsGuess: false })).toBe(false);
+    expect(guessedYear({ installYear: "2012" })).toBe(false);
+    expect(details.rowDetails?.get("furnace")).toEqual({ condition: "fair", notes: "Noisy fan.", installYearIsGuess: true });
+    expect(details.rowDetails?.get("wh")).toEqual({ condition: "poor", notes: "", installYearIsGuess: false });
+  });
+
+  it("says why an install year is an estimate", () => {
+    expect(installYearNote(false, { installYearIsGuess: true })).toBe("");
+    expect(installYearNote(true, { installYearIsGuess: true })).toBe(GUESS_NOTE);
+    expect(installYearNote(true, { installYearIsGuess: false })).toBe(ESTIMATED_NOTE);
+    expect(installYearNote(true, undefined)).toBe(ESTIMATED_NOTE);
+  });
+
+  it("puts each component's condition and notes on its rows, and names guessed years", () => {
+    expect(withDetails.find((r) => r.name === "Gas furnace")).toMatchObject({
+      notes: [GUESS_NOTE],
+      condition: "fair",
+      ownerNotes: "Noisy fan.",
+    });
+    expect(withDetails.find((r) => r.name === "Water heater" && r.year === 2026)).toMatchObject({
+      notes: ["Overdue", ESTIMATED_NOTE],
+      condition: "poor",
+      ownerNotes: "",
+    });
+    expect(withDetails.find((r) => r.name === "Carpet")).toMatchObject({ notes: [], condition: null, ownerNotes: "" });
+  });
+
+  it("lists the rows with a condition or notes, in form order, for the PDF", () => {
+    expect(details.conditionNotes).toEqual([
+      { name: "Gas furnace", condition: "fair", notes: "Noisy fan." },
+      { name: "Water heater", condition: "poor", notes: "" },
+      { name: "Boiler", condition: null, notes: "Get a quote\nbefore winter" },
+    ]);
+  });
+
+  it("keeps condition and notes on rows left out of the forecast", () => {
+    expect(details.leftOut).toEqual([{ name: "Boiler", category: "HVAC", condition: null, notes: "Get a quote\nbefore winter" }]);
+  });
+
+  it("works for rows from before condition and notes existed", () => {
+    const old = exportDetails([{ id: "carpet", name: "Carpet", category: "Flooring", unitLabel: "per_sq_ft" }], components);
+    expect(old.rowDetails?.get("carpet")).toEqual({ condition: null, notes: "", installYearIsGuess: false });
+    expect(old.conditionNotes).toEqual([]);
   });
 });
 

@@ -18,6 +18,19 @@ describe("unsaved property edits", () => {
     expect(parseUnsaved(JSON.stringify(edits), now)).toEqual(edits);
   });
 
+  it("brings back condition and notes, dropping values the calculator couldn't have written", () => {
+    const draft = exampleDraft();
+    draft.rows[0] = { ...draft.rows[0], condition: "fair", notes: "Leaks", installYearIsGuess: true };
+    const edits = { name: "Maple Court", draft, baseUpdatedAt: null, keptAt: now };
+    expect(parseUnsaved(JSON.stringify(edits), now)?.draft.rows[0]).toMatchObject({
+      condition: "fair",
+      notes: "Leaks",
+      installYearIsGuess: true,
+    });
+    const damaged = JSON.stringify(edits).replace('"condition":"fair"', '"condition":"mint"');
+    expect(parseUnsaved(damaged, now)?.draft.rows[0]).not.toHaveProperty("condition");
+  });
+
   it("keeps edits to a property that isn't saved yet", () => {
     const edits = { name: "", draft: exampleDraft(), baseUpdatedAt: null, keptAt: now };
     expect(parseUnsaved(JSON.stringify(edits), now)?.baseUpdatedAt).toBeNull();
@@ -130,6 +143,14 @@ describe("deciding whether kept edits need bringing back", () => {
   it("drops an untouched import, even with rows still to finish", () => {
     const calculator = { ...draft, rows: [...draft.rows, { ...draft.rows[0], id: "row-x", quantity: "" }] };
     expect(nothingToRestore({ name: "", draft: calculator }, "", calculator, 2026)).toBe(true);
+  });
+
+  it("brings back a changed condition or notes", () => {
+    const draft = exampleDraft();
+    const noted = { ...draft, rows: [{ ...draft.rows[0], notes: "Leaks" }, ...draft.rows.slice(1)] };
+    expect(nothingToRestore({ name: "Maple Court", draft: noted }, "Maple Court", draft, 2026)).toBe(false);
+    const guessed = { ...draft, rows: [{ ...draft.rows[0], installYearIsGuess: true }, ...draft.rows.slice(1)] };
+    expect(nothingToRestore({ name: "Maple Court", draft: guessed }, "Maple Court", draft, 2026)).toBe(false);
   });
 
   it("brings back real changes", () => {

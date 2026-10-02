@@ -24,7 +24,7 @@ const FAQ = [
   },
   {
     q: "What if I don't know when something was installed?",
-    a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm.",
+    a: "Leave the install year blank and enter the year your building was built. We use it as the install year and mark the item as an estimate so you know which dates to confirm. If you have a rough idea, enter your best guess and tick Guess under it. It's marked as an estimate the same way.",
   },
   {
     q: "What does Replace this year do?",

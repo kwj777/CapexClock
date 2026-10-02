@@ -1,12 +1,16 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
+import { CONDITION_TEXT } from "@/components/calculator/draft";
 import { formatReserve } from "@/components/calculator/format";
-import { formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
+import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
   ESTIMATED_NOTE,
   exportRows,
+  GUESS_NOTE,
+  installYearNote,
   leftOutSummary,
   sumTotals,
+  type ConditionNote,
   type ExportDetails,
   type ExportRow,
 } from "@/lib/export/rows";
@@ -91,7 +95,7 @@ export async function forecastPdfBlob(
 
 /** The table's rows, and the money format the whole PDF uses. */
 function tableData({ forecast, components, details }: Pick<ForecastPdfProps, "forecast" | "components" | "details">) {
-  const rows = exportRows(forecast, components, details?.unitLabels);
+  const rows = exportRows(forecast, components, details?.unitLabels, details?.rowDetails);
   // Shows cents everywhere when any row has them, so rows add up to the totals.
   return { rows, money: moneyColumn(rows.map((r) => r.total)) };
 }
@@ -151,12 +155,20 @@ const s = StyleSheet.create({
 });
 
 // Wide enough for "250,000 sq ft", "$9,999,999.99" each and "$99,999,999.99" in total.
-const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84 };
+const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84, condition: 56 };
+// The notes column fills what's left of a letter page (612pt, less 40pt each side) after
+// the name and condition, less its own padding. Its 9pt type gives a line this many em.
+const NOTES_PADDING = 10;
+const NOTES_LINE_EMS = Math.floor((612 - 2 * 40 - cols.name - cols.condition - NOTES_PADDING) / 9);
 // A longer table starts on a new page.
 const MAX_ROWS_KEPT_TOGETHER = 12;
 // A row stays on one page unless its name is long enough that it might not fit
 // on one. The database allows 200 characters; the calculator has no limit.
 const MAX_NAME_KEPT_TOGETHER = 500;
+// Notes long enough to need most of a page (by characters or by lines, for a pasted list)
+// may break across pages; shorter ones stay whole.
+const MAX_NOTES_KEPT_TOGETHER = 1200;
+const MAX_NOTE_LINES_KEPT_TOGETHER = 30;
 
 export interface ForecastPdfProps {
   name: string;
@@ -232,17 +244,22 @@ export default function ForecastPdf({
         {forecast.atRisk.length > 0 && (
           <>
             <Text style={s.h2}>At risk</Text>
-            {forecast.atRisk.map((a) => (
-              <Text key={a.componentId} style={{ marginBottom: 2 }}>
-                {printable(a.name)}:{" "}
-                {a.status === "overdue"
-                  ? `${-a.yearsRemaining} yr${a.yearsRemaining === -1 ? "" : "s"} past end of life`
-                  : a.yearsRemaining === 0
-                    ? "due this year"
-                    : `due in ${a.yearsRemaining} yr${a.yearsRemaining === 1 ? "" : "s"}`}
-                {a.installYearIsEstimate ? " (install year estimated)" : ""}
-              </Text>
-            ))}
+            {forecast.atRisk.map((a) => {
+              const d = details.rowDetails?.get(a.componentId);
+              const yearNote = installYearNote(a.installYearIsEstimate, d);
+              return (
+                <Text key={a.componentId} style={{ marginBottom: 2 }}>
+                  {printable(a.name)}:{" "}
+                  {a.status === "overdue"
+                    ? `${-a.yearsRemaining} yr${a.yearsRemaining === -1 ? "" : "s"} past end of life`
+                    : a.yearsRemaining === 0
+                      ? "due this year"
+                      : `due in ${a.yearsRemaining} yr${a.yearsRemaining === 1 ? "" : "s"}`}
+                  {d?.condition ? `, ${CONDITION_TEXT[d.condition].toLowerCase()} condition` : ""}
+                  {yearNote ? ` (${yearNote.toLowerCase()})` : ""}
+                </Text>
+              );
+            })}
           </>
         )}
 
@@ -257,6 +274,9 @@ export default function ForecastPdf({
           <Text style={s.note}>
             {ESTIMATED_NOTE}: no install year was entered, so the building&apos;s year built is used.
           </Text>
+        )}
+        {rows.some((r) => r.notes.includes(GUESS_NOTE)) && (
+          <Text style={s.note}>{GUESS_NOTE}: the year entered is the owner&apos;s best guess.</Text>
         )}
 
         {/* Later replacements the monthly reserve is already saving for, so it isn't a mystery. */}
@@ -280,6 +300,10 @@ export default function ForecastPdf({
               ))}
             </View>
           </>
+        )}
+
+        {(details.conditionNotes ?? []).length > 0 && (
+          <ConditionNotes items={details.conditionNotes ?? []} printable={printable} />
         )}
 
         <View style={s.footer} fixed>
@@ -333,6 +357,45 @@ function DueTable({
       ))}
       {rows.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
     </View>
+  );
+}
+
+/** Each component's condition and the owner's notes, as the owner entered them. */
+function ConditionNotes({ items, printable }: { items: ConditionNote[]; printable: (text: string) => string }) {
+  return (
+    <>
+      {/* Outside the rows' view, so minPresenceAhead can carry it to the next page with
+          the header row and the first item. */}
+      <Text style={s.h2} minPresenceAhead={50}>
+        Condition and notes
+      </Text>
+      <View style={s.table}>
+        {/* Fixed inside the view, so it repeats on each page the list runs onto. */}
+        <View style={s.tr} fixed>
+          <Text style={[s.th, { width: cols.name }]}>Component</Text>
+          <Text style={[s.th, { width: cols.condition }]}>Condition</Text>
+          <Text style={[s.th, { flex: 1, paddingLeft: 10 }]}>Notes</Text>
+        </View>
+        {items.map((item, i) => (
+          <View
+            key={`${item.name}-${i}`}
+            style={s.tr}
+            wrap={
+              item.name.length > MAX_NAME_KEPT_TOGETHER ||
+              item.notes.length > MAX_NOTES_KEPT_TOGETHER ||
+              item.notes.split("\n").length > MAX_NOTE_LINES_KEPT_TOGETHER
+            }
+          >
+            <Text style={{ width: cols.name }}>{printable(item.name)}</Text>
+            <Text style={{ width: cols.condition }}>{item.condition ? CONDITION_TEXT[item.condition] : ""}</Text>
+            {/* Notes can hold a pasted link, too long to fit on one line without breaking. */}
+            <Text style={{ flex: 1, paddingLeft: NOTES_PADDING }}>
+              {breakLongWords(printable(item.notes), NOTES_LINE_EMS)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </>
   );
 }
 

@@ -48,3 +48,40 @@ export function moneyColumn(values: number[]): (value: number) => string {
   const format = cents ? withCents : wholeDollars;
   return (value) => format.format(toCents(value));
 }
+
+/**
+ * The most room one character can take in the PDF's font, in em: DejaVu Sans has no
+ * basic Latin or Latin-1 character wider than 1em, and nothing at all wider than 1.75em.
+ */
+function widestEm(character: string): number {
+  return (character.codePointAt(0) ?? 0) <= 0xff ? 1 : 1.75;
+}
+
+/**
+ * Breaks a run of characters without a space (a pasted link, say) that's too long
+ * for one line into lines that fit, with line breaks between them, so the PDF wraps
+ * it without the hyphen it would add, which would change a link. `lineEms` is the
+ * line's width in em. Shorter words and the spaces and line breaks between words
+ * stay as they are, and characters are never split in half.
+ */
+export function breakLongWords(text: string, lineEms: number): string {
+  return text
+    .split(/([ \n]+)/)
+    .map((word) => {
+      const characters = Array.from(word);
+      if (characters.reduce((sum, c) => sum + widestEm(c), 0) <= lineEms) return word;
+      let line = "";
+      let width = 0;
+      const lines: string[] = [];
+      for (const c of characters) {
+        if (line !== "" && width + widestEm(c) > lineEms) {
+          lines.push(line);
+          [line, width] = ["", 0];
+        }
+        line += c;
+        width += widestEm(c);
+      }
+      return [...lines, line].join("\n");
+    })
+    .join("");
+}
