@@ -438,11 +438,12 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | This week | `calculator_started`, `forecast_generated`, `pdf_exported`, `csv_exported`, `account_created`, `property_saved` (Total count) | none | Last 7 days |
 | Buy now | `presale_checkout_clicked`, `presale_completed` (Total count) | `offer` | Since step 2 |
 | Pricing page | `$pageview` (Unique users), with a filter on the series: **Current URL** contains `/pricing` | none | Since step 2 |
+| Import | `import_started`, `import_completed` (Total count) | none | Since step 4 |
+| Import problems | `import_failed` (Total count) | `reason` | Since step 4 |
 
 A new event shows up in the event picker only after it has happened once on the live site. If
 one is missing, open the site, use that button once, wait a few minutes and try again. Later
-steps (import, the comparison and the quick estimate) add their own tiles; each of those changes
-says what to add.
+Phase 3 steps add their own rows to this table.
 
 On the **Buy now** tile, `presale_checkout_clicked` counts trips to Stripe: once per click that
 leaves for Stripe (a double click is one), and once per Buy now opened in a new tab with a middle,
@@ -450,6 +451,14 @@ Ctrl, Cmd or Shift click. Opening it from the right-click menu isn't counted. On
 count without a trip: in the property editor with unsaved changes, the browser asks "Leave site?"
 first, and the click counts even if the owner stays. `presale_completed` counts the thank-you
 pages, once per visit. Stripe is the real count of sales; these only rank the two offers.
+
+On the **Import** tile, `import_started` counts imports that got data (rows pasted or a file
+chosen), once each time the import panel is used, and `import_completed` counts the ones the
+owner added. Import is working when `import_completed` is at least 6 in 10 of `import_started`.
+On **Import problems**, `reason` says why a sheet couldn't be read: `too_big` (over 2,000 rows
+or 5 MB), `no_header` (no heading row found, or an empty file), `unsupported` (an Excel, Numbers
+or other spreadsheet file, which needs saving as CSV first) or `unreadable`. The events carry
+counts and these labels only, never anything from the sheet.
 
 ### Weekly Supabase query
 

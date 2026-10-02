@@ -1,5 +1,6 @@
 import type { ForecastComponent, Scenario, UnitLabel } from "@/lib/forecast";
 import { validateComponent } from "@/lib/forecast";
+import type { ImportedRow } from "@/lib/import/preview";
 import { defaultLife, type LibraryComponent } from "@/lib/library/components";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 
@@ -236,6 +237,32 @@ export function withLibraryItem(
   const row = fillRow(rowFromLibrary(item, draft.unitCount), typed, draft.unitCount);
   // A draft with nothing in it yet starts a new forecast in the calculator.
   return { ...draft, forecastTracked: draft.rows.length > 0 && draft.forecastTracked, rows: [...draft.rows, row] };
+}
+
+/**
+ * Adds rows from an imported spreadsheet after the ones already there; it never
+ * replaces them. Quantities stay as the sheet gives them, and a per-unit row
+ * follows later unit-count changes only when its quantity is the unit count.
+ */
+export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Draft {
+  const added = rows.map((r): DraftRow => ({
+    id: newRowId(),
+    librarySlug: r.librarySlug,
+    category: r.category,
+    name: r.name,
+    quantity: r.quantity,
+    unitLabel: r.unitLabel,
+    installYear: r.installYear,
+    usefulLife: r.usefulLife,
+    costEach: r.costEach,
+    scenario: "run_to_failure",
+    followsUnitCount: quantityMatchesUnits(r, draft.unitCount),
+    condition: r.condition,
+    notes: r.notes,
+    installYearIsGuess: r.installYearIsGuess,
+  }));
+  // A draft with nothing in it yet starts a new forecast in the calculator.
+  return { ...draft, forecastTracked: draft.rows.length > 0 && draft.forecastTracked, rows: [...draft.rows, ...added] };
 }
 
 /**

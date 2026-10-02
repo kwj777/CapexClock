@@ -22,6 +22,7 @@ import {
   STORAGE_KEY,
   toComponents,
   upgradeDraft,
+  withImportedRows,
   withLibraryItem,
   withUnitCount,
   type Draft,
@@ -521,5 +522,50 @@ describe("adding from a lifespan page", () => {
     const draft = exampleDraft();
     const next = withLibraryItem(draft, waterHeater, typed, "add");
     expect(next.rows.filter((r) => r.librarySlug === "tank-water-heater")).toHaveLength(2);
+  });
+});
+
+describe("adding rows from a spreadsheet", () => {
+  const imported = (quantity: string, unitLabel: DraftRow["unitLabel"] = "per_unit") => ({
+    librarySlug: "tank-water-heater",
+    category: "Plumbing",
+    name: "Tank water heater",
+    quantity,
+    unitLabel,
+    installYear: "2014",
+    installYearIsGuess: true,
+    usefulLife: "10",
+    costEach: "1400",
+    condition: "fair" as const,
+    notes: "Apt: 101 and 102",
+  });
+
+  it("adds after the rows already there and never replaces them", () => {
+    const draft = { ...exampleDraft(), forecastTracked: true };
+    const next = withImportedRows(draft, [imported("12"), imported("2")]);
+    expect(next.rows).toHaveLength(draft.rows.length + 2);
+    expect(next.rows.slice(0, draft.rows.length)).toEqual(draft.rows);
+    expect(next.rows.at(-1)).toMatchObject({
+      quantity: "2",
+      installYear: "2014",
+      installYearIsGuess: true,
+      condition: "fair",
+      notes: "Apt: 101 and 102",
+      scenario: "run_to_failure",
+    });
+    expect(new Set(next.rows.map((r) => r.id)).size).toBe(next.rows.length);
+    expect(next.forecastTracked).toBe(true);
+  });
+
+  it("keeps quantities as given: a per-unit row follows the unit count only when it equals it", () => {
+    const next = withImportedRows({ unitCount: "12", yearBuilt: "", rows: [] }, [imported("12"), imported("10"), imported("12", "per_building")]);
+    expect(next.rows.map((r) => r.followsUnitCount)).toEqual([true, false, false]);
+    const grown = withUnitCount(next, "14");
+    expect(grown.rows.map((r) => r.quantity)).toEqual(["14", "10", "12"]);
+  });
+
+  it("starts a new forecast when the draft was empty", () => {
+    const next = withImportedRows({ ...EMPTY_DRAFT, forecastTracked: true }, [imported("1")]);
+    expect(next.forecastTracked).toBe(false);
   });
 });

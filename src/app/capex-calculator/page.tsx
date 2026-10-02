@@ -42,6 +42,10 @@ const FAQ = [
     q: "Is my data saved?",
     a: "Your entries stay in this browser until you choose to save them. A free account keeps them safe and lets you add more properties.",
   },
+  {
+    q: "Can I import my own spreadsheet?",
+    a: "Yes. Click Import from a spreadsheet, then paste rows from Excel or Google Sheets, or choose a CSV file. We guess which column is which, match names like \"HWH\" to our list, and combine identical rows into one with a quantity. You can change any guess, and you see every row before anything is added. Your sheet is read in your browser and never uploaded.",
+  },
 ];
 
 const faqJsonLd = {
