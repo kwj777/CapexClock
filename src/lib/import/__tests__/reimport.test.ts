@@ -96,6 +96,10 @@ describe("what a row from the file changes", () => {
 
   it("treats the same number written two ways as the same", () => {
     expect(rowChanges(listRow("a", { costEach: "$1,400", quantity: "12.0" }), sheetRow())).toEqual([]);
+    // A row that takes the unit count changes only a row that doesn't already.
+    const takesUnits = sheetRow({ quantity: "", followsUnitCount: true });
+    expect(rowChanges(listRow("a", { followsUnitCount: true, quantity: "8" }), takesUnits)).toEqual([]);
+    expect(rowChanges(listRow("a", { followsUnitCount: false, quantity: "3" }), takesUnits)).toEqual(["Quantity from 3 to the unit count"]);
   });
 });
 

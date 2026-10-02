@@ -50,6 +50,12 @@ export interface ImportedRow {
   notes: string;
   /** "Replace now" said yes: plan its replacement this year. */
   replaceNow: boolean;
+  /**
+   * Counted per unit with no quantity: one in each unit, so its quantity is the
+   * unit count of the list it goes into, and follows it. `quantity` is the sheet's
+   * unit count for the preview to show, or blank when the sheet doesn't give one.
+   */
+  followsUnitCount?: boolean;
 }
 
 /** Fields the owner can fix in the preview. */
@@ -220,6 +226,7 @@ const ABSENT = /^(?:no|n|none|n\/a|na|not present|-+|–|—|0)$/i;
 const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
 const NO_QUANTITY = "No quantity, so counted as 1";
+const FOLLOWS_UNITS = "No quantity, so used the unit count, since it's counted per unit";
 const COUNTED_EACH = "Kept the quantity as a count, not sq ft, so the cost is for each one";
 const COUNTED_APARTMENTS = "Counted apartments, not sq ft, so the cost is for each apartment";
 
@@ -253,6 +260,8 @@ interface Record_ {
   details: string[];
   /** The quantity, when it's a number, so merged rows can add up. */
   quantity: number | null;
+  /** Counted per unit with a blank quantity, so it takes the unit count (see ImportedRow). */
+  followsUnits: boolean;
 }
 
 interface Context {
@@ -402,6 +411,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     lifeIsTypical: false,
     details: [],
     quantity: 1,
+    followsUnits: false,
   };
 
   if (isTotalRow(row, cellText(cell("item")))) return "total";
@@ -477,6 +487,15 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     record.changes.push(COUNTED_EACH);
   }
   if (counted?.note) record.changes.push(counted.note);
+  // Counted per unit with the quantity left blank, as in our template: one in each
+  // unit, as the calculator counts it, not 1 for the whole building.
+  if (counted?.value === "per_unit" && quantityFix === undefined && hasRole(columns, "quantity") && cellText(quantityCell) === "") {
+    record.followsUnits = true;
+    record.quantity = null;
+    record.row.quantity = "";
+    record.row.followsUnitCount = true;
+    record.changes = record.changes.map((c) => (c === NO_QUANTITY ? FOLLOWS_UNITS : c));
+  }
 
   // Useful life: the sheet's, else the library's typical one.
   const lifeFix = fixed(ctx, key, "usefulLife");
@@ -666,6 +685,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       lifeIsTypical: true,
       details: [],
       quantity: 1,
+      followsUnits: false,
     };
     const fix = fixed(ctx, key, "installYear");
     if (fix === undefined && PRESENT.test(text)) {
@@ -733,8 +753,9 @@ export function mergedNotes(label: string, members: readonly { location: string;
 function mergeKey(r: Record_): string {
   const { row } = r;
   return JSON.stringify([
-    // A row with a CapexClock ID stands for one row of the list, so it stays on its own.
-    r.id === null ? "" : r.key,
+    // A row with a CapexClock ID stands for one row of the list, so it stays on its own,
+    // and so does one that takes the unit count, which can't be added up.
+    r.id === null && !r.followsUnits ? "" : r.key,
     r.building,
     row.replaceNow,
     row.librarySlug ?? `own:${row.name.trim().toLowerCase()}`,
@@ -926,6 +947,12 @@ export function buildPreview(
     if (only !== null && building.key !== only) continue;
     for (const r of result) r.building = building.key;
     records.push(...result);
+  }
+
+  // A row that takes the unit count shows the building's, when the sheet gives one.
+  for (const r of records) {
+    const units = r.followsUnits ? buildings.get(r.building)?.unitCount : undefined;
+    if (units != null) r.row.quantity = String(units);
   }
 
   const locationColumn = columns.indexOf("location");

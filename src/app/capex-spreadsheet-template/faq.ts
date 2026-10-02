@@ -14,7 +14,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: "What do I put in Counted per?",
-    a: "Use unit when the cost is for one apartment's worth, like a water heater in each unit. Use building when it's for the whole building, like the roof. Use sq ft for flooring and paving, with the square feet as the quantity. A replacement costs the quantity times the cost each.",
+    a: "Use unit when the cost is for one apartment's worth, like a water heater in each unit. Leave its quantity blank to use the building's unit count. Use building when it's for the whole building, like the roof. Use sq ft for flooring and paving, with the square feet as the quantity. A replacement costs the quantity times the cost each.",
   },
   {
     q: "Can one spreadsheet hold several buildings?",

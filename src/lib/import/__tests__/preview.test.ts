@@ -1,6 +1,7 @@
-import { costLabel, MAX_NOTES_LENGTH, withImportedRows } from "@/components/calculator/draft";
+import { costLabel, EMPTY_DRAFT, MAX_NOTES_LENGTH, withImport, withImportedRows, withUnitCount } from "@/components/calculator/draft";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import { buildPreview, isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
+import { planProperty, plannedSave, withEdits } from "../buildings";
 import { startingChoices } from "../open";
 import {
   AGE_ROWS,
@@ -750,6 +751,51 @@ describe("a sheet in CapexClock's own columns", () => {
     expect(p.rows[0].capexclockId).toBe("row-1");
     // Without the list, the same name is matched to the library's item.
     expect(preview(sheet(",,,Water heater,Plumbing,12,unit,2016,,10,1400,,,,row-1")).rows[0].row.librarySlug).toBe("tank-water-heater");
+  });
+
+  describe("a row counted per unit with no quantity", () => {
+    const waterHeaters = "Elm,12,1998,Water heater,,,unit,2016,,10,1400";
+
+    it("takes the unit count, as the calculator does, and says so", () => {
+      const [row] = preview(sheet(waterHeaters)).rows;
+      expect(row.status).toBe("changed");
+      expect(row.changes).toContain("No quantity, so used the unit count, since it's counted per unit");
+      expect(row.changes).not.toContain("No quantity, so counted as 1");
+      expect(row.row).toMatchObject({ unitLabel: "per_unit", quantity: "12", followsUnitCount: true });
+      expect(detailsText(row.row, false)).toMatch(/^Qty 12, the unit count · /);
+    });
+
+    it("takes the list's unit count and follows it, in the calculator and on My properties", () => {
+      const [row] = preview(sheet(waterHeaters)).rows;
+      const draft = withImportedRows({ ...EMPTY_DRAFT, unitCount: "6" }, [row.row]);
+      expect(draft.rows[0]).toMatchObject({ quantity: "6", followsUnitCount: true });
+      expect(costLabel(draft.rows[0])).toBe("Cost per apartment");
+      expect(withUnitCount(draft, "8").rows[0].quantity).toBe("8");
+      // A building of 6 on My properties saves 6 water heaters, not 1.
+      const p = preview(sheet(waterHeaters));
+      const planned = withEdits(planProperty(0, p.buildings[0], p.rows.map((r) => r.row), { tab: null, file: "list.csv" }), { unitCount: "6" });
+      expect(plannedSave(planned, CURRENT_YEAR).components[0]).toMatchObject({ quantity: 6, unit_label: "per_unit" });
+      // Re-imported over a row, it takes the unit count the import leaves.
+      const updated = withImport(draft, { add: [], update: [{ id: draft.rows[0].id, row: row.row }], remove: [], unitCount: "10" });
+      expect(updated.rows[0]).toMatchObject({ quantity: "10", followsUnitCount: true });
+    });
+
+    it("waits for the list's unit count when the sheet gives none", () => {
+      const [row] = preview(sheet(",,,Water heater,,,unit,2016,,10,1400")).rows;
+      expect(row.row).toMatchObject({ quantity: "", followsUnitCount: true });
+      expect(detailsText(row.row, false)).toMatch(/^Qty: the unit count · /);
+      expect(withImportedRows(EMPTY_DRAFT, [row.row]).rows[0]).toMatchObject({ quantity: "", followsUnitCount: true });
+    });
+
+    it("isn't added up with an identical row, and leaves other ways of counting at 1", () => {
+      expect(preview(sheet(waterHeaters, waterHeaters)).rows).toHaveLength(2);
+      const [roof] = preview(sheet("Elm,12,1998,Asphalt shingle roof,,,building,2016,,22,30000")).rows;
+      expect(roof.row).toMatchObject({ quantity: "1", unitLabel: "per_building" });
+      expect(roof.row.followsUnitCount).toBeUndefined();
+      expect(roof.changes).toContain("No quantity, so counted as 1");
+      // A quantity typed on the sheet is kept as it is.
+      expect(preview(sheet("Elm,12,1998,Water heater,,3,unit,2016,,10,1400")).rows[0].row).toMatchObject({ quantity: "3" });
+    });
   });
 
   it("skips blank and total rows only for the building they're in, and never another building's rows", () => {

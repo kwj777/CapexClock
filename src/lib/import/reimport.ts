@@ -61,7 +61,11 @@ export function rowChanges(current: DraftRow, row: ImportedRow): string[] {
   if (current.name.trim() !== row.name.trim()) from("Name", quote(current.name.trim()), quote(row.name.trim()));
   else if ((current.librarySlug ?? null) !== row.librarySlug) changes.push(`Matched to a different item in our list`);
   if (current.category !== row.category) from("Category", shown(current.category), shown(row.category));
-  if (!sameNumber(current.quantity, row.quantity)) from("Quantity", shown(current.quantity), shown(row.quantity));
+  if (row.followsUnitCount && row.unitLabel === "per_unit") {
+    // It takes the list's unit count, so only a row that doesn't already is changed.
+    const follows = current.unitLabel === "per_unit" && current.followsUnitCount === true;
+    if (!follows) from("Quantity", shown(current.quantity), "the unit count");
+  } else if (!sameNumber(current.quantity, row.quantity)) from("Quantity", shown(current.quantity), shown(row.quantity));
   if (current.unitLabel !== row.unitLabel) {
     from("Counted per", COUNTED_PER_TEXT[current.unitLabel], COUNTED_PER_TEXT[row.unitLabel]);
   }

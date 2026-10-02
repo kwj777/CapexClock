@@ -114,7 +114,9 @@ export function duplicateText(names: readonly string[]): string {
 export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
   const parts: string[] = [];
   const quantity = Number(row.quantity);
-  if (row.unitLabel === "per_sq_ft") {
+  if (row.followsUnitCount && row.unitLabel === "per_unit") {
+    parts.push(row.quantity === "" ? "Qty: the unit count" : `Qty ${quantity.toLocaleString("en-US")}, the unit count`);
+  } else if (row.unitLabel === "per_sq_ft") {
     parts.push(Number.isFinite(quantity) ? `${quantity.toLocaleString("en-US")} sq ft` : `Sq ft ${quote(row.quantity)}`);
   } else {
     parts.push(Number.isFinite(quantity) ? `Qty ${quantity.toLocaleString("en-US")}` : `Qty ${quote(row.quantity)}`);

@@ -240,9 +240,18 @@ export function withLibraryItem(
 }
 
 /**
+ * An imported row's quantity in a list with this unit count. Quantities stay as the
+ * sheet gives them, and a per-unit row follows later unit-count changes only when
+ * its quantity is the unit count, or the sheet left it blank (see ImportedRow).
+ */
+function importedQuantity(row: ImportedRow, unitCount: string): Pick<DraftRow, "quantity" | "followsUnitCount"> {
+  if (row.followsUnitCount && row.unitLabel === "per_unit") return { quantity: unitCount, followsUnitCount: true };
+  return { quantity: row.quantity, followsUnitCount: quantityMatchesUnits(row, unitCount) };
+}
+
+/**
  * Adds rows from an imported spreadsheet after the ones already there; it never
- * replaces them. Quantities stay as the sheet gives them, and a per-unit row
- * follows later unit-count changes only when its quantity is the unit count.
+ * replaces them. Quantities are kept as importedQuantity says.
  */
 export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Draft {
   const added = rows.map((r): DraftRow => ({
@@ -250,13 +259,12 @@ export function withImportedRows(draft: Draft, rows: readonly ImportedRow[]): Dr
     librarySlug: r.librarySlug,
     category: r.category,
     name: r.name,
-    quantity: r.quantity,
+    ...importedQuantity(r, draft.unitCount),
     unitLabel: r.unitLabel,
     installYear: r.installYear,
     usefulLife: r.usefulLife,
     costEach: r.costEach,
     scenario: r.replaceNow ? "replace_now" : "run_to_failure",
-    followsUnitCount: quantityMatchesUnits(r, draft.unitCount),
     condition: r.condition,
     notes: r.notes,
     installYearIsGuess: r.installYearIsGuess,
@@ -280,8 +288,7 @@ export interface DraftImport {
 /**
  * Applies an import: the building's details first, then the rows the sheet changes
  * (in place, keeping their ids), then the removals, then the new rows after the
- * rest. Rows from the sheet take its quantities, and a per-unit one follows later
- * unit-count changes only when its quantity is the unit count.
+ * rest. Rows from the sheet take its quantities, as importedQuantity says.
  */
 export function withImport(draft: Draft, change: DraftImport): Draft {
   let next = change.unitCount !== undefined ? withUnitCount(draft, change.unitCount) : draft;
@@ -299,13 +306,12 @@ export function withImport(draft: Draft, change: DraftImport): Draft {
         librarySlug: row.librarySlug,
         category: row.category,
         name: row.name,
-        quantity: row.quantity,
+        ...importedQuantity(row, unitCount),
         unitLabel: row.unitLabel,
         installYear: row.installYear,
         usefulLife: row.usefulLife,
         costEach: row.costEach,
         scenario: row.replaceNow ? "replace_now" : "run_to_failure",
-        followsUnitCount: quantityMatchesUnits(row, unitCount),
         condition: row.condition,
         notes: row.notes,
         installYearIsGuess: row.installYearIsGuess,
