@@ -6,10 +6,12 @@ import {
   detailsText,
   duplicates,
   duplicateText,
+  longListText,
   previewHints,
   previewSummary,
   rowNumbers,
   skippedLines,
+  SLOW_ROWS,
   unitsQuestionText,
 } from "../wording";
 
@@ -181,6 +183,19 @@ describe("import wording", () => {
     ]);
     // Answered as the quantity: no hint about a doubtful quantity column either.
     expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], unitsAnswered: true }))).toEqual([]);
+  });
+
+  it("warns before a list gets long enough to slow the calculator", () => {
+    expect(longListText(0, SLOW_ROWS)).toBe("");
+    expect(longListText(250, 50)).toBe("");
+    expect(longListText(0, 0)).toBe("");
+    expect(longListText(400, 0)).toBe("");
+    expect(longListText(0, 2000)).toBe(
+      "That's 2,000 rows, and the calculator gets slow past about 300. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
+    );
+    expect(longListText(290, 20)).toBe(
+      "Adding these makes 310 rows in your list, and the calculator gets slow past about 300. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
+    );
   });
 
   it("names columns the way spreadsheets do", () => {

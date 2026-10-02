@@ -37,6 +37,7 @@ import {
   columnLetter,
   duplicates,
   duplicateText,
+  longListText,
   previewHints,
   previewSummary,
   unitsQuestionText,
@@ -241,6 +242,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
   const unanswered =
     (preview?.questions.filter((q) => choices?.answers[q.key] === undefined).length ?? 0) +
     (preview?.unitsQuestion?.answer === null ? 1 : 0);
+  const longList = preview ? longListText(draftRows.length, preview.rows.length) : "";
 
   return (
     <section
@@ -508,6 +510,11 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
             {dup && dup.names.length > 0 && (
               <p className="rounded-lg bg-amber-50 p-3 text-sm wrap-anywhere text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
                 {duplicateText(dup.names)}
+              </p>
+            )}
+            {longList && (
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
+                {longList}
               </p>
             )}
             {(preview.counts.needsYou > 0 || unanswered > 0) && (
