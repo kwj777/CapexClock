@@ -24,7 +24,7 @@ export const FAIL_TEXT: Record<FailReason, string> = {
     "We can't read that kind of file. Save it as .xlsx or CSV (File > Save As in Excel, File > Export in Numbers, File > Download in Google Sheets), or copy the rows and paste them here. If the file has a password, take it off first.",
   unreadable: "We couldn't read that file. Make sure it's an .xlsx or CSV file, or copy the rows and paste them here.",
   forecast_file:
-    "That's a forecast download, with a row for each replacement, so it can't be read back in. Use Download component list (CSV) instead, and import that file.",
+    "That's a forecast download, with a row for each replacement, so it can't be read back in. Use Download component list (Excel) instead, and import that file.",
 };
 
 /**

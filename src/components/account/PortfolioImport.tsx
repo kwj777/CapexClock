@@ -381,8 +381,11 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
         or name it in a Building column. Your sheet is read in this browser and never uploaded.
       </p>
       <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-        Starting from scratch? <TemplateLink file="template" where="import_portfolio" />. To add rows to a property you
-        already have, open it and use Import from a spreadsheet there.
+        Starting from scratch? <TemplateLink file="template" format="xlsx" where="import_portfolio" /> or{" "}
+        <TemplateLink file="template" format="csv" where="import_portfolio">
+          the CSV version
+        </TemplateLink>
+        . To add rows to a property you already have, open it and use Import from a spreadsheet there.
       </p>
 
       {!started && <SourcePicker where="portfolio" onRead={onRead} onProblem={onProblem} />}

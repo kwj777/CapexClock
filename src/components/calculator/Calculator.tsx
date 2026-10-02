@@ -601,15 +601,18 @@ function CalculatorBody({
                   >
                     Import from a spreadsheet
                   </button>
-                  {draft.rows.length > 0 && (
-                    <ComponentListButton
-                      name={exportName}
-                      building={listName}
-                      draft={draft}
-                      where="components"
-                      className={textButton}
-                    />
-                  )}
+                  {draft.rows.length > 0 &&
+                    (["xlsx", "csv"] as const).map((format) => (
+                      <ComponentListButton
+                        key={format}
+                        format={format}
+                        name={exportName}
+                        building={listName}
+                        draft={draft}
+                        where="components"
+                        className={textButton}
+                      />
+                    ))}
                 </div>
                 {photoButton}
               </div>

@@ -106,6 +106,8 @@ describe("the component list download", () => {
   });
 
   it("is named after the property", () => {
-    expect(componentListFileName("Maple Court")).toBe("maple-court-component-list.csv");
+    expect(componentListFileName("Maple Court", "csv")).toBe("maple-court-component-list.csv");
+    expect(componentListFileName("Maple Court", "xlsx")).toBe("maple-court-component-list.xlsx");
+    expect(componentListFileName("", "xlsx")).toBe("capexclock-component-list.xlsx");
   });
 });

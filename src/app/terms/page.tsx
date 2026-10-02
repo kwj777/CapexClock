@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 // Plan T5 sets what this page must say. Keep it in step with /pricing, the
 // panels (src/components/paid) and the thank-you pages.
-const UPDATED = "October 1, 2026";
+const UPDATED = "October 2, 2026";
 
 // Baked in at build time. The membership only goes on sale with it.
 const PORTAL = presaleLinksFromEnv().portal;
@@ -61,7 +61,7 @@ export default function TermsPage() {
 
           <Section title="The free tools">
             <p>
-              The calculators, saved properties and PDF and CSV exports are free today, with no limits during early
+              The calculators, saved properties and PDF, Excel and CSV exports are free today, with no limits during early
               access. Their figures are estimates in today&apos;s dollars, worked out from the numbers you enter. They
               are for planning, and aren&apos;t professional, financial or engineering advice.
             </p>
@@ -106,7 +106,7 @@ export default function TermsPage() {
           <Section title="Condition report ($29)">
             <p>
               {report.includes} {report.delivery} You send us your building&apos;s details by email: a spreadsheet,
-              or a PDF or CSV export from the calculator. Please remove tenant names first. We&apos;re taking up to 20
+              or a PDF, Excel or CSV export from the calculator. Please remove tenant names first. We&apos;re taking up to 20
               orders while we make them by hand.{" "}
               <a href={SAMPLE_REPORT_PATH} className={link}>
                 See a sample report (PDF)

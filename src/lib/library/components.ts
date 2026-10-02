@@ -74,7 +74,7 @@ export interface TypicalCost {
  * Mirrors the typical costs in supabase/migrations/0005_typical_costs.sql and the
  * seed (a test keeps them in sync). Items in each apartment and building-wide
  * items are both priced per apartment; building-wide ones for a 12-unit, two-story
- * building. Sources and assumptions: typical-costs.md, for Kevin to approve.
+ * building. Sources and assumptions: typical-costs.md, approved by Kevin on October 2, 2026.
  */
 export const TYPICAL_COSTS: TypicalCost[] = [
   { slug: "asphalt-shingle-roof", low: 2600, high: 4700, per: "apartment" },

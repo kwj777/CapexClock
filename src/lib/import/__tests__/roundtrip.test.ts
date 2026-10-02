@@ -1,5 +1,6 @@
 import readExcelFile from "read-excel-file/universal";
 import Papa from "papaparse";
+import writeXlsxFile from "write-excel-file/universal";
 import {
   editRow,
   EMPTY_DRAFT,
@@ -9,7 +10,8 @@ import {
   type Draft,
   type DraftRow,
 } from "@/components/calculator/draft";
-import { componentListCsv, EXAMPLE_BUILDING, exampleCsv } from "@/lib/export/component-list";
+import { componentListCsv, componentListGrid, EXAMPLE_BUILDING, exampleCsv, exampleGrid } from "@/lib/export/component-list";
+import { listXlsx } from "@/lib/export/xlsx";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import { CURRENT_YEAR, match, parse } from "../__fixtures__/sheets";
 import { xlsxFile, type FixtureCell } from "../__fixtures__/xlsx";
@@ -37,6 +39,14 @@ function gridFromCsv(csv: string): Grid {
   const grid = readText(decodeText(new TextEncoder().encode(csv)), parse, "file");
   if (typeof grid === "string") throw new Error(`readText failed: ${grid}`);
   return grid;
+}
+
+/** A downloaded Excel file, read back the way the import panel reads a chosen file. */
+async function gridFromXlsx(blob: Blob): Promise<Grid> {
+  const tabs = await readWorkbook(await blob.arrayBuffer(), readExcelFile);
+  if (typeof tabs === "string") throw new Error(`readWorkbook failed: ${tabs}`);
+  expect(tabs).toHaveLength(1);
+  return tabs[0].grid;
 }
 
 function previewOf(grid: Grid, draft: Draft): Preview {
@@ -184,6 +194,20 @@ describe("downloading the component list and importing it again", () => {
     expect(next.rows.map(shown)).toEqual(draft.rows.map(shown));
   });
 
+  it("gives back the same rows from the Excel download, and changes nothing", async () => {
+    const grid = await gridFromXlsx(await listXlsx(componentListGrid(building, draft.rows), writeXlsxFile));
+    const preview = previewOf(grid, draft);
+    expect(preview.counts).toMatchObject({ rows: draft.rows.length, ready: draft.rows.length, needsYou: 0, skipped: 0 });
+    const { plan, next } = importInto(draft, grid);
+    expect(plan.matched).toBe(true);
+    expect(plan.add).toEqual([]);
+    expect(plan.missing).toEqual([]);
+    expect(plan.update.every((u) => u.changes.length === 0)).toBe(true);
+    expect(next.rows.map((r) => r.id)).toEqual(draft.rows.map((r) => r.id));
+    expect(next.rows.map(shown)).toEqual(draft.rows.map(shown));
+    expect(perUnit(next)).toEqual(perUnit(draft));
+  });
+
   it("leaves Quantity blank on rows that follow the unit count, and writes the rest", () => {
     const table = Papa.parse<string[]>(csv.slice(1).trimEnd(), { delimiter: "," }).data;
     const [name, quantity] = ["Component", "Quantity"].map((h) => table[0].indexOf(h));
@@ -238,6 +262,16 @@ describe("the filled-in example", () => {
       ["Tank water heater", "20", true],
       ["Refrigerator", "20", true],
     ]);
+  });
+
+  it("imports as the calculator's example from the Excel file too", async () => {
+    const grid = await gridFromXlsx(await listXlsx(exampleGrid(), writeXlsxFile));
+    expect(previewOf(grid, EMPTY_DRAFT).counts).toMatchObject({ ready: exampleDraft().rows.length, needsYou: 0 });
+    const csv = importInto(EMPTY_DRAFT, gridFromCsv(exampleCsv())).next;
+    const { next } = importInto(EMPTY_DRAFT, grid);
+    expect(next.rows.map(shown)).toEqual(csv.rows.map(shown));
+    expect(next.rows.map((r) => r.followsUnitCount)).toEqual(csv.rows.map((r) => r.followsUnitCount));
+    expect([next.unitCount, next.yearBuilt]).toEqual([csv.unitCount, csv.yearBuilt]);
   });
 
   it("imports as the calculator's example, every row Ready", () => {

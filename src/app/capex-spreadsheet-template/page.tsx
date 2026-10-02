@@ -47,21 +47,31 @@ export default async function SpreadsheetTemplatePage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <TemplateLink
               file="template"
+              format="xlsx"
               where="template_page"
               className={`${downloadButton} bg-amber-500 text-slate-950 ring-amber-500 hover:bg-amber-400`}
             >
-              Download the template (CSV)
+              Download the template (Excel)
             </TemplateLink>
             <TemplateLink
               file="example"
+              format="xlsx"
               where="template_page"
               className={`${downloadButton} bg-white text-slate-800 ring-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800`}
             >
-              Download the filled-in example (CSV)
+              Download the filled-in example (Excel)
             </TemplateLink>
           </div>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            CSV files open in Excel, Google Sheets and Numbers. Save it as .xlsx if you like: the import reads both.
+            The Excel files open in Excel, Google Sheets and Numbers. Prefer CSV? Get the{" "}
+            <TemplateLink file="template" format="csv" where="template_page">
+              template as CSV
+            </TemplateLink>{" "}
+            or the{" "}
+            <TemplateLink file="example" format="csv" where="template_page">
+              example as CSV
+            </TemplateLink>
+            . The import reads both.
           </p>
 
           <section className="mt-14 max-w-3xl" aria-labelledby="columns-heading">

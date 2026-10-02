@@ -215,9 +215,10 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   columns, so running it again changes no costs and never puts back one edited or blanked in the
   dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
   Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
-  says it isn't available and no hints show. The numbers, and how the quick estimate uses the
-  year built, are still waiting for Kevin's approval in `typical-costs.md` (phase 3 project
-  files); `SPREAD_REPLACEMENTS` in `src/lib/reserve/quick-estimate.ts` switches the method.
+  says it isn't available and no hints show. Kevin approved the numbers, and spreading each
+  replacement over its lifespan range for the year built, on October 2, 2026 (sources in
+  `typical-costs.md`, phase 3 project files); `SPREAD_REPLACEMENTS` in
+  `src/lib/reserve/quick-estimate.ts` switches the method.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
@@ -528,9 +529,11 @@ if the first try saved none (then it has `retry` = true). An import that creates
 `import_completed`. Each "Retry failed" also sends `import_retried`, so each import counts once.
 
 On **Template page**, `file` is `template` (the blank template) or `example` (the filled-in
-example). The page itself is checked in Search Console (below): it should show up in Google
-results by the check-in. **Component list downloads** counts "Download component list (CSV)";
-`where` is `downloads` (next to the forecast downloads) or `components` (next to Import).
+example), and `format` is `xlsx` (Excel) or `csv`. The page itself is checked in Search Console
+(below): it should show up in Google results by the check-in. **Component list downloads** counts
+"Download component list (Excel)" and "Download component list (CSV)"; `where` is `downloads`
+(next to the forecast downloads) or `components` (next to Import), and `format` is `xlsx` or
+`csv`. Downloads from before the Excel files were added have no `format`; they were all CSV.
 
 On **Comparison**, filter each compare series: click the filter icon on it, choose **Path name**,
 then **equals**, and type `/capex-calculator`. The filter matters because the comparison also
@@ -540,8 +543,8 @@ The comparison is working when `compare_viewed` is at least a tenth of `forecast
 **Quick estimate** shows how many people who got a quick estimate on /reserve-calculator went on
 to the CapEx calculator in the same visit. In **New insight**, pick **Funnels** instead of
 Trends. Add `quick_estimate_shown` as step 1 and `$pageview` as step 2, then filter step 2 to
-**Path name** equals `/capex-calculator`. Under the steps, set **Conversion window limit** to
-**1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
+**Path name** equals `/capex-calculator`. Open **Funnel settings** (below the steps, closed at
+first) and set **Conversion window limit** to **1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
 `quick_estimate_shown` goes once per page view, after an estimate has been on screen for 2
 seconds, and carries only `systems`, how many systems were ticked.
 

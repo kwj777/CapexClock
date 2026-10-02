@@ -96,9 +96,18 @@ export default function ExportButtons({
             >
               Download forecast (CSV)
             </button>
-            {list && (
-              <ComponentListButton name={name} building={list.building} draft={list.draft} where="downloads" className={button} />
-            )}
+            {list &&
+              (["xlsx", "csv"] as const).map((format) => (
+                <ComponentListButton
+                  key={format}
+                  format={format}
+                  name={name}
+                  building={list.building}
+                  draft={list.draft}
+                  where="downloads"
+                  className={button}
+                />
+              ))}
             {reportButton}
             {failed && (
               <span role="alert" className="text-sm text-red-700 dark:text-red-400">
