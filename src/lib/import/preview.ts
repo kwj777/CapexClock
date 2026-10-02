@@ -177,7 +177,10 @@ export interface Preview {
 
 export interface QuantityQuestion extends QuantityDoubt {
   heading: string;
-  /** "each_one": it's the unit count or row numbers, so each row counts as one. */
+  /**
+   * "each_one": it's the building's unit count (kind "same"), so an item in every unit
+   * takes it and other rows count as one, or row numbers, so each row counts as one.
+   */
   answer: "quantity" | "each_one" | null;
 }
 
@@ -244,6 +247,7 @@ const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
 const NO_QUANTITY = "No quantity, so counted as 1";
 const FOLLOWS_UNITS = "No quantity, so used the unit count, since it's counted per unit";
+const EACH_UNIT = "One in each unit, so used the unit count";
 const COUNTED_EACH = "Kept the quantity as a count, not sq ft, so the cost is for each one";
 const COUNTED_APARTMENTS = "Counted apartments, not sq ft, so the cost is for each apartment";
 
@@ -294,6 +298,11 @@ interface Context {
   currentYear: number;
   /** The column of a quantity question the owner hasn't answered, so rows it changes wait. */
   quantityPending: number | null;
+  /**
+   * The column the owner said is the building's unit count. An item in every unit,
+   * like a fridge, takes the unit count of the list it goes into.
+   */
+  unitsColumn: number | null;
   /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
   quantityInSqFt: boolean;
   costInSqFt: boolean;
@@ -522,20 +531,25 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     record.changes.push(COUNTED_EACH);
   }
   if (counted?.note) record.changes.push(counted.note);
-  // Counted per unit with the quantity left blank, as in our template: one in each
-  // unit, as the calculator counts it, not 1 for the whole building.
-  if (
-    counted?.value === "per_unit" &&
-    quantityFix === undefined &&
-    !squareFeet &&
-    hasRole(columns, "quantity") &&
-    cellText(quantityCell) === ""
-  ) {
+  // One in each unit, as the calculator counts it, not 1 for the whole building: a row
+  // counted per unit with the quantity left blank, as in our template, or an item the
+  // library counts per unit when the owner said a column is the building's unit count.
+  // It takes the unit count of the list it goes into. Anything else counts as one.
+  const blankPerUnit = counted?.value === "per_unit" && hasRole(columns, "quantity") && cellText(quantityCell) === "";
+  const inEachUnit = ctx.unitsColumn !== null && !counted?.value && !quantityGiven && record.row.unitLabel === "per_unit";
+  if ((blankPerUnit || inEachUnit) && quantityFix === undefined && !squareFeet) {
     record.followsUnits = true;
     record.quantity = null;
     record.row.quantity = "";
     record.row.followsUnitCount = true;
     record.changes = record.changes.map((c) => (c === NO_QUANTITY ? FOLLOWS_UNITS : c));
+    if (inEachUnit && ctx.unitsColumn !== null) {
+      // A total is divided by the sheet's unit count, and one that disagrees is flagged.
+      const units = readQuantity(row[ctx.unitsColumn]).value;
+      record.quantity = units !== null && units > 0 ? units : null;
+      quantityGiven = record.quantity !== null;
+      record.changes.push(EACH_UNIT);
+    }
   }
 
   // Useful life: the sheet's, else the library's typical one.
@@ -1026,6 +1040,7 @@ export function buildPreview(
     choices,
     currentYear,
     quantityPending: doubt && quantityAnswer === null ? doubt.column : null,
+    unitsColumn: doubt?.kind === "same" && quantityAnswer === "each_one" ? doubt.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
     known,

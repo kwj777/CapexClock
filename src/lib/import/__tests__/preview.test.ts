@@ -880,25 +880,83 @@ describe("a Units column with the same number on every row", () => {
     ]);
   });
 
-  it("counts each row as one when it's the building's unit count", () => {
-    const p = preview(sheet, { quantityAnswered: true });
+  // Answering "the number of units in the building" sets the column to the building's unit count.
+  const asUnits = { columns: ["item", "unitCount", "installYear", "cost"] as const, quantityAnswered: true };
+
+  it("gives an item in every unit the unit count when it's the building's unit count", () => {
+    const p = preview(sheet, asUnits);
     expect(p.quantityQuestion?.answer).toBe("each_one");
-    expect(p.rows.map((r) => [r.row.quantity, r.issues])).toEqual([
-      ["1", []],
-      ["1", []],
-      ["1", []],
+    expect(p.buildings).toMatchObject([{ key: "", unitCount: 12 }]);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.followsUnitCount, r.row.unitLabel, r.status, r.issues])).toEqual([
+      ["Tank water heater", "12", true, "per_unit", "changed", []],
+      ["Refrigerator", "12", true, "per_unit", "changed", []],
+      ["Range / oven", "12", true, "per_unit", "changed", []],
+    ]);
+    expect(byName(p, "Refrigerator").changes).toEqual(['Matched "Fridge" to Refrigerator', "One in each unit, so used the unit count"]);
+    expect(detailsText(byName(p, "Refrigerator").row, true)).toMatch(/^Qty 12, the unit count · /);
+    // Set to Ignore instead, the sheet gives no unit count, so the list's is used.
+    const ignored = preview(sheet, { quantityAnswered: true });
+    expect(ignored.quantityQuestion?.answer).toBe("each_one");
+    expect(ignored.rows.map((r) => [r.row.quantity, r.row.followsUnitCount])).toEqual([
+      ["", true],
+      ["", true],
+      ["", true],
     ]);
   });
 
+  it("counts a building-wide item and the owner's own item as one when it's the building's unit count", () => {
+    const mixed = [
+      "Item,Units,Year,Cost",
+      "Asphalt shingle roof,8,2010,30000",
+      "Boiler,8,2012,60000",
+      "Zorbex,8,2019,700",
+      "Gas furnace,8,2014,4200",
+    ].join("\n");
+    const p = preview(mixed, asUnits);
+    expect(p.rows.map((r) => [r.row.name, r.row.quantity, r.row.followsUnitCount ?? false, r.row.unitLabel])).toEqual([
+      ["Asphalt shingle roof", "1", false, "per_building"],
+      ["Boiler", "1", false, "per_building"],
+      ["Zorbex", "1", false, "per_building"],
+      ["Gas furnace", "8", true, "per_unit"],
+    ]);
+    // A total is divided by the sheet's unit count, and a typed quantity wins.
+    const totals = preview(["Item,Units,Total", "Refrigerator,8,7200", "Boiler,8,60000"].join("\n"), {
+      columns: ["item", "unitCount", "total"],
+      quantityAnswered: true,
+    });
+    expect(totals.rows.map((r) => [r.row.quantity, r.row.costEach])).toEqual([
+      ["8", "900"],
+      ["1", "60000"],
+    ]);
+    const typed = preview(mixed, { ...asUnits, fixes: { r4: { quantity: "2" } } });
+    expect(byName(typed, "Gas furnace").row.quantity).toBe("2");
+    expect(byName(typed, "Gas furnace").row.followsUnitCount).toBeUndefined();
+  });
+
+  it("goes in the draft at the list's unit count, and follows it", () => {
+    const rows = preview(sheet, asUnits).rows.map((r) => r.row);
+    const draft = withImportedRows({ unitCount: "10", yearBuilt: "1985", rows: [] }, rows);
+    expect(draft.rows.map((r) => [r.quantity, r.followsUnitCount, costLabel(r)])).toEqual([
+      ["10", true, "Cost per apartment"],
+      ["10", true, "Cost per apartment"],
+      ["10", true, "Cost per apartment"],
+    ]);
+  });
+
+  it("keeps row numbers out of it: each row counts as one", () => {
+    const numbered = preview("#,Item,Year\n4,Fridge,2018\n101,Range,2018\n7,Dishwasher,2019", { quantityAnswered: true });
+    expect(numbered.quantityQuestion).toMatchObject({ kind: "numbers", answer: "each_one" });
+    expect(numbered.rows.map((r) => r.row.quantity)).toEqual(["1", "1", "1"]);
+  });
+
   it("takes the building's unit count from it when the column is set to that, answered or not", () => {
-    // The import sets the column to the building's unit count when the owner answers so.
     for (const quantityAnswered of [true, false]) {
       const p = preview(sheet, { columns: ["item", "unitCount", "installYear", "cost"], quantityAnswered });
       expect(p.quantityQuestion?.answer).toBe("each_one");
       expect(p.rows.map((r) => [r.row.quantity, r.status === "needs_you"])).toEqual([
-        ["1", false],
-        ["1", false],
-        ["1", false],
+        ["12", false],
+        ["12", false],
+        ["12", false],
       ]);
       expect(p.buildings).toMatchObject([{ key: "", unitCount: 12 }]);
     }

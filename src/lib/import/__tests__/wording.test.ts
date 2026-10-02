@@ -200,11 +200,11 @@ describe("import wording", () => {
     expect(quantityQuestionText(asked.quantityQuestion)).toBe('Column B, "Units", says 12 on every row. What is it?');
     expect(quantityAnswers(asked.quantityQuestion)).toEqual([
       ["quantity", "How many of each item there are"],
-      ["each_one", "The number of units in the building, so each row counts as one"],
+      ["each_one", "The number of units in the building. Items like fridges count one per unit, and the rest count as one."],
     ]);
     expect(previewHints(asked)).toEqual([]);
     expect(previewHints(preview(sheet, { quantityAnswered: true }))).toEqual([
-      "There's no quantity column, so each row counts as one, and identical rows are added up.",
+      "Column B is the building's unit count, so items like fridges count one per unit. Other rows count as one, and identical rows are added up.",
     ]);
     // Answered as the quantity: no hint about the quantity at all.
     expect(previewHints(preview(sheet, { columns: ["item", "quantity", "installYear", "cost"], quantityAnswered: true }))).toEqual([]);
