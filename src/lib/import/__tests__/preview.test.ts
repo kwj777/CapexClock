@@ -621,7 +621,7 @@ describe("a Units column with the same number on every row", () => {
       ["1", "needs_you"],
     ]);
     expect(byName(p, "Refrigerator").issues).toEqual([
-      { field: "quantity", text: "Answer the question about column B above, or type the quantity." },
+      { field: "quantity", text: "Answer the question about column B above, or type the quantity. If you don't, it's added as 1." },
     ]);
   });
 

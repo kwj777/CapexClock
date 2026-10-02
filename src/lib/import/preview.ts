@@ -474,7 +474,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     } else if (ctx.unitsPending !== null) {
       record.issues.push({
         field: "quantity",
-        text: `Answer the question about column ${columnLetter(ctx.unitsPending)} above, or type the quantity.`,
+        text: `Answer the question about column ${columnLetter(ctx.unitsPending)} above, or type the quantity. If you don't, it's added as 1.`,
       });
     }
   }
