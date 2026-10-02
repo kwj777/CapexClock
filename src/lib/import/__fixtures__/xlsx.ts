@@ -1,9 +1,10 @@
 /**
  * Builds small .xlsx files for tests, so no real owner's workbook is ever
- * committed. Each file is a plain (stored, uncompressed) zip with one worksheet
- * per tab, inline strings, and a date style for Date cells, which is all
- * read-excel-file needs to read it as Excel would have saved it.
+ * committed. Each file is a zip (stored, or deflated as Excel saves it) with one
+ * worksheet per tab, inline strings, and a date style for Date cells, which is
+ * all read-excel-file needs to read it as Excel would have saved it.
  */
+import { deflateRawSync } from "node:zlib";
 
 /** A cell as written: text, a number, a yes/no, a date, or empty. */
 export type FixtureCell = string | number | boolean | Date | null;
@@ -11,6 +12,8 @@ export type FixtureCell = string | number | boolean | Date | null;
 export interface FixtureTab {
   name: string;
   rows: FixtureCell[][];
+  /** Hidden in Excel (right-click, Hide), or only from code ("veryHidden"). */
+  state?: "hidden" | "veryHidden";
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -25,8 +28,8 @@ function crc32(bytes: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** A zip of the files, stored without compression. */
-function zip(files: { name: string; data: Uint8Array }[]): Uint8Array {
+/** A zip of the files, stored without compression or deflated. */
+function zip(files: { name: string; data: Uint8Array }[], deflate: boolean): Uint8Array {
   const encoder = new TextEncoder();
   const parts: Uint8Array[] = [];
   const central: Uint8Array[] = [];
@@ -34,25 +37,29 @@ function zip(files: { name: string; data: Uint8Array }[]): Uint8Array {
   for (const file of files) {
     const name = encoder.encode(file.name);
     const crc = crc32(file.data);
+    const data = deflate ? new Uint8Array(deflateRawSync(file.data)) : file.data;
+    const method = deflate ? 8 : 0;
     const local = new DataView(new ArrayBuffer(30));
     local.setUint32(0, 0x04034b50, true);
     local.setUint16(4, 20, true);
+    local.setUint16(8, method, true);
     local.setUint32(14, crc, true);
-    local.setUint32(18, file.data.length, true);
+    local.setUint32(18, data.length, true);
     local.setUint32(22, file.data.length, true);
     local.setUint16(26, name.length, true);
-    parts.push(new Uint8Array(local.buffer), name, file.data);
+    parts.push(new Uint8Array(local.buffer), name, data);
     const entry = new DataView(new ArrayBuffer(46));
     entry.setUint32(0, 0x02014b50, true);
     entry.setUint16(4, 20, true);
     entry.setUint16(6, 20, true);
+    entry.setUint16(10, method, true);
     entry.setUint32(16, crc, true);
-    entry.setUint32(20, file.data.length, true);
+    entry.setUint32(20, data.length, true);
     entry.setUint32(24, file.data.length, true);
     entry.setUint16(28, name.length, true);
     entry.setUint32(42, offset, true);
     central.push(new Uint8Array(entry.buffer), name);
-    offset += 30 + name.length + file.data.length;
+    offset += 30 + name.length + data.length;
   }
   const centralSize = central.reduce((n, p) => n + p.length, 0);
   const end = new DataView(new ArrayBuffer(22));
@@ -105,7 +112,7 @@ const PKG_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
 const TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml";
 
 /** An .xlsx file with these tabs, as the bytes a file input would give. */
-export function xlsxFile(tabs: FixtureTab[]): ArrayBuffer {
+export function xlsxFile(tabs: FixtureTab[], { deflate = false }: { deflate?: boolean } = {}): ArrayBuffer {
   const encoder = new TextEncoder();
   const text = (name: string, xml: string) => ({ name, data: encoder.encode(xml) });
   const files = [
@@ -122,7 +129,7 @@ export function xlsxFile(tabs: FixtureTab[]): ArrayBuffer {
     text(
       "xl/workbook.xml",
       `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="${MAIN}" xmlns:r="${REL}"><sheets>${tabs
-        .map((t, i) => `<sheet name="${escape(t.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+        .map((t, i) => `<sheet name="${escape(t.name)}" sheetId="${i + 1}"${t.state ? ` state="${t.state}"` : ""} r:id="rId${i + 1}"/>`)
         .join("")}</sheets></workbook>`,
     ),
     text(
@@ -137,6 +144,6 @@ export function xlsxFile(tabs: FixtureTab[]): ArrayBuffer {
     ),
     ...tabs.map((t, i) => text(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(t.rows))),
   ];
-  const bytes = zip(files);
+  const bytes = zip(files, deflate);
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }

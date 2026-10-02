@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import { openTabs, tabNote, type OpenedTab } from "@/components/import/ImportPanel";
 import SheetReview, { type SheetState } from "@/components/import/SheetReview";
 import SourcePicker, {
   headingClass,
@@ -34,6 +33,7 @@ import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
 import { buildPreview, type Preview } from "@/lib/import/preview";
 import { PROBLEM_TEXT, type Problem } from "@/lib/import/read";
+import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { previewSummary } from "@/lib/import/wording";
 import type { LibraryComponent } from "@/lib/library/components";
 import type { SaveInput } from "@/lib/properties/convert";
@@ -93,6 +93,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const [runs, setRuns] = useState(0);
 
   const started = Object.keys(results).length > 0;
+  const tabRows = useMemo(() => tabRowCounts(tabs, library, match, currentYear), [tabs, library, match, currentYear]);
 
   const plans = useMemo((): TabPlan[] => {
     if (!read) return [];
@@ -143,14 +144,16 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   }, [read, plans]);
 
   function onRead(next: SourceRead) {
-    const list = openTabs(next, match, currentYear);
+    const list = openTabs(next.tabs, match, currentYear);
     const usable = list.flatMap((t, i) => (typeof t === "object" ? [i] : []));
     if (usable.length === 0) {
-      const reason = list[0];
+      const only = list[0];
+      const reason = typeof only === "string" && list.length === 1 ? only : "no_header";
       setRead(null);
-      setProblem(typeof reason === "string" && list.length === 1 ? reason : "no_header");
+      setProblem(reason);
       return;
     }
+    const starting = startingTabs(next.tabs, list);
     const states: Record<number, SheetState> = {};
     for (const i of usable) {
       const tab = list[i];
@@ -158,9 +161,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
     }
     setRead(next);
     setTabs(list);
-    setTicked(usable);
+    setTicked(starting);
     setSheets(states);
-    setReviewTab(usable[0]);
+    setReviewTab(starting[0] ?? usable[0]);
     setReviewOpen(false);
     setEdits({});
     setIncluded({});
@@ -284,6 +287,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const allResults = chosen.flatMap((p) => (results[p.id] ? [results[p.id]] : []));
   const summary = createSummary(allResults);
   const usable = tabs.filter((t) => typeof t === "object").length;
+  const anyHidden = read?.tabs.some((t) => t.hidden) ?? false;
 
   return (
     <section
@@ -326,6 +330,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 </p>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   Each ticked tab becomes a property, or one for each building when it has a Building column.
+                  {anyHidden ? " Tabs hidden in your spreadsheet are marked hidden and start unticked." : ""}
                 </p>
                 <div role="group" aria-labelledby={`${baseId}-tabs`} className="mt-2 flex flex-col gap-1.5">
                   {read.tabs.map((tab, i) => (
@@ -339,7 +344,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       />
                       <span className="wrap-anywhere">
                         {tab.name}{" "}
-                        <span className="text-slate-500 dark:text-slate-400">({tabNote(tab, tabs[i])})</span>
+                        <span className="text-slate-500 dark:text-slate-400">({tabNote(tab, tabs[i], tabRows[i] ?? null)})</span>
                       </span>
                     </label>
                   ))}

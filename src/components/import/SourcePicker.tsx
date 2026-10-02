@@ -14,7 +14,7 @@ import {
 } from "@/lib/import/read";
 import { readWorkbook, sniff, type Tab } from "@/lib/import/xlsx";
 import { loadCsvParser } from "./csv";
-import { loadXlsxReader } from "./xlsx";
+import { inflateRaw, loadXlsxReader } from "./xlsx";
 
 export const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
@@ -120,7 +120,7 @@ export default function SourcePicker({ onRead, onProblem, intro }: SourcePickerP
       if (kind === "xlsx" || sniff(new Uint8Array(bytes.slice(0, 8))) !== "other") {
         const read = await loadXlsxReader().catch(() => null);
         if (!read) return fail("loading_failed", "xlsx");
-        const tabs = await readWorkbook(bytes, read);
+        const tabs = await readWorkbook(bytes, read, inflateRaw);
         if (typeof tabs === "string") return fail(tabs, "xlsx");
         onRead({ source: "xlsx", tabs, fileName: file.name });
         return;

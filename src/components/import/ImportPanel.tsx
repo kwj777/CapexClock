@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type SetStateAction } from
 import type { Draft, DraftImport } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { createMatcher } from "@/lib/import/names";
-import { openSheet, startingChoices, type OpenedSheet } from "@/lib/import/open";
+import { startingChoices, type OpenedSheet } from "@/lib/import/open";
 import { buildPreview, type Preview } from "@/lib/import/preview";
 import { failedReason, PROBLEM_TEXT, type FailReason, type Problem } from "@/lib/import/read";
 import {
@@ -21,8 +21,8 @@ import {
   removeText,
   sheetDetails,
 } from "@/lib/import/reimport";
+import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { duplicates, duplicateText, longListText } from "@/lib/import/wording";
-import { tooWide } from "@/lib/import/xlsx";
 import type { LibraryComponent } from "@/lib/library/components";
 import SheetReview, { type SheetState } from "./SheetReview";
 import SourcePicker, { headingClass, inputClass, labelClass, secondaryButton, type SourceRead } from "./SourcePicker";
@@ -42,24 +42,6 @@ export interface ImportPanelProps {
   where: ImportWhere;
   /** Accounts are on, so a sheet of several buildings can point to My properties. */
   accountsEnabled?: boolean;
-}
-
-/** A tab opened, or why it couldn't be. */
-export type OpenedTab = OpenedSheet | FailReason;
-
-/** Opens every tab, so the picker can say which ones have headings. */
-export function openTabs(read: SourceRead, match: ReturnType<typeof createMatcher>, currentYear: number): OpenedTab[] {
-  return read.tabs.map((t) => (tooWide(t) ? "too_big" : openSheet(t.grid, match, currentYear)));
-}
-
-/** "24 rows" or why a tab can't be read, for the tab picker. */
-export function tabNote(tab: SourceRead["tabs"][number], opened: OpenedTab): string {
-  if (typeof opened === "string") {
-    if (tab.grid.length === 0) return "empty";
-    return opened === "no_header" ? "no headings found" : opened === "too_big" ? "too big" : opened === "forecast_file" ? "a forecast download" : "can't be read";
-  }
-  const rows = Math.max(0, opened.sheet.grid.length - opened.sheet.headerRow - 1);
-  return `${rows.toLocaleString("en-US")} ${rows === 1 ? "row" : "rows"}`;
 }
 
 /**
@@ -84,6 +66,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   const [announcement, setAnnouncement] = useState("");
   const previewed = useRef<OpenedSheet | null>(null);
 
+  const tabRows = useMemo(() => tabRowCounts(tabs, library, match, currentYear), [tabs, library, match, currentYear]);
   const opened = sheet ? tabs[tabIndex] : undefined;
   const openedSheet = typeof opened === "object" ? opened : null;
   const known = useMemo(() => knownRows(draft.rows), [draft.rows]);
@@ -148,10 +131,10 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   }
 
   function onRead(next: SourceRead) {
-    const list = openTabs(next, match, currentYear);
+    const list = openTabs(next.tabs, match, currentYear);
     setRead(next);
     setTabs(list);
-    const first = list.findIndex((t) => typeof t === "object");
+    const first = startingTabs(next.tabs, list)[0] ?? -1;
     if (first < 0) {
       const reason = list[0];
       return failOpen(typeof reason === "string" && list.length === 1 ? reason : "no_header", next.source);
@@ -204,6 +187,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     (preview?.questions.filter((q) => sheet?.choices.answers[q.key] === undefined).length ?? 0) +
     (preview?.unitsQuestion?.answer === null ? 1 : 0);
   const usable = tabs.filter((t) => typeof t === "object").length;
+  const anyHidden = read?.tabs.some((t) => t.hidden) ?? false;
   const summaryLines = plan ? planSummary(plan) : [];
 
   return (
@@ -247,6 +231,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
               <legend className={headingClass}>Which tab?</legend>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 {usable > 1 ? "This file has more than one tab. Choose the one to import." : "We'll import the only tab with headings."}
+                {anyHidden && usable > 1 ? " Tabs hidden in your spreadsheet are marked hidden, and we start with one that isn't." : ""}
               </p>
               <div className="mt-2 flex flex-col gap-1.5">
                 {read.tabs.map((tab, i) => (
@@ -260,7 +245,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
                       className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
                     />
                     <span className="wrap-anywhere">
-                      {tab.name} <span className="text-slate-500 dark:text-slate-400">({tabNote(tab, tabs[i])})</span>
+                      {tab.name} <span className="text-slate-500 dark:text-slate-400">({tabNote(tab, tabs[i], tabRows[i] ?? null)})</span>
                     </span>
                   </label>
                 ))}

@@ -1,3 +1,4 @@
+import { inflateRawSync } from "node:zlib";
 import readExcelFile from "read-excel-file/universal";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import { createInTurn, createSummary, createLabel, MAX_PROPERTIES, planProperty, plannedProblems, plannedSave, startingName, withEdits } from "../buildings";
@@ -6,10 +7,26 @@ import { xlsxFile, type FixtureTab } from "../__fixtures__/xlsx";
 import { openSheet, startingChoices, type OpenedSheet } from "../open";
 import { buildPreview, type ImportChoices, type Preview } from "../preview";
 import { MAX_COLUMNS } from "../read";
-import { readWorkbook, sniff, tabsFromWorkbook, tooWide, xlsxProblem, type Tab } from "../xlsx";
+import { openTabs, startingTabs, tabNote, tabRowCounts } from "../tabs";
+import {
+  parseSheetStates,
+  readWorkbook,
+  sheetStates,
+  sniff,
+  tabsFromWorkbook,
+  tooWide,
+  xlsxProblem,
+  zipEntry,
+  type Inflate,
+  type SheetState,
+  type Tab,
+} from "../xlsx";
+
+/** zlib in place of the browser's DecompressionStream. */
+const inflate: Inflate = async (bytes) => new Uint8Array(inflateRawSync(bytes));
 
 async function read(tabs: FixtureTab[]): Promise<Tab[]> {
-  const result = await readWorkbook(xlsxFile(tabs), readExcelFile);
+  const result = await readWorkbook(xlsxFile(tabs), readExcelFile, inflate);
   if (typeof result === "string") throw new Error(`readWorkbook failed: ${result}`);
   return result;
 }
@@ -95,6 +112,70 @@ describe("reading an .xlsx file", () => {
     expect(tabsFromWorkbook([{ sheet: "A", data: [] }])).toBe("empty_file");
   });
 
+  it("reads one file out of a zip, stored or deflated as Excel saves it", async () => {
+    const tabs: FixtureTab[] = [{ name: "List", rows: [["Item"]] }];
+    for (const deflate of [false, true]) {
+      const file = xlsxFile(tabs, { deflate });
+      const xml = await zipEntry(file, "xl/workbook.xml", inflate);
+      expect(new TextDecoder().decode(xml ?? new Uint8Array())).toContain('<sheet name="List"');
+      expect(await zipEntry(file, "xl/missing.xml", inflate)).toBeNull();
+    }
+    expect(await zipEntry(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2]).buffer, "xl/workbook.xml", inflate)).toBeNull();
+  });
+
+  it("lists each sheet's name and whether it's hidden, decoding what XML escapes", () => {
+    const xml =
+      '<workbook><bookViews><workbookView/></bookViews><sheets>' +
+      '<sheet name="Maple &amp; Oak" sheetId="1" r:id="rId1"/>' +
+      '<sheet name="Lookups" sheetId="2" state="hidden" r:id="rId2"/>' +
+      "<x:sheet name='Macro data' state='veryHidden' sheetId='3' r:id='rId3'/>" +
+      '<sheet name="Shown" state="visible" sheetId="4" r:id="rId4"></sheet>' +
+      "</sheets></workbook>";
+    expect(parseSheetStates(xml)).toEqual([
+      { name: "Maple & Oak", hidden: false },
+      { name: "Lookups", hidden: true },
+      { name: "Macro data", hidden: true },
+      { name: "Shown", hidden: false },
+    ]);
+  });
+
+  it("marks hidden tabs, and reads them anyway", async () => {
+    const workbook: FixtureTab[] = [
+      { name: "Maple Court", rows: [["Item", "Qty", "Year installed", "Cost"], ["Roof", 1, 2008, 38000]] },
+      { name: "Hidden calc", state: "hidden", rows: [["Item", "Qty", "Year installed", "Cost"], ["Roof", 1, 2008, 1]] },
+      { name: "Very hidden", state: "veryHidden", rows: [["Item", "Qty"], ["Roof", 1]] },
+    ];
+    for (const deflate of [false, true]) {
+      const tabs = await readWorkbook(xlsxFile(workbook, { deflate }), readExcelFile, inflate);
+      if (typeof tabs === "string") throw new Error(tabs);
+      expect(tabs.map((t) => [t.name, t.hidden === true, t.grid.length])).toEqual([
+        ["Maple Court", false, 2],
+        ["Hidden calc", true, 2],
+        ["Very hidden", true, 2],
+      ]);
+    }
+    // Without a way to unpack it, or when it can't be read, no tab is marked.
+    const plain = await readWorkbook(xlsxFile(workbook, { deflate: true }), readExcelFile);
+    if (typeof plain === "string") throw new Error(plain);
+    expect(plain.some((t) => t.hidden)).toBe(false);
+    const broken: Inflate = () => Promise.reject(new Error("no DecompressionStream"));
+    expect(await sheetStates(xlsxFile(workbook, { deflate: true }), broken)).toBeNull();
+  });
+
+  it("uses the hidden marks only when they list the same sheets as the reader", () => {
+    const raw = [
+      { sheet: "A", data: [["Item"]] },
+      { sheet: "B", data: [["Item"]] },
+    ];
+    const hidden = (states: SheetState[]) => {
+      const tabs = tabsFromWorkbook(raw, states);
+      return typeof tabs === "string" ? tabs : tabs.map((t) => t.hidden === true);
+    };
+    expect(hidden([{ name: "A", hidden: false }, { name: "B", hidden: true }])).toEqual([false, true]);
+    expect(hidden([{ name: "B", hidden: true }])).toEqual([false, false]);
+    expect(hidden([{ name: "A", hidden: false }, { name: "C", hidden: true }])).toEqual([false, false]);
+  });
+
   it("won't read a tab wider than a component list could be", () => {
     expect(tooWide({ name: "Wide", grid: [Array.from({ length: MAX_COLUMNS + 1 }, (_, i) => `C${i}`)] })).toBe(true);
     expect(tooWide({ name: "List", grid: [["Item", "Qty"]] })).toBe(false);
@@ -122,6 +203,46 @@ const ONE_TAB_EACH: FixtureTab[] = [
   },
   { name: "Sheet3", rows: [["Phone numbers, no headings"], ["Roofer: 555-0100"]] },
 ];
+
+describe("the tab picker", () => {
+  const workbook: FixtureTab[] = [
+    { name: "Notes", rows: [["Call the roofer in May"]] },
+    { name: "Lookups", state: "hidden", rows: [["Item", "Qty", "Year installed", "Cost"], ["Roof", 1, 2008, 1], ["Furnace", 1, 2008, 1]] },
+    {
+      name: "Maple Court",
+      rows: [
+        ["Item", "Qty", "Year installed", "Cost each"],
+        ["Water heater", 12, 2016, 1400],
+        ["Furnace", 12, 2014, 4200],
+        [],
+        ["Roof", 1, 2008, 38000],
+        ["Total", null, null, 43600],
+      ],
+    },
+    { name: "Empty", rows: [] },
+  ];
+
+  it("counts the rows each tab would import, leaving out totals and blank rows", async () => {
+    const tabs = await read(workbook);
+    const opened = openTabs(tabs, match, CURRENT_YEAR);
+    const rows = tabRowCounts(opened, COMPONENT_LIBRARY, match, CURRENT_YEAR);
+    expect(rows).toEqual([null, 2, 3, null]);
+    expect(tabs.map((t, i) => tabNote(t, opened[i], rows[i]))).toEqual(["no headings found", "hidden, 2 rows", "3 rows", "empty"]);
+  });
+
+  it("counts identical rows once, as the preview adds them", () => {
+    const tab: Tab = { name: "Apts", grid: [["Item", "Unit", "Year installed"], ["Fridge", "1A", 2014], ["Fridge", "1B", 2014], ["Fridge", "2A", 2019]] };
+    const opened = openTabs([tab], match, CURRENT_YEAR);
+    expect(tabRowCounts(opened, COMPONENT_LIBRARY, match, CURRENT_YEAR)).toEqual([2]);
+  });
+
+  it("starts with the tabs that can be read, leaving hidden ones out unless they're all there is", async () => {
+    const tabs = await read(workbook);
+    expect(startingTabs(tabs, openTabs(tabs, match, CURRENT_YEAR))).toEqual([2]);
+    const onlyHidden = tabs.filter((t) => t.name !== "Maple Court");
+    expect(startingTabs(onlyHidden, openTabs(onlyHidden, match, CURRENT_YEAR))).toEqual([1]);
+  });
+});
 
 describe("a workbook with one tab per building", () => {
   it("opens each building's tab, and says which can't be read", async () => {
