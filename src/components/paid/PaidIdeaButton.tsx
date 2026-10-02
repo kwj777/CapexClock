@@ -228,8 +228,10 @@ function PhotoOffer({ where }: { where: PaidWhere }) {
       <a
         href={photoOfferHref(CONTACT_EMAIL)}
         // Opens the mail app and the page stays. The property editor lets mail links
-        // through without asking about unsaved edits (see opensAnotherApp).
-        onClick={() => void track("photo_offer_clicked", paidIdeaEvent("photo", where))}
+        // through without asking about unsaved edits (see opensAnotherApp). The event
+        // goes at once: a phone pauses the page while the mail app is open, which would
+        // hold it until the person comes back.
+        onClick={() => void track("photo_offer_clicked", paidIdeaEvent("photo", where), { sendNow: true })}
         className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
       >
         {CONTACT_EMAIL}
