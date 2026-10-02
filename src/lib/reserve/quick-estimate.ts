@@ -83,7 +83,7 @@ export function quickSystems(library: LibraryComponent[], costs: TypicalCost[]):
  * lifespan range, and each replacement lands up to GIVE_OR_TAKE_YEARS early or
  * late, so its cost is spread over the years it could come due. False: each lasts
  * exactly the middle of its range, the plan's method, which jumps up to 4 times
- * between neighbouring build years when several systems come due together.
+ * between neighboring build years when several systems come due together.
  */
 export const SPREAD_REPLACEMENTS = true;
 /** How many years early or late each replacement may land, when replacements are spread. */

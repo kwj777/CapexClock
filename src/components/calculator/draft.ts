@@ -433,7 +433,7 @@ const LIBRARY_COST_BASIS: Record<UnitLabel, CostBasis> = {
 };
 
 /**
- * Grey help text under a cost field, from the library item's typical cost. Only
+ * Gray help text under a cost field, from the library item's typical cost. Only
  * while the field and the typical cost mean the same thing, per apartment or per
  * sq ft. A cost each (the owner's own count: one window, not an apartment's
  * eight) or for the building can't be compared with them, so those get no hint.
