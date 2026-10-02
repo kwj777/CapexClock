@@ -38,7 +38,10 @@ export function initAnalytics(): Promise<PostHog | null> {
   return client;
 }
 
-export async function track(event: string, properties?: Record<string, string>) {
+/** Event properties: counts and labels only, never names, emails, addresses or anything typed. */
+export type EventProperties = Record<string, string | number | boolean>;
+
+export async function track(event: string, properties?: EventProperties) {
   const posthog = await initAnalytics();
   posthog?.capture(event, properties);
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CONTACT_EMAIL } from "@/lib/site";
+import { turnstileSiteKey } from "@/lib/turnstile";
 
 export const metadata: Metadata = {
   title: "Privacy | CapexClock",
@@ -12,8 +13,12 @@ export const metadata: Metadata = {
 };
 
 // Keep this page in step with what the code does (src/lib/analytics.ts,
-// src/lib/supabase, src/components/SignupForm.tsx) whenever those change.
-const UPDATED = "September 28, 2026";
+// src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
+// src/lib/turnstile.ts) whenever those change.
+const UPDATED = "October 2, 2026";
+
+// The sign-in check is mentioned only on deploys that have it switched on.
+const CAPTCHA_ON = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) !== null;
 
 const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
 
@@ -40,7 +45,7 @@ export default function PrivacyPage() {
             <p>
               The CapEx calculator keeps your work in your browser&apos;s local storage, so it&apos;s still there when you
               come back. It isn&apos;t sent to us. PDF and CSV exports are made in your browser too. We also remember in
-              your browser whether you&apos;ve answered our one-question survey, so we don&apos;t ask twice. Clearing your
+              your browser whether you&apos;ve answered our short survey, so we don&apos;t ask twice. Clearing your
               browser data removes all of this.
             </p>
           </Section>
@@ -52,13 +57,38 @@ export default function PrivacyPage() {
               and only your account can read or change them. Supabase also sends our sign-in emails. A cookie keeps you
               signed in on this browser until you sign out.
             </p>
+            {CAPTCHA_ON && (
+              <p className="mt-3">
+                The sign-in page uses Cloudflare Turnstile to check that you&apos;re a person, so bots can&apos;t send
+                sign-in emails. Cloudflare sees your IP address and details about your browser to do this.
+              </p>
+            )}
           </Section>
 
-          <Section title="The early access list">
+          <Section title="The early access list and idea sign-ups">
             <p>
               If you join the early access list, Netlify, our web host, stores what you send through Netlify Forms: your
               email, how many units you own, how you track CapEx today and, if you answer it, what worries you most. We
               use it to contact you about CapexClock.
+            </p>
+            <p className="mt-3">
+              Some buttons in the calculator are for ideas we haven&apos;t built yet. If you ask us to tell you first
+              about one, Netlify Forms stores your email, how many units you own, which idea it was and which page you
+              were on. We only use it to email you about that idea.
+            </p>
+          </Section>
+
+          <Section title="Files you email us">
+            <p>
+              You might email us a spreadsheet, a PDF export or photos, for example to ask for a report, to have rows
+              filled in for you from a photo of a label, or to send a sample of how you track CapEx today. We read these
+              files, and so does Anthropic&apos;s Claude, an AI assistant that helps us prepare reports, fill in rows and
+              make sure our import can read sheets like yours. We delete them within 30 days of delivering what you asked
+              for, or within 30 days of getting them if you sent a sample. To have them deleted sooner, email{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
+                {CONTACT_EMAIL}
+              </a>
+              . Please remove tenant names before you send a file.
             </p>
           </Section>
 
@@ -70,6 +100,10 @@ export default function PrivacyPage() {
               <li>
                 steps like starting the calculator, getting a forecast, creating an account, saving a property,
                 exporting, and coming back on a later day,
+              </li>
+              <li>
+                your answers to our short survey (one question, and a second one if you answer Yes or Maybe), and which buttons for ideas we haven&apos;t built yet you saw,
+                clicked or signed up for, but not the email or unit count you gave,
               </li>
               <li>on the early access form, your answers about units and how you track CapEx, but not your email,</li>
               <li>basic details such as your browser, screen size and rough location, which PostHog works out from your IP address.</li>
@@ -84,16 +118,17 @@ export default function PrivacyPage() {
 
           <Section title="Who we share data with">
             <p>
-              Only the services that run the site: Netlify (hosting and the early access form), Supabase (accounts,
-              saved properties and sign-in emails) and PostHog (analytics). We don&apos;t sell your data, and we
-              don&apos;t share it with advertisers.
+              Only the services that run the site: Netlify (hosting, the early access list and idea sign-ups), Supabase
+              (accounts, saved properties and sign-in emails), PostHog (analytics),{" "}
+              {CAPTCHA_ON && "Cloudflare (the check on the sign-in page), "}and Anthropic (reading files you email us).
+              We don&apos;t sell your data, and we don&apos;t share it with advertisers.
             </p>
           </Section>
 
           <Section title="Deleting your data">
             <p>
-              You can delete a saved property from your account at any time. To delete your account or your early access
-              answers, email{" "}
+              You can delete a saved property from your account at any time. To delete your account, your early access
+              answers, your idea sign-ups or files you emailed us, email{" "}
               <a href={`mailto:${CONTACT_EMAIL}`} className={link}>
                 {CONTACT_EMAIL}
               </a>

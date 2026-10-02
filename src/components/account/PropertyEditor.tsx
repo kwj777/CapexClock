@@ -25,6 +25,7 @@ import {
   keepUnsaved,
   loadUnsaved,
   nothingToRestore,
+  opensAnotherApp,
   unsavedKey,
   wasDropped,
   type UnsavedEdits,
@@ -59,6 +60,8 @@ export interface PropertyEditorProps {
   library: LibraryComponent[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
+  /** The account's email, filled in on the paid-idea "tell me first" forms. */
+  userEmail?: string | null;
 }
 
 /** Reads a property and its components from the database; null if that fails. */
@@ -100,6 +103,7 @@ export default function PropertyEditor({
   importFromCalculator = false,
   library,
   userId,
+  userEmail,
 }: PropertyEditorProps) {
   const router = useRouter();
   const backupKey = unsavedKey(userId, propertyId, importFromCalculator);
@@ -154,7 +158,22 @@ export default function PropertyEditor({
 
   useEffect(() => {
     if (!dirty) return;
+    // A mail link opens the mail app and this page stays, but Chrome still fires
+    // beforeunload for it. That one is let through, if it comes within a second.
+    let openingApp = false;
+    let openingTimer: ReturnType<typeof setTimeout> | undefined;
+    const letAppOpen = () => {
+      openingApp = true;
+      clearTimeout(openingTimer);
+      openingTimer = setTimeout(() => {
+        openingApp = false;
+      }, 1000);
+    };
     const warn = (event: BeforeUnloadEvent) => {
+      if (openingApp) {
+        openingApp = false;
+        return;
+      }
       if (!leaving.current) event.preventDefault();
     };
     const askToLeave = (event: Event) => {
@@ -172,6 +191,10 @@ export default function PropertyEditor({
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
       if (!(link instanceof HTMLAnchorElement)) return;
+      if (opensAnotherApp(link.href)) {
+        letAppOpen();
+        return;
+      }
       if (link.hasAttribute("download") || link.hasAttribute("data-keeps-edits")) return;
       if (link.target && link.target !== "_self") return;
       const to = new URL(link.href);
@@ -180,15 +203,19 @@ export default function PropertyEditor({
       askToLeave(event);
     };
     // Forms that go to another page (Sign out) ask the same way, before signing out
-    // drops the kept copy.
+    // drops the kept copy. Forms marked data-keeps-edits (the paid-idea sign-ups) stay here.
     const confirmSubmit = (event: SubmitEvent) => {
       if (event.defaultPrevented) return;
-      if (event.target instanceof HTMLFormElement && event.target.hasAttribute("action")) askToLeave(event);
+      const form = event.target;
+      if (form instanceof HTMLFormElement && form.hasAttribute("action") && !form.hasAttribute("data-keeps-edits")) {
+        askToLeave(event);
+      }
     };
     window.addEventListener("beforeunload", warn);
     document.addEventListener("click", confirmLeave, true);
     document.addEventListener("submit", confirmSubmit, true);
     return () => {
+      clearTimeout(openingTimer);
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", confirmLeave, true);
       document.removeEventListener("submit", confirmSubmit, true);
@@ -521,6 +548,8 @@ export default function PropertyEditor({
         exportName={name.trim() || "My property"}
         library={library}
         rowNotes={rowNotes}
+        where="property"
+        ownerEmail={userEmail}
       />
       {propertyId && (
         <div className="border-t border-slate-200 pt-6 dark:border-slate-800">
