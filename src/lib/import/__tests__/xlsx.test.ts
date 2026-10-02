@@ -1,6 +1,6 @@
 import readExcelFile from "read-excel-file/universal";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
-import { createSummary, createLabel, MAX_PROPERTIES, planProperty, plannedProblems, plannedSave, startingName, withEdits } from "../buildings";
+import { createInTurn, createSummary, createLabel, MAX_PROPERTIES, planProperty, plannedProblems, plannedSave, startingName, withEdits } from "../buildings";
 import { CURRENT_YEAR, match } from "../__fixtures__/sheets";
 import { xlsxFile, type FixtureTab } from "../__fixtures__/xlsx";
 import { openSheet, startingChoices, type OpenedSheet } from "../open";
@@ -256,10 +256,32 @@ describe("naming the properties and saying how it went", () => {
       createSummary([
         { status: "created", propertyId: "x", components: 3, detailsDropped: false },
         { status: "created", propertyId: "y", components: 1, detailsDropped: false },
-        { status: "failed", message: "Network" },
+        { status: "failed", failure: "network" },
       ]),
     ).toBe("Created 2 properties. 1 didn't save.");
     expect(createLabel(1)).toBe("Create 1 property");
+  });
+
+  it("creates them one at a time, and stops sending once signed out", async () => {
+    const sent: string[] = [];
+    const results: [string, string][] = [];
+    await createInTurn(
+      ["a", "b", "c", "d"],
+      async (id) => {
+        sent.push(id);
+        if (id === "b") return { status: "failed", failure: "network" };
+        if (id === "c") return { status: "failed", failure: "signed_out" };
+        return { status: "created", propertyId: `p-${id}`, components: 1, detailsDropped: false };
+      },
+      (id, r) => results.push([id, r.status === "created" ? r.propertyId : r.failure]),
+    );
+    expect(sent).toEqual(["a", "b", "c"]);
+    expect(results).toEqual([
+      ["a", "p-a"],
+      ["b", "network"],
+      ["c", "signed_out"],
+      ["d", "signed_out"],
+    ]);
     expect(createLabel(MAX_PROPERTIES)).toBe("Create 20 properties");
   });
 });

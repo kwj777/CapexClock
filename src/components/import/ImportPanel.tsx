@@ -44,7 +44,7 @@ export interface ImportPanelProps {
 }
 
 /** A tab opened, or why it couldn't be. */
-type OpenedTab = OpenedSheet | FailReason;
+export type OpenedTab = OpenedSheet | FailReason;
 
 /** Opens every tab, so the picker can say which ones have headings. */
 export function openTabs(read: SourceRead, match: ReturnType<typeof createMatcher>, currentYear: number): OpenedTab[] {

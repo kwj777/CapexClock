@@ -14,7 +14,6 @@ import {
   toSaveInput,
   type SaveInput,
 } from "@/lib/properties/convert";
-import { fetchAllRows } from "@/lib/properties/load";
 import {
   compareSaved,
   DETAILS_NOT_SAVED_TEXT,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
 import type { ComponentRow } from "@/lib/supabase/database.types";
+import { isSignedOut, readBack } from "./read-back";
 import {
   clearUnsaved,
   keepUnsaved,
@@ -82,37 +82,6 @@ export interface PropertyEditorProps {
   library: LibraryComponent[];
   /** The signed-in account, so unsaved edits kept in this browser only come back for it. */
   userId: string | null;
-}
-
-/** Reads a property and its components from the database; null if that fails. */
-async function readBack(id: string): Promise<ReadBack | null> {
-  const supabase = createClient();
-  try {
-    // The property (with its version) first, then its components. If another save
-    // lands in between, the older version goes with the newer components, so the
-    // next save is refused instead of overwriting that save.
-    const { data: property, error } = await supabase.from("properties").select("*").eq("id", id).maybeSingle();
-    if (error) return null;
-    if (!property) return { property: null, components: [] };
-    const components = await fetchAllRows((from, to) =>
-      supabase
-        .from("components")
-        .select("*", { count: "exact" })
-        .eq("property_id", id)
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    );
-    return { property, components };
-  } catch {
-    return null;
-  }
-}
-
-/** True only when the browser has definitely lost its session (not when it's offline). */
-async function isSignedOut(): Promise<boolean> {
-  const { data, error } = await createClient().auth.getSession();
-  return !error && !data.session;
 }
 
 export default function PropertyEditor({

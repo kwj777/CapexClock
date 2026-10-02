@@ -1,5 +1,6 @@
 import { EMPTY_DRAFT, withImportedRows, type Draft } from "@/components/calculator/draft";
 import { SAVE_PROBLEM_TEXT, toSaveInput, type SaveInput } from "@/lib/properties/convert";
+import type { SaveFailure } from "@/lib/properties/save";
 import type { BuildingInfo, ImportedRow } from "./preview";
 import { listText } from "./text";
 
@@ -101,7 +102,34 @@ export function plannedProblems(property: PlannedProperty, currentYear: number):
 /** What happened to one property when the owner clicked Create. */
 export type CreateResult =
   | { status: "created"; propertyId: string; components: number; detailsDropped: boolean }
-  | { status: "failed"; message: string };
+  | { status: "failed"; failure: SaveFailure };
+
+/** Why a property wasn't created, and what to do. Nothing typed is lost: the list stays on screen. */
+export const CREATE_FAILURE_TEXT: Record<SaveFailure, string> = {
+  signed_out: "You've been signed out. Sign in again in another tab, then click Retry failed.",
+  rejected: "One of the values isn't allowed. Check the name, units, year built and the rows, then retry.",
+  network: "Couldn't reach CapexClock. Check your connection, then click Retry failed.",
+  // Not expected for a new property; worded so retrying is still the answer.
+  conflict: "Couldn't save it this time. Click Retry failed.",
+  deleted: "Couldn't save it this time. Click Retry failed.",
+};
+
+/**
+ * Creates the properties one at a time, in order, reporting each as it lands.
+ * Once the account is signed out, the rest aren't sent: they'd fail the same way.
+ */
+export async function createInTurn(
+  ids: readonly string[],
+  create: (id: string) => Promise<CreateResult>,
+  onResult: (id: string, result: CreateResult) => void,
+): Promise<void> {
+  let signedOut = false;
+  for (const id of ids) {
+    const result: CreateResult = signedOut ? { status: "failed", failure: "signed_out" } : await create(id);
+    if (result.status === "failed" && result.failure === "signed_out") signedOut = true;
+    onResult(id, result);
+  }
+}
 
 /** "Created 3 properties. 1 didn't save." */
 export function createSummary(results: readonly CreateResult[]): string {

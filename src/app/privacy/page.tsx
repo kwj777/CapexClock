@@ -70,7 +70,8 @@ export default function PrivacyPage() {
               <li>clicks, without the text of what you clicked,</li>
               <li>
                 steps like starting the calculator, getting a forecast, creating an account, saving a property,
-                exporting, and coming back on a later day,
+                exporting, importing a spreadsheet (how many rows, never what&apos;s in them), and coming back on a later
+                day,
               </li>
               <li>on the early access form, your answers about units and how you track CapEx, but not your email,</li>
               <li>basic details such as your browser, screen size and rough location, which PostHog works out from your IP address.</li>
