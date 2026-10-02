@@ -168,7 +168,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
 
   // Screen readers hear what will be created once the plan settles (after reading the
   // sheet, ticking a tab or changing a column or answer), not on every key press.
-  const planSummary = read && !started && !running ? portfolioSummary(pending) : "";
+  const planSummary = read && !started && !running ? portfolioSummary(pending, planned.length) : "";
   useEffect(() => {
     if (!planSummary) return;
     const timer = window.setTimeout(
@@ -495,9 +495,10 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
             )}
             {planned.length > MAX_PROPERTIES && (
               <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
-                This sheet has {planned.length} buildings. You can create up to {MAX_PROPERTIES} at a time, so{" "}
-                {picks.size === MAX_PROPERTIES ? `the first ${MAX_PROPERTIES}` : picks.size} are ticked. Once they&apos;re
-                created, tick the rest here and create those too.
+                This sheet has {planned.length} buildings. You can create up to {MAX_PROPERTIES} at a time
+                {picks.size === MAX_PROPERTIES
+                  ? `, so the first ${MAX_PROPERTIES} are ticked. Once they're created, tick the rest here and create those too.`
+                  : "."}
               </p>
             )}
             {unpicked > 0 && (

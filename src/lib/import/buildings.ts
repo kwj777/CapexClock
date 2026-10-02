@@ -183,10 +183,16 @@ export function plannedProblems(property: PlannedProperty, currentYear: number):
 
 /**
  * What the import panel's live region reads once the plan settles:
- * "3 properties to create from 41 rows. 2 rows need you."
+ * "3 properties to create from 41 rows. 2 rows need you." `planned` counts the
+ * buildings found, ticked or not.
  */
-export function portfolioSummary(properties: readonly Pick<PlannedProperty, "rows" | "waiting">[]): string {
-  if (properties.length === 0) return "No properties to create yet. Tick a tab with rows.";
+export function portfolioSummary(properties: readonly Pick<PlannedProperty, "rows" | "waiting">[], planned: number): string {
+  if (properties.length === 0) {
+    if (planned === 1) return "The property isn't ticked to create. Tick it to make it.";
+    return planned > 1
+      ? `None of the ${count(planned, "building")} are ticked to create. Tick the ones to make.`
+      : "No properties to create yet. Tick a tab with rows.";
+  }
   const rows = properties.reduce((n, p) => n + p.rows.length, 0);
   const waiting = properties.reduce((n, p) => n + p.waiting.length, 0);
   const made = `${count(properties.length, "property", "properties")} to create from ${count(rows, "row")}.`;

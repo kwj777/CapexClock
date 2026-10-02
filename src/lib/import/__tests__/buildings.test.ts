@@ -118,8 +118,11 @@ describe("which properties start ticked", () => {
 describe("what the live region says about the plan", () => {
   it("counts properties, rows and rows that need the owner", () => {
     const planned = planProperties(0, preview(BUILDINGS), names);
-    expect(portfolioSummary(planned)).toBe("2 properties to create from 5 rows. 1 row needs you.");
-    expect(portfolioSummary(planned.slice(0, 1))).toBe("1 property to create from 2 rows.");
-    expect(portfolioSummary([])).toBe("No properties to create yet. Tick a tab with rows.");
+    expect(portfolioSummary(planned, 2)).toBe("2 properties to create from 5 rows. 1 row needs you.");
+    expect(portfolioSummary(planned.slice(0, 1), 2)).toBe("1 property to create from 2 rows.");
+    expect(portfolioSummary([], 0)).toBe("No properties to create yet. Tick a tab with rows.");
+    // Every building is already in My properties, so none starts ticked.
+    expect(portfolioSummary([], 23)).toBe("None of the 23 buildings are ticked to create. Tick the ones to make.");
+    expect(portfolioSummary([], 1)).toBe("The property isn't ticked to create. Tick it to make it.");
   });
 });
