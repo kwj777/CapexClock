@@ -189,6 +189,19 @@ PostHog events, all with `{idea, where}` and never the email or unit count:
 `paid_idea_seen` (once per page view per idea, once the button is actually on screen),
 `paid_idea_clicked` (once per page view per idea) and `paid_idea_signup`.
 
+**The photo offer.** The photo idea's real test is a free offer (plan section 2): its panel says
+"Want it now? Email a photo of the label to support@capexclock.com and we'll fill in the row for
+you, free." The address opens an email with the subject "Photo of a label", and a click sends
+`photo_offer_clicked` (`{idea, where}` only). When a photo arrives:
+
+1. Forward it to the CapexClock thread. Claude reads the label and drafts the row: the item, its
+   install year (the made-on date from the label or serial number, marked a guess), and the brand
+   and model for the notes.
+2. Check the draft and reply to that one person, from support@capexclock.com.
+3. Delete the photo within 30 days of replying, as /privacy says.
+
+Count the photos you get each week in the Monday numbers.
+
 The pay question after an export keeps its wording. A Yes or Maybe now asks "Which would you
 use first?" and sends `pay_question_first_pick` with `pick` (`reminders`, `report`, `photo` or
 `other`). Every pay-question event now has `version` = `2`; events from before this change have
@@ -378,11 +391,13 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 1. **PostHog:** the numbers on the dashboard below (a screenshot of each tile is fine).
 2. **Netlify:** **Forms → paid-interest** and **Forms → early-access**: how many new entries
    since last Monday.
-3. **Supabase:** the weekly query below.
-4. **Stripe** (once the links are live): for each Payment Link, the payments since last Monday
+3. **Your inbox:** how many people emailed a photo of a label since last Monday (the photo
+   offer), and how many of those you answered.
+4. **Supabase:** the weekly query below.
+5. **Stripe** (once the links are live): for each Payment Link, the payments since last Monday
    and any refunds (**Payment Links → the link**, or **Payments**). For memberships, also the
    number under **Billing → Subscriptions → Active**. Stripe is the real count of sales.
-5. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
+6. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
 
 ### Build the PostHog dashboard (once, about 20 minutes)
 
@@ -407,7 +422,7 @@ Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tall
 | Pay question | `pay_question_shown`, `pay_question_answered`, `pay_question_dismissed` (Total count) | none | Since the review fix |
 | Pay question answers | `pay_question_answered` (Total count) | `answer` | Since the review fix |
 | Which would you use first | `pay_question_first_pick` (Total count) | `pick` | Since step 1 |
-| Idea buttons | `paid_idea_seen`, `paid_idea_clicked`, `paid_idea_signup` (Total count) | `idea` | Since step 1 |
+| Idea buttons | `paid_idea_seen`, `paid_idea_clicked`, `paid_idea_signup`, `photo_offer_clicked` (Total count) | `idea` | Since step 1 |
 | People who saw each idea | `paid_idea_seen` (Unique users) | `idea` | Since step 1 |
 | This week | `calculator_started`, `forecast_generated`, `pdf_exported`, `csv_exported`, `account_created`, `property_saved` (Total count) | none | Last 7 days |
 | Buy now | `presale_checkout_clicked`, `presale_completed` (Total count) | `offer` | Since step 2 |
