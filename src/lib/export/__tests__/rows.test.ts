@@ -1,5 +1,5 @@
 import { computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { formatCostEach, formatPrice, formatQuantity, LONG_WORD, longWordParts, moneyColumn } from "../format";
+import { breakLongWords, formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
 import {
   ESTIMATED_NOTE,
   exportDetails,
@@ -99,22 +99,30 @@ describe("money in exports", () => {
 });
 
 describe("long words in PDF notes", () => {
-  it("leaves ordinary words whole", () => {
-    expect(longWordParts("furnace")).toEqual(["furnace"]);
-    expect(longWordParts("x".repeat(LONG_WORD))).toEqual(["x".repeat(LONG_WORD)]);
+  it("leaves ordinary words, spaces and line breaks as they are", () => {
+    const text = "Leaks a little.\nQuote from  ABC Plumbing, 555-0100.";
+    expect(breakLongWords(text, 36)).toBe(text);
+    expect(breakLongWords("x".repeat(36), 36)).toBe("x".repeat(36));
   });
 
-  it("splits a long run, such as a link, into pieces that can wrap", () => {
-    const link = "https://example.com/photos/unit-3/furnace-label.jpg";
-    const parts = longWordParts(link);
-    expect(parts.join("")).toBe(link);
-    expect(parts.every((p) => p.length <= LONG_WORD)).toBe(true);
-    expect(parts).toHaveLength(Math.ceil(link.length / LONG_WORD));
+  it("breaks a long link into lines that fit, adding nothing to it", () => {
+    const link = "https://example.com/a-very-long-link-without-any-spaces-at-all-to-test-wrapping/abc.jpg";
+    const text = `See ${link} for the label`;
+    const broken = breakLongWords(text, 36);
+    expect(broken.replace(/\n/g, "")).toBe(text);
+    const lines = broken.split("\n");
+    expect(lines.every((l) => Array.from(l.replace(/^See |for the label$/g, "")).length <= 36)).toBe(true);
+    expect(lines).toHaveLength(Math.ceil(link.length / 36));
+    expect(broken).not.toMatch(/--/);
   });
 
-  it("never splits an emoji in half", () => {
-    const parts = longWordParts("🙂".repeat(LONG_WORD + 1));
-    expect(parts).toEqual(["🙂".repeat(LONG_WORD), "🙂"]);
+  it("gives wider characters more room, and never splits one in half", () => {
+    // Outside Latin-1, a character may be up to 1.75em wide, so 20 fit in 36em.
+    const broken = breakLongWords("Ж".repeat(41), 36);
+    expect(broken.split("\n").map((l) => l.length)).toEqual([20, 20, 1]);
+    const emoji = breakLongWords("🙂".repeat(25), 36);
+    expect(emoji.split("\n").map((l) => Array.from(l).length)).toEqual([20, 5]);
+    expect(emoji.replace(/\n/g, "")).toBe("🙂".repeat(25));
   });
 });
 

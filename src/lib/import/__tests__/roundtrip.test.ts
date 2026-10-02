@@ -1,6 +1,14 @@
 import readExcelFile from "read-excel-file/universal";
 import Papa from "papaparse";
-import { EMPTY_DRAFT, exampleDraft, withImport, type Draft, type DraftRow } from "@/components/calculator/draft";
+import {
+  editRow,
+  EMPTY_DRAFT,
+  exampleDraft,
+  withImport,
+  withUnitCount,
+  type Draft,
+  type DraftRow,
+} from "@/components/calculator/draft";
 import { componentListCsv, EXAMPLE_BUILDING, exampleCsv } from "@/lib/export/component-list";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
 import { CURRENT_YEAR, match, parse } from "../__fixtures__/sheets";
@@ -8,7 +16,7 @@ import { xlsxFile, type FixtureCell } from "../__fixtures__/xlsx";
 import { openSheet, startingChoices } from "../open";
 import { buildPreview, type Preview } from "../preview";
 import { decodeText, readText } from "../read";
-import { applyLabel, doneText, knownRows, planImport, planSummary, sheetDetails, type ImportPlan } from "../reimport";
+import { applyLabel, doneText, importSummary, knownRows, planImport, planSummary, sheetDetails, type ImportPlan } from "../reimport";
 import type { Grid } from "../text";
 import { readWorkbook } from "../xlsx";
 
@@ -37,15 +45,35 @@ function previewOf(grid: Grid, draft: Draft): Preview {
   return buildPreview(opened.sheet, startingChoices(opened, CURRENT_YEAR), COMPONENT_LIBRARY, match, CURRENT_YEAR, knownRows(draft.rows));
 }
 
+/**
+ * Imports as the panel does: the sheet's unit count and year built fill in blank ones,
+ * and a different one is taken, as its choice is ticked to start with.
+ */
 function importInto(draft: Draft, grid: Grid, removeMissing = false): { plan: ImportPlan; next: Draft; preview: Preview } {
   const preview = previewOf(grid, draft);
   const plan = planImport(preview.rows, draft.rows);
+  const details = sheetDetails(preview.buildings[0], draft);
+  const taken = (field: "unitCount" | "yearBuilt") => [...details.fill, ...details.ask].find((d) => d.field === field)?.value;
   const next = withImport(draft, {
     add: plan.add,
     update: plan.update,
     remove: removeMissing ? plan.missing.map((m) => m.id) : [],
+    unitCount: taken("unitCount"),
+    yearBuilt: taken("yearBuilt"),
   });
   return { plan, next, preview };
+}
+
+/** The file with every Units cell changed to `units`. */
+function withUnits(csv: string, units: string): string[][] {
+  const table = Papa.parse<string[]>(csv.slice(1).trimEnd(), { delimiter: "," }).data;
+  const col = table[0].indexOf("Units");
+  return table.map((r, i) => (i === 0 ? r : r.map((c, j) => (j === col ? units : c))));
+}
+
+/** The per-unit rows' names, quantities and whether they follow the unit count. */
+function perUnit(draft: Draft): [string, string, boolean | undefined][] {
+  return draft.rows.filter((r) => r.unitLabel === "per_unit").map((r) => [r.name, r.quantity, r.followsUnitCount]);
 }
 
 /** What the owner sees of a row: everything but its id and the unit-count follow flag. */
@@ -155,9 +183,63 @@ describe("downloading the component list and importing it again", () => {
     expect(plan.update.every((u) => u.changes.length === 0)).toBe(true);
     expect(next.rows.map(shown)).toEqual(draft.rows.map(shown));
   });
+
+  it("leaves Quantity blank on rows that follow the unit count, and writes the rest", () => {
+    const table = Papa.parse<string[]>(csv.slice(1).trimEnd(), { delimiter: "," }).data;
+    const [name, quantity] = ["Component", "Quantity"].map((h) => table[0].indexOf(h));
+    const written = new Map(table.slice(1).map((r) => [r[name], r[quantity]]));
+    for (const r of draft.rows) {
+      expect([r.name, written.get(r.name)]).toEqual([r.name, r.unitLabel === "per_unit" && r.followsUnitCount ? "" : r.quantity]);
+    }
+    expect(perUnit(draft).every(([, , follows]) => follows)).toBe(true);
+  });
+
+  it("moves the rows that follow the unit count when the Units column changes, as the app does", () => {
+    const { plan, next, preview } = importInto(draft, withUnits(csv, "14"));
+    expect(preview.counts).toMatchObject({ ready: draft.rows.length, changed: 0, needsYou: 0 });
+    // Nothing about the rows changes: they still follow the unit count, which is now 14.
+    expect(plan.update.every((u) => u.changes.length === 0)).toBe(true);
+    const details = sheetDetails(preview.buildings[0], draft);
+    expect(importSummary(preview.counts, plan, false, details.ask)).toBe(
+      `${draft.rows.length} rows: ${draft.rows.length} the same. ${draft.rows.length} ready. Rental units will be set to 14.`,
+    );
+    expect(next.unitCount).toBe("14");
+    expect(perUnit(next)).toEqual(perUnit(draft).map(([n]) => [n, "14", true]));
+    // And they keep following it afterwards.
+    expect(perUnit(withUnitCount(next, "16"))).toEqual(perUnit(draft).map(([n]) => [n, "16", true]));
+    // Everything else is as it was.
+    const others = (d: Draft) => d.rows.filter((r) => r.unitLabel !== "per_unit").map(shown);
+    expect(others(next)).toEqual(others(draft));
+  });
+
+  it("keeps a count the owner typed, even one that matched the old unit count", () => {
+    const typed = { ...draft, rows: draft.rows.map((r) => (r.unitLabel === "per_unit" ? editRow(r, { quantity: "12" }, "12") : r)) };
+    const file = componentListCsv(building, typed.rows);
+    const { next } = importInto(typed, withUnits(file, "14"));
+    expect(perUnit(next)).toEqual(perUnit(typed).map(([n]) => [n, "12", false]));
+  });
 });
 
 describe("the filled-in example", () => {
+  it("leaves Quantity blank on its rows counted per unit", () => {
+    const table = Papa.parse<string[]>(exampleCsv().slice(1).trimEnd(), { delimiter: "," }).data;
+    const [counted, quantity] = ["Counted per", "Quantity"].map((h) => table[0].indexOf(h));
+    const body = table.slice(1);
+    expect(body.filter((r) => r[counted] === "unit").map((r) => r[quantity])).toEqual(["", "", ""]);
+    expect(body.filter((r) => r[counted] !== "unit").every((r) => r[quantity] !== "")).toBe(true);
+  });
+
+  it("counts one of each per-unit item in every unit when the Units column is changed", () => {
+    const { next, preview } = importInto(EMPTY_DRAFT, withUnits(exampleCsv(), "20"));
+    expect(preview.counts).toMatchObject({ ready: exampleDraft().rows.length, needsYou: 0 });
+    expect(next.unitCount).toBe("20");
+    expect(perUnit(next)).toEqual([
+      ["Gas furnace", "20", true],
+      ["Tank water heater", "20", true],
+      ["Refrigerator", "20", true],
+    ]);
+  });
+
   it("imports as the calculator's example, every row Ready", () => {
     const grid = gridFromCsv(exampleCsv());
     const preview = previewOf(grid, EMPTY_DRAFT);
@@ -168,5 +250,8 @@ describe("the filled-in example", () => {
     ]);
     const { next } = importInto(EMPTY_DRAFT, grid);
     expect(next.rows.map((r) => r.name)).toEqual(exampleDraft().rows.map((r) => r.name));
+    expect(next.rows.map((r) => [r.quantity, r.followsUnitCount])).toEqual(
+      exampleDraft().rows.map((r) => [r.quantity, r.followsUnitCount]),
+    );
   });
 });

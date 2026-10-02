@@ -29,6 +29,15 @@ export interface ListBuilding {
   yearBuilt: string;
 }
 
+/**
+ * A row's Quantity cell. A row counted per unit that follows the unit count is left
+ * blank, which the format says means the unit count, so it still follows after the
+ * owner changes the Units column, as it would in the app.
+ */
+function quantityCell(row: DraftRow): string {
+  return row.unitLabel === "per_unit" && row.followsUnitCount === true ? "" : plainNumber(row.quantity);
+}
+
 function rowValues(building: ListBuilding, row: DraftRow, withId: boolean): RowValues {
   return {
     building: building.name.trim(),
@@ -36,7 +45,7 @@ function rowValues(building: ListBuilding, row: DraftRow, withId: boolean): RowV
     yearBuilt: building.yearBuilt.trim(),
     item: row.name.trim(),
     category: row.category,
-    quantity: plainNumber(row.quantity),
+    quantity: quantityCell(row),
     countedPer: COUNTED_PER_TEXT[row.unitLabel],
     installYear: row.installYear.trim(),
     guess: row.installYearIsGuess ? YES : "",

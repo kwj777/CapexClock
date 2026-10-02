@@ -22,7 +22,7 @@ export const metadata: Metadata = pageMetadata({
   path: "/pricing",
 });
 
-// Baked in at build time. An offer without a link says it isn't on sale yet.
+// Baked in at build time. An offer without a link says it isn't on sale right now.
 const LINKS = presaleLinksFromEnv();
 
 // Plain text, so the FAQPage data below says exactly what the page shows.
@@ -173,7 +173,10 @@ function Plan({ name, price, summary, children }: { name: string; price: string;
   );
 }
 
-/** Buy now with the price note, or "not on sale yet" while the offer's link isn't set. */
+/**
+ * Buy now with the price note, or "not on sale right now" while the offer's link
+ * isn't set: before sales start, and after it sells out or sales are paused.
+ */
 function Buy({ offer }: { offer: Offer }) {
   const buyLink = LINKS.offers[offer];
   if (buyLink) {
@@ -187,7 +190,7 @@ function Buy({ offer }: { offer: Offer }) {
     <div className="mt-6 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
       <p className="font-medium text-slate-900 dark:text-white">{OFFER_TEXT[offer].priceNote}</p>
       <p className="mt-1">
-        Not on sale yet.{" "}
+        Not on sale right now.{" "}
         <Link href="/#signup" className={link}>
           Join the early access list
         </Link>{" "}

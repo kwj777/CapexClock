@@ -54,6 +54,11 @@ describe("the filled-in example", () => {
     expect(new Set(body.map((r) => r[col("Counted per")]))).toEqual(new Set(["unit", "building", "sq ft"]));
   });
 
+  it("leaves Quantity blank on the rows counted per unit, so they follow a changed Units column", () => {
+    const [quantity, counted] = ["Quantity", "Counted per"].map((h) => FORMAT_HEADINGS.indexOf(h));
+    for (const r of rows.slice(1)) expect(r[quantity] === "").toBe(r[counted] === "unit");
+  });
+
   it("matches the rows the template page shows", () => {
     expect(rows.slice(1).map((r) => r[3])).toEqual(exampleRows().map((r) => r.name));
   });
@@ -81,6 +86,15 @@ describe("the component list download", () => {
       "40 gallon\ngas",
       "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
     ]);
+  });
+
+  it("leaves Quantity blank on a row that follows the unit count, which means the unit count", () => {
+    const building = { name: "", unitCount: "12", yearBuilt: "1998" };
+    const quantity = (r: DraftRow) => table(componentListCsv(building, [r]))[1][5];
+    expect(quantity(row({ followsUnitCount: true }))).toBe("");
+    // A count the owner typed is written, even when it's the unit count.
+    expect(quantity(row({ followsUnitCount: false }))).toBe("12");
+    expect(quantity(row({ quantity: "1,400", unitLabel: "per_sq_ft", followsUnitCount: false }))).toBe("1400");
   });
 
   it("leaves the Building column blank in the public calculator, and guards formulas", () => {

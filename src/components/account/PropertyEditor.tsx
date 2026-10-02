@@ -16,6 +16,7 @@ import {
 } from "@/lib/properties/convert";
 import {
   compareSaved,
+  detailsDropped,
   DETAILS_NOT_SAVED_TEXT,
   FUNCTION_NOT_FOUND,
   SAVE_FAILURE_TEXT,
@@ -52,6 +53,9 @@ type SaveState =
 
 // These stay on screen while the owner keeps editing, until they act on them.
 const STICKY: SaveFailure[] = ["signed_out", "conflict", "deleted"];
+
+// How long after a page opens a status meant for it is set, so screen readers announce it.
+const ANNOUNCE_DELAY_MS = 500;
 
 // Set once the database turns out not to have migration 0002's version check.
 let versionCheckMissing = false;
@@ -126,9 +130,7 @@ export default function PropertyEditor({
   // A new property that just opened here after its condition and notes were dropped:
   // the kept edits hold them, and the message replaces "We brought back changes".
   const [arrivedDetailsDropped] = useState(() => propertyId !== undefined && detailsNotSavedFor === propertyId);
-  const [save, setSave] = useState<SaveState>(() =>
-    arrivedDetailsDropped ? { kind: "saved_without_details" } : { kind: "idle" },
-  );
+  const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
   const busy = useRef(false);
   const leaving = useRef(false);
@@ -198,9 +200,17 @@ export default function PropertyEditor({
     };
   }, [dirty, backupKey]);
 
-  // Said once: opening this property again later starts as usual.
+  // Said once: opening this property again later starts as usual. The message is set
+  // just after the page appears, not in its first render, because a live region reads
+  // out what changes in it, not what it starts with.
   useEffect(() => {
-    if (arrivedDetailsDropped) noteDetailsNotSaved(null);
+    if (!arrivedDetailsDropped) return;
+    noteDetailsNotSaved(null);
+    const timer = window.setTimeout(
+      () => setSave((s) => (s.kind === "idle" ? { kind: "saved_without_details" } : s)),
+      ANNOUNCE_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
   }, [arrivedDetailsDropped]);
 
   useEffect(() => {
@@ -370,8 +380,9 @@ export default function PropertyEditor({
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
     } else {
       const match = compareSaved(input, back.property, back.components);
-      if (match === "different") {
-        // Another tab or device saved right after this one.
+      const lastSaved = toSaveInput(saved.name, saved.draft, currentYear, id);
+      if (match === "different" || (match === "without_details" && !detailsDropped(lastSaved, back.components))) {
+        // Another tab or device saved right after this one, maybe only condition or notes.
         setSave({ kind: "failed", failure: "conflict" });
         return;
       }

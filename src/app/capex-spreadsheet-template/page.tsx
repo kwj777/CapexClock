@@ -96,7 +96,8 @@ export default async function SpreadsheetTemplatePage() {
             </p>
             <div
               role="region"
-              aria-labelledby="example-heading"
+              // Its own name, not the section's again, so the two regions can be told apart.
+              aria-label="Example rows (scrolls sideways)"
               tabIndex={0}
               className="mt-5 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
             >
@@ -116,7 +117,14 @@ export default async function SpreadsheetTemplatePage() {
                       <th scope="row" className={`${cellClass} font-medium text-slate-950 dark:text-white`}>
                         {r.name}
                       </th>
-                      <td className={`${cellClass} tabular-nums`}>{Number(r.quantity).toLocaleString("en-US")}</td>
+                      <td className={`${cellClass} tabular-nums`}>
+                        {r.unitLabel === "per_unit" && r.followsUnitCount ? (
+                          // Blank in the download too: blank means the unit count, and follows it.
+                          <span className="text-slate-500 dark:text-slate-400">Blank: one per unit</span>
+                        ) : (
+                          Number(r.quantity).toLocaleString("en-US")
+                        )}
+                      </td>
                       <td className={cellClass}>{COUNTED_PER_TEXT[r.unitLabel]}</td>
                       <td className={`${cellClass} tabular-nums`}>
                         {r.installYear}
