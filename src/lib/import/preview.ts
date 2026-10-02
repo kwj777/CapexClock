@@ -248,7 +248,6 @@ const ABSENT = /^(?:no|n|none|n\/a|na|not present|-+|–|—|0)$/i;
 const PRESENT = /^(?:yes|y|x|✓|✔|present|have|has|yes - unknown)$/i;
 
 const NO_QUANTITY = "No quantity, so counted as 1";
-const FOLLOWS_UNITS = "No quantity, so used the unit count, since it's counted per unit";
 const EACH_UNIT = "One in each unit, so used the unit count";
 const COUNTED_EACH = "Kept the quantity as a count, not sq ft, so the cost is for each one";
 const COUNTED_APARTMENTS = "Counted apartments, not sq ft, so the cost is for each apartment";
@@ -536,7 +535,8 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   // One in each unit, as the calculator counts it, not 1 for the whole building: a row
   // counted per unit with the quantity left blank, as in our template, or an item the
   // library counts per unit when the owner said a column is the building's unit count.
-  // It takes the unit count of the list it goes into. Anything else counts as one.
+  // It takes the unit count of the list it goes into. Anything else counts as one. A
+  // blank quantity counted per unit is what our format asks for, so it's no change.
   const blankPerUnit = counted?.value === "per_unit" && hasRole(columns, "quantity") && cellText(quantityCell) === "";
   const inEachUnit = ctx.unitsColumn !== null && !counted?.value && !quantityGiven && record.row.unitLabel === "per_unit";
   if ((blankPerUnit || inEachUnit) && quantityFix === undefined && !squareFeet) {
@@ -544,7 +544,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     record.quantity = null;
     record.row.quantity = "";
     record.row.followsUnitCount = true;
-    record.changes = record.changes.map((c) => (c === NO_QUANTITY ? FOLLOWS_UNITS : c));
+    record.changes = record.changes.filter((c) => c !== NO_QUANTITY);
     if (inEachUnit && ctx.unitsColumn !== null) {
       // A total is divided by the sheet's unit count, and one that disagrees is flagged.
       const units = readQuantity(row[ctx.unitsColumn]).value;

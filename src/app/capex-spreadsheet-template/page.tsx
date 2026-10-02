@@ -116,7 +116,14 @@ export default async function SpreadsheetTemplatePage() {
                       <th scope="row" className={`${cellClass} font-medium text-slate-950 dark:text-white`}>
                         {r.name}
                       </th>
-                      <td className={`${cellClass} tabular-nums`}>{Number(r.quantity).toLocaleString("en-US")}</td>
+                      <td className={`${cellClass} tabular-nums`}>
+                        {r.unitLabel === "per_unit" && r.followsUnitCount ? (
+                          // Blank in the download too: blank means the unit count, and follows it.
+                          <span className="text-slate-500 dark:text-slate-400">Blank: one per unit</span>
+                        ) : (
+                          Number(r.quantity).toLocaleString("en-US")
+                        )}
+                      </td>
                       <td className={cellClass}>{COUNTED_PER_TEXT[r.unitLabel]}</td>
                       <td className={`${cellClass} tabular-nums`}>
                         {r.installYear}
