@@ -497,4 +497,18 @@ describe("a Units column beside the building's name or year built", () => {
   it("is left to the usual rules otherwise", () => {
     expect(guessColumns(["Item", "Units", "Qty"], match, "rows")).toEqual(["item", "ignore", "quantity"]);
   });
+
+  it("is left out when it holds units of measure, not a number of units", () => {
+    const heads = ["Item", "Qty", "Units", "Year built", "Year installed", "Cost"];
+    const grid = [
+      heads,
+      ["Carpet", "900", "sf", "1998", "2015", "4"],
+      ["Window", "40", "ea", "1998", "2010", "450"],
+    ];
+    const roles = guessColumns(heads, match, "rows", columnValues(grid, 0));
+    expect(roles).toEqual(["item", "quantity", "ignore", "yearBuilt", "installYear", "cost"]);
+    // "12 units" and "12" both read as a unit count.
+    const counted = [heads, ["Carpet", "900", "12 units", "1998", "2015", "4"], ["Window", "40", "12", "1998", "2010", "450"]];
+    expect(guessColumns(heads, match, "rows", columnValues(counted, 0))[2]).toBe("unitCount");
+  });
 });

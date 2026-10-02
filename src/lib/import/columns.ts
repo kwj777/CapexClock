@@ -1,7 +1,7 @@
 import { formatField, isCapexClockFormat } from "./format";
 import type { NameMatcher } from "./names";
 import { cellText, isBlankRow, words, type Grid } from "./text";
-import { isYesNo } from "./values";
+import { isYesNo, readUnitCount } from "./values";
 
 /** What a column holds. */
 export type FieldKind =
@@ -534,9 +534,14 @@ export function guessColumns(
     });
     if (at >= 0) roles[at] = "quantity";
   }
-  // Beside a quantity column and the building's name or year built, "Units" is the building's unit count.
+  // Beside a quantity column and the building's name or year built, "Units" is the
+  // building's unit count when its cells read as one ("12", "12 units"). One that
+  // holds units of measure ("sf", "ea") is left out.
   if (roles.includes("quantity") && !roles.includes("unitCount") && (roles.includes("building") || roles.includes("yearBuilt"))) {
-    const at = heads.findIndex((h, i) => roles[i] === "ignore" && doubtfulQuantity(h) === "units");
+    const at = heads.findIndex((h, i) => {
+      if (roles[i] !== "ignore" || doubtfulQuantity(h) !== "units") return false;
+      return values(i).every((v) => readUnitCount(v).value !== null);
+    });
     if (at >= 0) roles[at] = "unitCount";
   }
   if (!roles.includes("item")) {
