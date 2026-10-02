@@ -21,10 +21,13 @@ import {
   MAX_PROPERTIES,
   NO_NAME_TEXT,
   NO_UNITS_TEXT,
-  planProperty,
+  planProperties,
   plannedProblems,
   plannedSave,
+  portfolioSummary,
   propertyFieldProblems,
+  propertyNameKey,
+  startingPicks,
   withEdits,
   type CreateResult,
   type PlannedProperty,
@@ -32,7 +35,7 @@ import {
 } from "@/lib/import/buildings";
 import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
-import { buildPreview, type Preview } from "@/lib/import/preview";
+import { buildPreview, type ImportChoices, type Preview } from "@/lib/import/preview";
 import { failedReason, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
 import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { previewSummary } from "@/lib/import/wording";
@@ -55,8 +58,11 @@ interface TabPlan {
 
 export interface PortfolioImportProps {
   library: LibraryComponent[];
-  /** The account's properties when the panel opened, so a retry can tell a property this import made. */
-  propertyIds: readonly string[];
+  /**
+   * The account's properties when the panel opened: a retry can tell a property this
+   * import made, and buildings already here by name start unticked.
+   */
+  existing: readonly { id: string; name: string }[];
   onClose: () => void;
   id: string;
 }
@@ -68,7 +74,7 @@ export interface PortfolioImportProps {
  * save_property. Ones that fail can be sent again on their own. The sheet is read
  * in this browser; only the properties are saved.
  */
-export default function PortfolioImport({ library, propertyIds, onClose, id }: PortfolioImportProps) {
+export default function PortfolioImport({ library, existing, onClose, id }: PortfolioImportProps) {
   const router = useRouter();
   const baseId = useId();
   const headingId = `${baseId}-heading`;
@@ -81,6 +87,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const [sheets, setSheets] = useState<Record<number, SheetState>>({});
   const [reviewTab, setReviewTab] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(false);
+  // The read whose plan has been looked at, to open the review once if anything needs the owner.
+  const [checkedRead, setCheckedRead] = useState<SourceRead | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [problem, setProblem] = useState<Problem | null>(null);
   const [edits, setEdits] = useState<Record<string, PropertyEdits>>({});
   const [included, setIncluded] = useState<Record<string, boolean>>({});
@@ -88,10 +97,17 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
   const [showProblems, setShowProblems] = useState(false);
-  const known = useRef(new Set(propertyIds));
+  const known = useRef(new Set(existing.map((p) => p.id)));
+  // Names as they were when the panel opened: ones made here don't untick themselves.
+  const [existingNames] = useState(() => new Set(existing.map((p) => propertyNameKey(p.name))));
   const previewed = useRef<SourceRead | null>(null);
+  // Sends import_completed once, when the first property of this import is created.
+  const completed = useRef(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
   const [runs, setRuns] = useState(0);
+  // Each tab's preview, kept while its choices stay the same, so changing one tab
+  // doesn't read the others again.
+  const [previews] = useState(() => new WeakMap<ImportChoices, Preview>());
 
   const started = Object.keys(results).length > 0;
   const tabRows = useMemo(() => tabRowCounts(tabs, library, match, currentYear), [tabs, library, match, currentYear]);
@@ -104,33 +120,63 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
       const opened = tabs[t];
       const state = sheets[t];
       if (typeof opened !== "object" || !state) return [];
-      const all = buildPreview(opened.sheet, { ...state.choices, building: null }, library, match, currentYear);
-      const { buildings } = all;
-      const properties =
-        buildings.length <= 1
-          ? buildings.map((b) => planProperty(t, b, all.rows.map((r) => r.row), names(t)))
-          : buildings.map((b) => {
-              const one = buildPreview(opened.sheet, { ...state.choices, building: b.key }, library, match, currentYear);
-              return planProperty(t, b, one.rows.map((r) => r.row), names(t));
-            });
-      return [{ tab: t, preview: all, properties }];
+      // Every building's rows, read once and split by building.
+      let all = previews.get(state.choices);
+      if (!all) {
+        all = buildPreview(opened.sheet, { ...state.choices, building: null }, library, match, currentYear);
+        previews.set(state.choices, all);
+      }
+      return [{ tab: t, preview: all, properties: planProperties(t, all, names(t)) }];
     });
-  }, [read, ticked, tabs, sheets, library, match, currentYear]);
+  }, [read, ticked, tabs, sheets, library, match, currentYear, previews]);
 
   const planned = useMemo(() => plans.flatMap((p) => p.properties.map((property) => withEdits(property, edits[property.id]))), [plans, edits]);
-  const isIncluded = (p: PlannedProperty, index: number) => included[p.id] ?? index < MAX_PROPERTIES;
-  const chosen = planned.filter((p, i) => isIncluded(p, i));
+  // The first 20 not already in My properties, by the names the sheet gives.
+  const picks = useMemo(() => startingPicks(plans.flatMap((p) => p.properties), existingNames), [plans, existingNames]);
+  const isIncluded = (p: PlannedProperty) => included[p.id] ?? picks.has(p.id);
+  const chosen = planned.filter((p) => isIncluded(p));
   const problems = useMemo(() => new Map(planned.map((p) => [p.id, plannedProblems(p, currentYear)])), [planned, currentYear]);
-  const toCreate = chosen.filter((p) => results[p.id]?.status !== "created");
+  // Ticked and not sent yet; ticked and sent but not saved.
+  const pending = chosen.filter((p) => results[p.id] === undefined);
   const failed = chosen.filter((p) => results[p.id]?.status === "failed");
   const sheetYearBad = plans.some((p) => p.preview.usesSheetYear && sheets[p.tab]?.choices.sheetYear === null);
-  const blocked = toCreate.some((p) => (problems.get(p.id) ?? []).length > 0) || sheetYearBad;
+  const blockedFor = (list: readonly PlannedProperty[]) => list.some((p) => (problems.get(p.id) ?? []).length > 0) || sheetYearBad;
   const fromDownload = plans.some((p) => p.preview.idColumn);
   const review = plans.find((p) => p.tab === reviewTab) ?? plans[0];
+
+  /** The first tab with a ticked property whose rows wait on the owner, or with no year for the sheet. */
+  function waitingTab(list: readonly PlannedProperty[]): number | undefined {
+    const waiting = list.find((p) => p.waiting.length > 0);
+    if (waiting) return waiting.tab;
+    return plans.find((p) => p.preview.usesSheetYear && sheets[p.tab]?.choices.sheetYear === null)?.tab;
+  }
+
+  // Once a sheet is read, the review opens by itself if anything in it needs the owner,
+  // so no question is left unseen under a closed section.
+  if (read && checkedRead !== read && plans.length > 0) {
+    setCheckedRead(read);
+    const tab = waitingTab(pending);
+    if (tab !== undefined) {
+      setReviewTab(tab);
+      setReviewOpen(true);
+    }
+  }
 
   useEffect(() => {
     if (runs > 0) resultRef.current?.focus();
   }, [runs]);
+
+  // Screen readers hear what will be created once the plan settles (after reading the
+  // sheet, ticking a tab or changing a column or answer), not on every key press.
+  const planSummary = read && !started && !running ? portfolioSummary(pending) : "";
+  useEffect(() => {
+    if (!planSummary) return;
+    const timer = window.setTimeout(
+      () => setAnnouncement((current) => (current === planSummary ? `${planSummary}\u00a0` : planSummary)),
+      600,
+    );
+    return () => window.clearTimeout(timer);
+  }, [planSummary, plans]);
 
   // Counts only: never names or anything from the sheet.
   useEffect(() => {
@@ -245,10 +291,16 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
 
   async function create(retry: boolean) {
     if (running) return;
-    const send = retry ? failed : toCreate;
-    if (send.length === 0) return;
-    if (blocked) {
+    const send = retry ? failed : pending;
+    if (send.length === 0 || send.length > MAX_PROPERTIES) return;
+    if (blockedFor(send)) {
       setShowProblems(true);
+      // The questions and rows that need the owner are under the review, so it opens.
+      const tab = waitingTab(send);
+      if (tab !== undefined) {
+        setReviewTab(tab);
+        setReviewOpen(true);
+      }
       return;
     }
     setRunning(true);
@@ -272,15 +324,21 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
       },
     );
     const created = run.filter((r) => r.status === "created");
-    // A retry finishes the same import again, so it has its own event and the
-    // import finish rate (import_completed ÷ import_started) counts each import once.
-    void track(retry ? "import_retried" : "import_completed", {
+    const counts = {
       rows_added: created.reduce((n, r) => n + (r.status === "created" ? r.components : 0), 0),
       properties_created: created.length,
       properties_failed: run.length - created.length,
       source: read?.source ?? "file",
       where: "portfolio",
-    });
+    } as const;
+    // The import finish rate (import_completed ÷ import_started) counts an import once,
+    // when its first property is created: on Create, or on a later Retry failed or
+    // Create once the first try saved none. Every retry also sends import_retried.
+    if (created.length > 0 && !completed.current) {
+      completed.current = true;
+      void track("import_completed", { ...counts, retry });
+    }
+    if (retry) void track("import_retried", counts);
     setProgress("");
     setRunning(false);
     // The button clicked is gone or disabled, so focus goes to what happened, once it's shown.
@@ -292,6 +350,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
   const summary = createSummary(allResults);
   const usable = tabs.filter((t) => typeof t === "object").length;
   const anyHidden = read?.tabs.some((t) => t.hidden) ?? false;
+  const unpicked = plans.flatMap((p) => p.properties).filter((p) => existingNames.has(propertyNameKey(p.name))).length;
 
   return (
     <section
@@ -299,6 +358,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
       aria-labelledby={headingId}
       className="ph-no-capture mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-950/40"
     >
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 id={headingId} className="text-lg font-semibold text-slate-950 dark:text-white">
           Import properties from a spreadsheet
@@ -432,8 +494,16 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
             )}
             {planned.length > MAX_PROPERTIES && (
               <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
-                This sheet has {planned.length} buildings. You can create up to {MAX_PROPERTIES} at once, so the first{" "}
-                {MAX_PROPERTIES} are ticked. Import the file again for the rest.
+                This sheet has {planned.length} buildings. You can create up to {MAX_PROPERTIES} at a time, so{" "}
+                {picks.size === MAX_PROPERTIES ? `the first ${MAX_PROPERTIES}` : picks.size} are ticked. Once they&apos;re
+                created, tick the rest here and create those too.
+              </p>
+            )}
+            {unpicked > 0 && (
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {unpicked === 1
+                  ? "One of these has the same name as a property you already have, so it starts unticked. Tick it to make it again."
+                  : `${unpicked} of these have the same names as properties you already have, so they start unticked. Tick any you want to make again.`}
               </p>
             )}
             <ol className="mt-3 space-y-3">
@@ -441,7 +511,8 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 const result = results[p.id];
                 const created = result?.status === "created";
                 const lines = problems.get(p.id) ?? [];
-                const on = isIncluded(p, i);
+                const on = isIncluded(p);
+                const twin = !created && existingNames.has(propertyNameKey(p.name));
                 const showLines = on && !created && lines.length > 0 && (showProblems || lines.some((l) => l !== NO_UNITS_TEXT && l !== NO_NAME_TEXT));
                 const problemId = `${baseId}-${i}-problems`;
                 const field = (name: keyof PropertyEdits) => `${baseId}-${i}-${name}`;
@@ -460,7 +531,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                         <input
                           type="checkbox"
                           checked={on}
-                          disabled={created || running || (started && !on)}
+                          disabled={created || running}
                           aria-label={`Create this property: ${p.name.trim() || "no name yet"}`}
                           onChange={(e) => setIncluded((s) => ({ ...s, [p.id]: e.target.checked }))}
                           className="h-4 w-4 accent-amber-500"
@@ -523,6 +594,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                       {p.rows.length} {p.rows.length === 1 ? "component" : "components"}
                       {plans.length > 1 || (read.source === "xlsx" && read.tabs.length > 1) ? `, from the ${read.tabs[p.tab]?.name} tab` : ""}
                     </p>
+                    {twin && (
+                      <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">You already have a property with this name.</p>
+                    )}
                     {p.notes.map((n) => (
                       <p key={n} className="mt-1 text-sm text-amber-800 dark:text-amber-300">
                         {n}
@@ -562,7 +636,7 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 Fix the year the sheet was last updated (under Check the columns and rows) to create these.
               </p>
             )}
-            {showProblems && blocked && (
+            {showProblems && (blockedFor(pending) || blockedFor(failed)) && (
               <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">
                 Some properties need something fixed first. It&apos;s listed under each one.
               </p>
@@ -579,17 +653,17 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
               {running ? "" : summary}
             </p>
             <div className="flex flex-wrap gap-3">
-              {toCreate.length > 0 && !started && (
+              {pending.length > 0 && (
                 <button
                   type="button"
                   onClick={() => void create(false)}
-                  disabled={running || chosen.length > MAX_PROPERTIES}
+                  disabled={running || pending.length > MAX_PROPERTIES}
                   className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {createLabel(toCreate.length)}
+                  {createLabel(pending.length)}
                 </button>
               )}
-              {started && failed.length > 0 && (
+              {failed.length > 0 && (
                 <button
                   type="button"
                   onClick={() => void create(true)}
@@ -603,9 +677,9 @@ export default function PortfolioImport({ library, propertyIds, onClose, id }: P
                 {started && failed.length === 0 ? "Done" : "Cancel"}
               </button>
             </div>
-            {chosen.length > MAX_PROPERTIES && (
+            {pending.length > MAX_PROPERTIES && (
               <p className="text-sm text-amber-800 dark:text-amber-300">
-                Untick {chosen.length - MAX_PROPERTIES} to create {MAX_PROPERTIES} now.
+                Untick {pending.length - MAX_PROPERTIES} to create {MAX_PROPERTIES} now.
               </p>
             )}
           </div>
