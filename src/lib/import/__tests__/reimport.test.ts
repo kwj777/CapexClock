@@ -8,6 +8,7 @@ import {
   importSummary,
   listNote,
   listNotes,
+  listsMissing,
   planImport,
   planSummary,
   removeText,
@@ -183,9 +184,15 @@ describe("planning an import against the list", () => {
     expect(listNote(plan, `p${next}`)).toBeNull();
   });
 
-  it("names a few of the rows it would remove", () => {
+  it("names the rows it would remove, or points to the list of them all", () => {
     expect(removeText([{ name: "Boiler" }])).toBe("Remove Boiler from my list");
-    expect(removeText(["A", "B", "C", "D", "E"].map((name) => ({ name })))).toBe("Remove A, B, C and 2 more from my list");
+    const four = ["A", "B", "C", "D"].map((name) => ({ name }));
+    expect(removeText(four)).toBe("Remove A, B, C and D from my list");
+    expect(listsMissing(four)).toBe(false);
+    // Past four, every row is listed above the choice, so none is removed unseen.
+    const ten = "ABCDEFGHIJ".split("").map((name) => ({ name }));
+    expect(removeText(ten)).toBe("Remove these 10 rows from my list");
+    expect(listsMissing(ten)).toBe(true);
   });
 });
 

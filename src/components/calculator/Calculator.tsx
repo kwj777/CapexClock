@@ -33,13 +33,16 @@ import {
   editRow,
   exampleDraft,
   EMPTY_DRAFT,
+  clearImportUndo,
   hasEntries,
+  importReplaces,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
   loadDraft,
   MAX_NOTES_LENGTH,
   neighborRowId,
   notesLeftText,
   parseUnitCount,
+  peekImportUndo,
   problemFields,
   problemText,
   rowFromLibrary,
@@ -102,8 +105,16 @@ export default function Calculator({
   library?: LibraryComponent[];
 }) {
   // Rendered client-only (see CalculatorLoader), so browser APIs are safe here.
-  const [draft, setDraft] = useState<Draft>(loadDraft);
+  // An import on the template page that changed the list leaves a copy to undo.
+  const [start] = useState(() => {
+    const loaded = loadDraft();
+    const before = peekImportUndo(loaded, new Date().getFullYear());
+    return { draft: loaded, undo: before ? { before, after: loaded, action: "import" as const } : null };
+  });
+  const [draft, setDraft] = useState<Draft>(start.draft);
   useEffect(() => saveDraft(draft), [draft]);
+  // Offered once: a reload or a later visit doesn't offer it again.
+  useEffect(() => clearImportUndo(), []);
   // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
@@ -121,6 +132,7 @@ export default function Calculator({
       trackEvents
       showExample
       accountsEnabled={accountsEnabled}
+      initialUndo={start.undo}
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount /> : null}
     />
   );
@@ -167,6 +179,15 @@ export interface CalculatorViewProps {
    * with the fields they're about (marked invalid and pointed at the note).
    */
   rowNotes?: Record<string, RowNote>;
+  /** An undo to offer from the start: an import on the template page that changed the list. */
+  initialUndo?: Undo | null;
+}
+
+/** What Load an example, Clear or an import replaced, and the list it left. */
+interface Undo {
+  before: Draft;
+  after: Draft;
+  action: "clear" | "example" | "import";
 }
 
 /** A note shown under a row, and the row's fields it's about. */
@@ -188,6 +209,7 @@ export function CalculatorView({
   accountsEnabled = false,
   library = COMPONENT_LIBRARY,
   rowNotes,
+  initialUndo = null,
 }: CalculatorViewProps) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
   const libraryGroups = useMemo(() => groupByCategory(library), [library]);
@@ -204,7 +226,7 @@ export function CalculatorView({
   const [editingYearBuilt, setEditingYearBuilt] = useState(false);
   const [picked, setPicked] = useState("");
   // What Load an example, Clear or an import replaced, offered back until the next edit.
-  const [undo, setUndo] = useState<{ before: Draft; after: Draft; action: "clear" | "example" | "import" } | null>(null);
+  const [undo, setUndo] = useState<Undo | null>(initialUndo);
   const [announcement, setAnnouncement] = useState("");
   const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
@@ -278,8 +300,7 @@ export function CalculatorView({
    */
   function applyImport(change: DraftImport, said: string) {
     const next = withImport(draft, change);
-    const replaces =
-      change.update.length > 0 || change.remove.length > 0 || change.unitCount !== undefined || change.yearBuilt !== undefined;
+    const replaces = importReplaces(change);
     setUndo(replaces ? { before: draft, after: next, action: "import" } : null);
     setDraft(next);
     setImporting(false);

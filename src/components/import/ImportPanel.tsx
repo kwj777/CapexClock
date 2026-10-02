@@ -16,6 +16,7 @@ import {
   importSummary,
   knownRows,
   listNotes,
+  listsMissing,
   planImport,
   planSummary,
   removeText,
@@ -320,6 +321,15 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
                 {summaryLines.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
+                {listsMissing(plan.missing) && (
+                  <ul aria-label="Rows not in this file" className="mt-1 list-disc pl-5 sm:columns-2 sm:gap-6">
+                    {plan.missing.map((m) => (
+                      <li key={m.id} className="break-inside-avoid wrap-anywhere">
+                        {m.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {plan.missing.length > 0 && (
                   <>
                     <label className="mt-2 flex items-start gap-2 font-medium wrap-anywhere">

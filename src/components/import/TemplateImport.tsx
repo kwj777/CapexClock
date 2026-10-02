@@ -3,7 +3,15 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
-import { loadDraft, saveDraft, withImport, type Draft, type DraftImport } from "@/components/calculator/draft";
+import {
+  importReplaces,
+  loadDraft,
+  saveDraft,
+  saveImportUndo,
+  withImport,
+  type Draft,
+  type DraftImport,
+} from "@/components/calculator/draft";
 import type { LibraryComponent } from "@/lib/library/components";
 
 // The importer (and the readers it loads) only once the owner opens it.
@@ -14,7 +22,8 @@ const ImportPanel = dynamic(() => import("./ImportPanel"), {
 
 /**
  * The template page's import box. Rows go into the free calculator's list in this
- * browser, after any already there, and the owner is taken to the calculator.
+ * browser, after any already there, and the owner is taken to the calculator,
+ * which offers Undo when the import changed or removed rows.
  */
 export default function TemplateImport({
   library,
@@ -41,8 +50,13 @@ export default function TemplateImport({
 
   function apply(change: DraftImport, said: string) {
     // Read again, in case the calculator changed in another tab meanwhile.
-    saveDraft(withImport(loadDraft(), change));
-    setStatus(`${said} Opening the calculator…`);
+    const before = loadDraft();
+    const after = withImport(before, change);
+    saveDraft(after);
+    // Changed or removed rows can be undone in the calculator, as after its own imports.
+    const replaces = importReplaces(change);
+    if (replaces) saveImportUndo(before, after);
+    setStatus(`${said} Opening the calculator${replaces ? ", where you can undo it" : ""}…`);
     router.push("/capex-calculator");
   }
 

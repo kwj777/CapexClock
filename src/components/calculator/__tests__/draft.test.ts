@@ -9,6 +9,8 @@ import {
   EMPTY_DRAFT,
   exampleDraft,
   hasEntries,
+  importReplaces,
+  importUndoFor,
   neighborRowId,
   notesLeftText,
   parseUnitCount,
@@ -607,5 +609,33 @@ describe("importing a component list download", () => {
     const followed = draft.rows.filter((r) => r.followsUnitCount).map((r) => r.id);
     expect(followed.length).toBeGreaterThan(0);
     for (const id of followed) expect(next.rows.find((r) => r.id === id)?.quantity).toBe("14");
+  });
+});
+
+describe("undoing an import from the template page", () => {
+  const draft = exampleDraft();
+  const gone = draft.rows[0].id;
+  const after = withImport(draft, { add: [], update: [], remove: [gone] });
+  // As kept in storage and read back.
+  const kept = JSON.parse(JSON.stringify({ before: draft, after })) as unknown;
+
+  it("is kept only for an import that changes or removes rows, or the building's details", () => {
+    expect(importReplaces({ add: [], update: [], remove: [gone] })).toBe(true);
+    expect(importReplaces({ add: [], update: [{ id: gone, row: {} as ImportedRow }], remove: [] })).toBe(true);
+    expect(importReplaces({ add: [], update: [], remove: [], unitCount: "14" })).toBe(true);
+    expect(importReplaces({ add: [{} as ImportedRow], update: [], remove: [] })).toBe(false);
+  });
+
+  it("brings back the list as it was while the list is what the import left", () => {
+    const back = importUndoFor(kept, after, 2026);
+    expect(back?.rows.map((r) => r.id)).toEqual(draft.rows.map((r) => r.id));
+    expect(back?.unitCount).toBe(draft.unitCount);
+  });
+
+  it("isn't offered once the list has changed since, or for a damaged copy", () => {
+    expect(importUndoFor(kept, withUnitCount(after, "20"), 2026)).toBeNull();
+    expect(importUndoFor(kept, draft, 2026)).toBeNull();
+    expect(importUndoFor({ before: "x", after }, after, 2026)).toBeNull();
+    expect(importUndoFor(null, after, 2026)).toBeNull();
   });
 });

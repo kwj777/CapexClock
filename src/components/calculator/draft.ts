@@ -71,6 +71,54 @@ export function saveDraft(draft: Draft): void {
   }
 }
 
+/**
+ * The list before an import on the template page changed it, kept for this tab
+ * only, so the calculator it opens can offer Undo as it does after its own imports.
+ */
+export const IMPORT_UNDO_KEY = "capexclock:calculator:import-undo:v1";
+
+export function saveImportUndo(before: Draft, after: Draft): void {
+  try {
+    window.sessionStorage.setItem(IMPORT_UNDO_KEY, JSON.stringify({ before, after }));
+  } catch {
+    // Storage blocked: the import still works, without an undo.
+  }
+}
+
+/** The kept list, if `current` is still what the import left; read without removing it. */
+export function peekImportUndo(current: Draft, currentYear: number): Draft | null {
+  try {
+    const raw = window.sessionStorage.getItem(IMPORT_UNDO_KEY);
+    return raw ? importUndoFor(JSON.parse(raw), current, currentYear) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearImportUndo(): void {
+  try {
+    window.sessionStorage.removeItem(IMPORT_UNDO_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+function sameEntries(a: Draft, b: Draft): boolean {
+  const entries = (d: Draft) => JSON.stringify([d.unitCount, d.yearBuilt, d.rows]);
+  return entries(a) === entries(b);
+}
+
+/**
+ * The list to bring back from a kept copy: its "before", when its "after" is still
+ * the list (nothing changed it since, in this tab or another). Null otherwise.
+ */
+export function importUndoFor(stored: unknown, current: Draft, currentYear: number): Draft | null {
+  if (typeof stored !== "object" || stored === null) return null;
+  const { before, after } = stored as Record<string, unknown>;
+  if (!isDraft(before) || !isDraft(after)) return null;
+  return sameEntries(upgradeDraft(after, currentYear), current) ? upgradeDraft(before, currentYear) : null;
+}
+
 function isDraft(value: unknown): value is Draft {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -290,6 +338,14 @@ export interface DraftImport {
  * (in place, keeping their ids), then the removals, then the new rows after the
  * rest. Rows from the sheet take its quantities, as importedQuantity says.
  */
+/**
+ * The import changes or removes rows, or the building's details, so it replaces
+ * something and can be undone. One that only adds rows can't lose anything.
+ */
+export function importReplaces(change: DraftImport): boolean {
+  return change.update.length > 0 || change.remove.length > 0 || change.unitCount !== undefined || change.yearBuilt !== undefined;
+}
+
 export function withImport(draft: Draft, change: DraftImport): Draft {
   let next = change.unitCount !== undefined ? withUnitCount(draft, change.unitCount) : draft;
   if (change.yearBuilt !== undefined) next = { ...next, yearBuilt: change.yearBuilt };

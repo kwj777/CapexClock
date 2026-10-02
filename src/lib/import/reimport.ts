@@ -210,11 +210,21 @@ export function importSummary(counts: Preview["counts"], plan: ImportPlan, remov
   return `${lines.join(" ")}${skippedText(counts)}`;
 }
 
-/** The choice to remove rows the file doesn't have: "Remove Boiler, Carpet and 1 more from my list". */
+/** Most rows the remove choice names itself; past this, every one is listed above it. */
+export const MISSING_NAMED = 4;
+
+/** Every row the file doesn't have is listed above the remove choice, so none is removed unseen. */
+export function listsMissing(missing: readonly unknown[]): boolean {
+  return missing.length > MISSING_NAMED;
+}
+
+/**
+ * The choice to remove rows the file doesn't have: "Remove Boiler and Carpet from
+ * my list", or "Remove these 7 rows from my list" under a list of all 7.
+ */
 export function removeText(missing: readonly { name: string }[]): string {
-  const names = missing.map((m) => m.name);
-  const shownNames = names.length > 4 ? [...names.slice(0, 3), `${names.length - 3} more`] : names;
-  return `Remove ${listText(shownNames)} from my list`;
+  if (listsMissing(missing)) return `Remove these ${plural(missing.length, "row")} from my list`;
+  return `Remove ${listText(missing.map((m) => m.name))} from my list`;
 }
 
 /** What one preview row does to the list, said under it; null when there's nothing to say. */
