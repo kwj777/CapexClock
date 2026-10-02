@@ -1,12 +1,16 @@
 import {
   readAge,
   readCondition,
+  readCountedPer,
   readInstallYear,
   readLife,
   readMoney,
   readQuantity,
   readRemaining,
   readReplaceBy,
+  readUnitCount,
+  readYearBuilt,
+  readYesNo,
   saysPerSqFt,
 } from "../values";
 
@@ -372,5 +376,67 @@ describe("costs per square foot", () => {
 
   it.each(["$4", "$1,400 ea", "4", 4, "", "Soft carpet", "$4 per unit"])("knows %p isn't", (cell) => {
     expect(saysPerSqFt(cell)).toBe(false);
+  });
+});
+
+describe("yes or no columns", () => {
+  it.each([
+    ["yes", true],
+    ["Y", true],
+    ["x", true],
+    ["guess", true],
+    [true, true],
+    ["", false],
+    ["no", false],
+    ["-", false],
+    [false, false],
+  ])("reads %j as %j", (cell, value) => {
+    expect(readYesNo(cell)).toEqual({ value });
+  });
+
+  it("reads anything else as no, and says so", () => {
+    expect(readYesNo("maybe")).toEqual({ value: false, note: 'Read "maybe" as no' });
+  });
+});
+
+describe("how a row is counted", () => {
+  it.each([
+    ["unit", "per_unit"],
+    ["per apartment", "per_unit"],
+    ["Building", "per_building"],
+    ["each", "per_building"],
+    ["sq ft", "per_sq_ft"],
+    ["SF", "per_sq_ft"],
+    ["square feet", "per_sq_ft"],
+  ])("reads %j", (cell, value) => {
+    expect(readCountedPer(cell)).toEqual({ value });
+  });
+
+  it("leaves a blank or unknown word to the usual way of counting the item", () => {
+    expect(readCountedPer("")).toEqual({ value: null });
+    expect(readCountedPer("per floor").value).toBeNull();
+    expect(readCountedPer("per floor").note).toMatch(/^Couldn't read "per floor"/);
+  });
+});
+
+describe("a building's unit count and year built", () => {
+  it("reads whole numbers, with or without the word units", () => {
+    expect(readUnitCount(12)).toEqual({ value: 12 });
+    expect(readUnitCount("1,200 units")).toEqual({ value: 1200 });
+    expect(readUnitCount("6 apts")).toEqual({ value: 6 });
+    expect(readUnitCount("")).toEqual({ value: null });
+  });
+
+  it("says when a unit count can't be one", () => {
+    for (const cell of ["0", "12.5", "a dozen", "200000"]) expect(readUnitCount(cell).problem).toMatch(/as a number of units\.$/);
+  });
+
+  it("reads a year built from a number, text or an Excel date", () => {
+    expect(readYearBuilt(1998, NOW)).toEqual({ value: 1998, guess: false });
+    expect(readYearBuilt("approx 1985", NOW)).toMatchObject({ value: 1985, guess: true });
+    expect(readYearBuilt(new Date(Date.UTC(1962, 0, 1)), NOW)).toMatchObject({ value: 1962 });
+    expect(readYearBuilt("unknown", NOW)).toEqual({ value: null });
+    expect(readYearBuilt("1700", NOW).problem).toBe('Couldn\'t read "1700" as the year built.');
+    expect(readYearBuilt(String(NOW + 1), NOW).problem).toMatch(/as the year built/);
   });
 });

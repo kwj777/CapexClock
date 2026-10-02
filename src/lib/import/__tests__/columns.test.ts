@@ -72,11 +72,23 @@ describe("guessing a column from its heading", () => {
     ["Comments", "notes"],
     ["Model", "notes"],
     ["Category", "category"],
+    ["Year built", "yearBuilt"],
+    ["Yr. built", "yearBuilt"],
+    ["Building", "building"],
+    ["Bldg", "building"],
+    ["Property name", "building"],
+    ["Unit count", "unitCount"],
+    ["Counted per", "countedPer"],
+    ["Install year is a guess", "guess"],
+    ["Install year guess", "guess"],
+    ["Replace now", "replaceNow"],
+    ["Replace this year", "replaceNow"],
+    ["CapexClock ID", "id"],
   ])("reads %p as %p", (heading, field) => {
     expect(guessField(heading)).toBe(field);
   });
 
-  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Year built", "Warranty", "Units", "Building", "", "Whatever", "constructor", "#", "No.", "Item #", "Item no.", "Line", "Ref #", "ID"])(
+  it.each(["Tenant", "Tenant name", "Phone", "Rent", "Built-in microwave", "Warranty", "Units", "Address", "", "Whatever", "constructor", "#", "No.", "Item #", "Item no.", "Line", "Ref #", "ID"])(
     "leaves %p unguessed",
     (heading) => {
       expect(guessField(heading)).toBeNull();
@@ -399,5 +411,61 @@ describe("guessing the layout and every column", () => {
   it("shows a few different values from a column", () => {
     const grid = [["Year"], ["2014"], [""], ["2014"], ["approx 2012"], ["orig"], ["1999"]];
     expect(samples(grid, 0, 0)).toEqual(["2014", "approx 2012", "orig"]);
+  });
+});
+
+describe("CapexClock's own template and downloads", () => {
+  const heads = [
+    "Building",
+    "Units",
+    "Year built",
+    "Component",
+    "Category",
+    "Quantity",
+    "Counted per",
+    "Install year",
+    "Install year is a guess",
+    "Useful life",
+    "Cost each",
+    "Condition",
+    "Replace now",
+    "Notes",
+    "CapexClock ID",
+  ];
+
+  it("reads every heading as exactly what it says", () => {
+    expect(guessColumns(heads, match, "rows")).toEqual([
+      "building",
+      "unitCount",
+      "yearBuilt",
+      "item",
+      "category",
+      "quantity",
+      "countedPer",
+      "installYear",
+      "guess",
+      "life",
+      "cost",
+      "condition",
+      "replaceNow",
+      "notes",
+      "id",
+    ]);
+  });
+
+  it("never asks what its Units column means", () => {
+    const grid = [heads, ["", "12", "1998", "Fridge", "", "12", "unit", "2019", "", "13", "900", "", "", "", ""]];
+    expect(sameUnitsColumn(heads, guessColumns(heads, match, "rows"), columnValues(grid, 0))).toBeNull();
+  });
+});
+
+describe("a Units column beside the building's name or year built", () => {
+  it("is the building's unit count when another column is the quantity", () => {
+    expect(guessColumns(["Building", "Units", "Item", "Qty"], match, "rows")).toEqual(["building", "unitCount", "item", "quantity"]);
+    expect(guessColumns(["Year built", "Units", "Item", "Qty"], match, "rows")).toEqual(["yearBuilt", "unitCount", "item", "quantity"]);
+  });
+
+  it("is left to the usual rules otherwise", () => {
+    expect(guessColumns(["Item", "Units", "Qty"], match, "rows")).toEqual(["item", "ignore", "quantity"]);
   });
 });

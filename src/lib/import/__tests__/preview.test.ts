@@ -1,9 +1,13 @@
 import { costLabel, MAX_NOTES_LENGTH, withImportedRows } from "@/components/calculator/draft";
-import { isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
+import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { buildPreview, isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
+import { startingChoices } from "../open";
 import {
   AGE_ROWS,
   APARTMENT_ROWS,
+  CURRENT_YEAR,
   ITEM_ROWS,
+  match,
   NUMBERED_ROWS,
   open,
   preview,
@@ -669,5 +673,69 @@ describe("a Units column with the same number on every row", () => {
     expect(preview(["Item,Units,Year", "Fridge,1,2018", "Range,1,2018"].join("\n")).unitsQuestion).toBeNull();
     expect(preview(["Item,Units,Qty,Year", "Fridge,12,12,2018", "Range,12,12,2018"].join("\n")).unitsQuestion).toBeNull();
     expect(preview(["Apt,Units,Water heater installed,Furnace installed", "101,12,2014,2012"].join("\n")).unitsQuestion).toBeNull();
+  });
+});
+
+describe("a sheet in CapexClock's own columns", () => {
+  const HEADINGS =
+    "Building,Units,Year built,Component,Category,Quantity,Counted per,Install year,Install year is a guess,Useful life,Cost each,Condition,Replace now,Notes,CapexClock ID";
+  const sheet = (...rows: string[]) => [HEADINGS, ...rows].join("\r\n");
+
+  it("takes Counted per over the item's usual way of counting it", () => {
+    const p = preview(
+      sheet(
+        ",,,Tank water heater,Plumbing,1,building,2016,,10,9000,,,,",
+        ",,,Carpet,Flooring,9600,sq ft,2020,,8,4,,,,",
+        ",,,Carpet,Flooring,12,unit,2020,,8,2200,,,,",
+      ),
+    );
+    expect(p.rows.map((r) => r.row.unitLabel)).toEqual(["per_building", "per_sq_ft", "per_unit"]);
+    expect(p.rows.every((r) => r.status === "ready")).toBe(true);
+  });
+
+  it("reads the guess and replace now columns, and keeps line breaks in notes", () => {
+    const p = preview(sheet(',,,Gas furnace,HVAC,12,unit,2011,yes,18,4200,Poor,yes,"Basement\nAsk Dana",'));
+    expect(p.rows[0].row).toMatchObject({
+      installYearIsGuess: true,
+      replaceNow: true,
+      condition: "poor",
+      notes: "Basement\nAsk Dana",
+    });
+  });
+
+  it("says when a yes or no column holds something else", () => {
+    const p = preview(sheet(",,,Gas furnace,HVAC,12,unit,2011,maybe,18,4200,,soon,,"));
+    expect(p.rows[0].row).toMatchObject({ installYearIsGuess: false, replaceNow: false });
+    expect(p.rows[0].changes).toEqual([
+      `Read "maybe" as no: the install year isn't marked a guess`,
+      `Read "soon" as no, so it isn't planned for this year`,
+    ]);
+  });
+
+  it("takes off the apostrophes our downloads put before formulas", () => {
+    const p = preview(sheet(`,,,"Zorbex; '=old",Other,1,building,2010,,30,60000,,,"Line one\n'=SUM(A1)",`));
+    expect(p.rows[0].row).toMatchObject({ name: "Zorbex; =old", notes: "Line one\n=SUM(A1)" });
+  });
+
+  it("flags a row with no useful life, since the calculator can't forecast it", () => {
+    const p = preview(sheet(",,,Zorbex,Other,1,building,2010,,,6000,,,,"));
+    expect(p.rows[0].status).toBe("needs_you");
+    expect(p.rows[0].issues).toEqual([{ field: "usefulLife", text: "No useful life yet. Type how many years it lasts." }]);
+  });
+
+  it("keeps a listed row's own item when its name hasn't changed, instead of matching it again", () => {
+    const opened = open(sheet(",,,Water heater,Plumbing,12,unit,2016,,10,1400,,,,row-1"));
+    const known = new Map([["row-1", { name: "Water heater", librarySlug: null, category: "Plumbing" }]]);
+    const p = buildPreview(opened.sheet, startingChoices(opened, CURRENT_YEAR), COMPONENT_LIBRARY, match, CURRENT_YEAR, known);
+    expect(p.rows[0].row).toMatchObject({ librarySlug: null, name: "Water heater" });
+    expect(p.rows[0].capexclockId).toBe("row-1");
+    // Without the list, the same name is matched to the library's item.
+    expect(preview(sheet(",,,Water heater,Plumbing,12,unit,2016,,10,1400,,,,row-1")).rows[0].row.librarySlug).toBe("tank-water-heater");
+  });
+
+  it("never merges rows with different CapexClock IDs", () => {
+    const row = (id: string) => `,,,Refrigerator,Appliances,1,unit,2019,,13,900,,,,${id}`;
+    expect(preview(sheet(row("a"), row("b"))).rows).toHaveLength(2);
+    expect(preview(sheet(row(""), row(""))).rows).toHaveLength(1);
   });
 });

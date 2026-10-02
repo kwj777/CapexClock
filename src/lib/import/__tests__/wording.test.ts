@@ -27,6 +27,7 @@ const row = (overrides: Partial<ImportedRow> = {}): ImportedRow => ({
   costEach: "1400",
   condition: null,
   notes: "",
+  replaceNow: false,
   ...overrides,
 });
 
@@ -38,6 +39,8 @@ const previewRow = (id: string, overrides: Partial<ImportedRow> = {}): PreviewRo
   row: row(overrides),
   changes: [],
   issues: [],
+  building: "",
+  capexclockId: null,
   question: null,
   lifeIsTypical: false,
 });
@@ -135,6 +138,8 @@ describe("import wording", () => {
       noYearColumn: false,
       doubtfulYears: [],
       withoutCost: 0,
+      buildings: [],
+      idColumn: false,
       counts: { rows: 0, ready: 0, changed: 0, needsYou: 0, skipped: 0 },
     };
     expect(previewHints(base)).toEqual([]);

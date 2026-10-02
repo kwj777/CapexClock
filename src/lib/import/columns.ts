@@ -1,12 +1,16 @@
+import { formatField, isCapexClockFormat } from "./format";
 import type { NameMatcher } from "./names";
 import { cellText, isBlankRow, words, type Grid } from "./text";
 
 /** What a column holds. */
 export type FieldKind =
   | "item"
+  | "category"
   | "quantity"
+  | "countedPer"
   | "location"
   | "installYear"
+  | "guess"
   | "age"
   | "life"
   | "remaining"
@@ -14,8 +18,12 @@ export type FieldKind =
   | "cost"
   | "total"
   | "condition"
+  | "replaceNow"
   | "notes"
-  | "category";
+  | "building"
+  | "unitCount"
+  | "yearBuilt"
+  | "id";
 
 /** A column's use: a field, nothing, or (each column is a component) one library item. */
 export type ColumnRole = "ignore" | FieldKind | `component:${string}`;
@@ -29,9 +37,12 @@ export type Layout = "rows" | "columns";
 /** The choices in each column's dropdown, in order, with what the owner reads. */
 export const FIELD_TEXT: Record<FieldKind, string> = {
   item: "Item name",
+  category: "Category",
   quantity: "Quantity",
+  countedPer: "Counted per (unit, building or sq ft)",
   location: "Apartment or location",
   installYear: "Install year",
+  guess: "Install year is a guess (yes or no)",
   age: "Age in years",
   life: "Useful life",
   remaining: "Years of life left",
@@ -39,14 +50,21 @@ export const FIELD_TEXT: Record<FieldKind, string> = {
   cost: "Cost each",
   total: "Total cost",
   condition: "Condition",
+  replaceNow: "Replace now (yes or no)",
   notes: "Notes",
-  category: "Category",
+  building: "Building",
+  unitCount: "Building's unit count",
+  yearBuilt: "Year built",
+  id: "CapexClock ID",
 };
 
 export const FIELDS = Object.keys(FIELD_TEXT) as FieldKind[];
 
+/** Fields about the building, not each item: one value per building. */
+export const BUILDING_FIELDS: readonly FieldKind[] = ["building", "unitCount", "yearBuilt"];
+
 /** Fields the "each column is a component" layout reads besides the components. */
-export const COLUMN_LAYOUT_FIELDS: readonly FieldKind[] = ["location"];
+export const COLUMN_LAYOUT_FIELDS: readonly FieldKind[] = ["location", "building"];
 
 // Whole headings, after words(): checked before the keyword rules below. Null means
 // the heading is about something else (the building, a tenant), so it's left out.
@@ -83,6 +101,24 @@ const EXACT: Record<string, FieldKind | null> = {
   "rating": "condition",
   "what": "item",
   "name": "item",
+  // Our own template's headings (see format.ts), and ways of saying the same.
+  "counted per": "countedPer",
+  "counted": "countedPer",
+  "per": "countedPer",
+  "install year is a guess": "guess",
+  "guess": "guess",
+  "guessed": "guess",
+  "replace now": "replaceNow",
+  "replace this year": "replaceNow",
+  "capexclock id": "id",
+  "building": "building",
+  "building name": "building",
+  "bldg": "building",
+  "bldg name": "building",
+  "property": "building",
+  "property name": "building",
+  "unit count": "unitCount",
+  "units in building": "unitCount",
   // Row and reference numbers, not items or quantities.
   "item #": null,
   "item no": null,
@@ -95,11 +131,9 @@ const EXACT: Record<string, FieldKind | null> = {
   "ref": null,
   "ref #": null,
   "id": null,
-  // Step 5 reads these for the property itself; here they're left out.
+  // "Units" may count items or the building's units: see doubtfulQuantity. An
+  // address may be each apartment's, so it isn't read as the building.
   "units": null,
-  "building": null,
-  "bldg": null,
-  "property": null,
   "address": null,
 };
 
@@ -142,6 +176,9 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   [null, ["rent"]],
   [null, ["lease"]],
   [null, ["move"]],
+  ["yearBuilt", ["year", "built"]],
+  ["yearBuilt", ["yr", "built"]],
+  ["yearBuilt", ["date", "built"]],
   [null, ["built"]],
   [null, ["warranty"]],
   // An apartment's or the building's size isn't read, but a cost or quantity in square feet is.
@@ -159,6 +196,8 @@ const RULES: [FieldKind | null, string[], Strength?][] = [
   ["replaceBy", ["budget", "year"]],
   ["cost", ["budget"]],
   ["cost", ["$"]],
+  // "Install year guess": a yes or no next to the install year.
+  ["guess", ["guess"]],
   ["remaining", ["remaining"]],
   ["remaining", ["left"]],
   ["remaining", ["rul"]],
@@ -412,7 +451,8 @@ const PLAIN_NUMBER = /^\d[\d,]*(?:\.\d+)?$/;
 /**
  * A role for each column, from its heading. Only one column of each kind is used
  * (notes columns are all kept): the surest heading, or the first of equally sure
- * ones, so "Year installed" wins over a bare "Date". A "#", "No." or "Units" column
+ * ones, so "Year installed" wins over a bare "Date". In our own format (format.ts)
+ * every heading is read as the format says, so "Units" is the building's unit count. A "#", "No." or "Units" column
  * is the quantity only when no heading names one and its values look like counts.
  * With no item column, a "System" column holds the item names. A "Replacement year"
  * column whose years have all gone by (before `currentYear`) is read as when each
@@ -426,7 +466,11 @@ export function guessColumns(
   currentYear?: number,
 ): ColumnRole[] {
   const items = componentColumns(heads, match);
+  // Our own template and downloads: their headings mean exactly what they say.
+  const ours = layout === "rows" && isCapexClockFormat(heads);
   const guesses = heads.map((heading, i): { role: ColumnRole; rank: number } => {
+    const own = ours ? formatField(heading) : null;
+    if (own) return { role: own, rank: RANK.sure };
     const { field, strength } = guessHeading(heading);
     let role: ColumnRole;
     if (layout === "columns") {
@@ -467,6 +511,11 @@ export function guessColumns(
     });
     if (at >= 0) roles[at] = "quantity";
   }
+  // Beside a quantity column and the building's name or year built, "Units" is the building's unit count.
+  if (roles.includes("quantity") && !roles.includes("unitCount") && (roles.includes("building") || roles.includes("yearBuilt"))) {
+    const at = heads.findIndex((h, i) => roles[i] === "ignore" && doubtfulQuantity(h) === "units");
+    if (at >= 0) roles[at] = "unitCount";
+  }
   if (!roles.includes("item")) {
     const at = heads.findIndex(
       (h, i) => (roles[i] === "category" || roles[i] === "ignore") && guessField(h) === "category" && /\bsystems?\b/.test(words(h)),
@@ -495,15 +544,18 @@ export function doubtfulQuantityColumn(heads: readonly string[], columns: readon
 /**
  * A "Units" column with the same number (not 1) on every row, when no other column
  * is the quantity. It could be how many of each item there are, or the building's
- * unit count, so the preview asks which.
+ * unit count, so the preview asks which. Our own format says which, so it never asks.
  */
 export function sameUnitsColumn(
   heads: readonly string[],
   columns: readonly ColumnRole[],
   values: ColumnValues,
 ): { column: number; value: string } | null {
+  if (isCapexClockFormat(heads)) return null;
   const column = heads.findIndex(
-    (h, i) => doubtfulQuantity(h) === "units" && (columns[i] === "ignore" || columns[i] === "quantity"),
+    (h, i) =>
+      doubtfulQuantity(h) === "units" &&
+      (columns[i] === "ignore" || columns[i] === "quantity" || columns[i] === "unitCount"),
   );
   if (column < 0 || columns.some((r, i) => r === "quantity" && i !== column)) return null;
   const cells = values(column);

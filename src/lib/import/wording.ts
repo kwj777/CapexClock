@@ -20,6 +20,7 @@ export const SKIP_TEXT: Record<SkipReason, string> = {
   no_name: "no item name or numbers",
   zero_quantity: "quantity 0",
   nothing_listed: "no items listed",
+  other_building: "another building",
 };
 
 function plural(n: number, one: string, many = `${one}s`): string {

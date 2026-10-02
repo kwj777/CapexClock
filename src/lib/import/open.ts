@@ -8,6 +8,7 @@ import {
   type ColumnRole,
   type Layout,
 } from "./columns";
+import { isForecastCsv } from "./format";
 import type { NameMatcher } from "./names";
 import { dataRowCount, type ImportChoices, type Sheet } from "./preview";
 import { MAX_ROWS, type FailReason } from "./read";
@@ -30,8 +31,9 @@ export interface OpenedSheet {
 export function openSheet(grid: Grid, match: NameMatcher, currentYear: number): OpenedSheet | FailReason {
   const headerRow = findHeaderRow(grid, match);
   if (headerRow === null) return "no_header";
-  if (dataRowCount(grid, headerRow) > MAX_ROWS) return "too_big";
   const heads = headings(grid, headerRow);
+  if (isForecastCsv(heads)) return "forecast_file";
+  if (dataRowCount(grid, headerRow) > MAX_ROWS) return "too_big";
   const layout = guessLayout(heads, match);
   return {
     sheet: { grid, headerRow },

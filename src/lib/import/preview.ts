@@ -17,16 +17,20 @@ import {
   type Layout,
 } from "./columns";
 import { nameKey, type NameMatcher } from "./names";
-import { cellText, clip, columnLetter, isBlankRow, listText, quote, type Cell, type Grid } from "./text";
+import { cellLines, cellText, clip, columnLetter, isBlankRow, listText, quote, words, type Cell, type Grid } from "./text";
 import {
   readAge,
   readCondition,
+  readCountedPer,
   readInstallYear,
   readLife,
   readMoney,
   readQuantity,
   readRemaining,
   readReplaceBy,
+  readUnitCount,
+  readYearBuilt,
+  readYesNo,
   saysPerSqFt,
   type Reading,
 } from "./values";
@@ -44,6 +48,8 @@ export interface ImportedRow {
   costEach: string;
   condition: ComponentCondition | null;
   notes: string;
+  /** "Replace now" said yes: plan its replacement this year. */
+  replaceNow: boolean;
 }
 
 /** Fields the owner can fix in the preview. */
@@ -72,6 +78,10 @@ export interface PreviewRow {
   question: string | null;
   /** The useful life is the library's typical one, not the sheet's. */
   lifeIsTypical: boolean;
+  /** The building it's in: its key in Preview.buildings ("" when the sheet doesn't say). */
+  building: string;
+  /** The row's CapexClock ID, from a component list download; null when it has none. */
+  capexclockId: string | null;
 }
 
 export type SkipReason =
@@ -82,7 +92,8 @@ export type SkipReason =
   | "section"
   | "no_name"
   | "zero_quantity"
-  | "nothing_listed";
+  | "nothing_listed"
+  | "other_building";
 
 export interface Skipped {
   sheetRow: number;
@@ -96,6 +107,20 @@ export interface NameQuestion {
   text: string;
   rows: number;
   suggestions: string[];
+}
+
+/** A building the sheet names, with its unit count and year built when the sheet gives them. */
+export interface BuildingInfo {
+  /** Its name in a form that ignores case and punctuation; "" for rows that name no building. */
+  key: string;
+  /** As the sheet first writes it; "" for rows that name no building. */
+  name: string;
+  unitCount: number | null;
+  yearBuilt: number | null;
+  /** Rows of items, before identical ones are combined. */
+  records: number;
+  /** What the owner should know about its unit count or year built, e.g. two different values. */
+  notes: string[];
 }
 
 export interface Preview {
@@ -123,6 +148,13 @@ export interface Preview {
   doubtfulYears: { column: number; heading: string; role: "installYear" | "replaceBy" }[];
   /** Rows without a cost, which the forecast leaves out until one is added. */
   withoutCost: number;
+  /**
+   * Every building the sheet names, in sheet order, even when only one is shown.
+   * A sheet without a building column has one, with the key "".
+   */
+  buildings: BuildingInfo[];
+  /** The sheet has a CapexClock ID column, so it came from a component list download. */
+  idColumn: boolean;
   counts: { rows: number; ready: number; changed: number; needsYou: number; skipped: number };
 }
 
@@ -140,6 +172,15 @@ export interface ImportChoices {
   fixes: Readonly<Record<string, Partial<Record<FixField, string>>>>;
   /** The owner answered what a "Units" column with the same number on every row is. */
   unitsAnswered: boolean;
+  /** Only this building's rows (a BuildingInfo key); null or missing for every row. */
+  building?: string | null;
+}
+
+/** A row already in the list, by its id, so a row with its CapexClock ID keeps the same item. */
+export interface KnownRow {
+  name: string;
+  librarySlug: string | null;
+  category: string;
 }
 
 export interface Sheet {
@@ -193,6 +234,10 @@ interface Record_ {
   key: string;
   sheetRow: number;
   location: string;
+  /** The building's key, set once the row is read. */
+  building: string;
+  /** Its CapexClock ID, if the sheet gives one. */
+  id: string | null;
   row: ImportedRow;
   changes: string[];
   issues: Issue[];
@@ -217,6 +262,8 @@ interface Context {
   /** The quantity or cost column's heading says square feet, like "Qty (sq ft)" or "Cost/SF". */
   quantityInSqFt: boolean;
   costInSqFt: boolean;
+  /** Rows already in the list, by id. */
+  known: ReadonlyMap<string, KnownRow>;
 }
 
 /** The first column with this role that has something in this row (or the first with the role). */
@@ -252,8 +299,14 @@ function fixed(ctx: Context, key: string, field: FixField): string | undefined {
 function resolveName(
   ctx: Context,
   original: string,
-  record: Pick<Record_, "changes" | "details" | "asked" | "pending">,
+  record: Pick<Record_, "changes" | "details" | "asked" | "pending" | "id">,
 ): { slug: string | null; name: string } {
+  // A row from a component list download that still has its name stays the same item.
+  const known = record.id ? ctx.known.get(record.id) : undefined;
+  if (known && known.name.trim() === original) {
+    const slug = known.librarySlug && ctx.library.has(known.librarySlug) ? known.librarySlug : null;
+    return { slug, name: clip(original, 200) };
+  }
   const found = ctx.match(original);
   let slug: string | null = null;
   if (found.kind === "exact" || found.kind === "matched") slug = found.slug;
@@ -318,10 +371,13 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   const key = `r${index}`;
   const cell = (role: FieldKind) => cellFor(row, columns, role);
   const original = fixed(ctx, key, "name") ?? cellText(cell("item"));
+  const id = cellText(cell("id"));
   const record: Record_ = {
     key,
     sheetRow: index + 1,
     location: cellText(cell("location")),
+    building: "",
+    id: id === "" ? null : clip(id, 100),
     row: {
       librarySlug: null,
       category: "Other",
@@ -334,6 +390,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       costEach: "",
       condition: null,
       notes: "",
+      replaceNow: false,
     },
     changes: [],
     issues: [],
@@ -393,15 +450,20 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
       record.row.unitLabel = item.unitLabel;
     } else {
       const category = clip(cellText(cell("category")), 100);
-      record.row.category = category || section || "Other";
+      const known = record.id ? ctx.known.get(record.id) : undefined;
+      record.row.category = category || (known && known.name.trim() === original ? known.category : "") || section || "Other";
     }
   }
-  // Square feet, in the quantity or the cost, are counted per sq ft. Anything else is
-  // a count priced each, even for an item the library counts in square feet.
+  // "Counted per" says how it's counted. Without it, square feet in the quantity or
+  // the cost are counted per sq ft, and anything else is a count priced each, even
+  // for an item the library counts in square feet.
   const costFix = fixed(ctx, key, "costEach");
   const costCell = costFix ?? cell("cost");
   const costPerSqFt = saysPerSqFt(costCell) || ctx.costInSqFt;
-  if (squareFeet || costPerSqFt) {
+  const counted = hasRole(columns, "countedPer") ? readCountedPer(cell("countedPer")) : null;
+  if (counted?.value) {
+    record.row.unitLabel = counted.value;
+  } else if (squareFeet || costPerSqFt) {
     if (squareFeet && record.row.librarySlug && record.row.unitLabel !== "per_sq_ft") {
       record.changes.push("Counted in square feet, as the sheet does");
     }
@@ -411,6 +473,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     record.row.unitLabel = "per_building";
     record.changes.push(COUNTED_EACH);
   }
+  if (counted?.note) record.changes.push(counted.note);
 
   // Useful life: the sheet's, else the library's typical one.
   const lifeFix = fixed(ctx, key, "usefulLife");
@@ -434,6 +497,12 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
 
   const timing = { installYear: cell("installYear"), age: cell("age"), replaceBy: cell("replaceBy"), remaining: cell("remaining") };
   applyTiming(record, readTiming(ctx, key, timing, life));
+  if (hasRole(columns, "guess")) {
+    const guess = readYesNo(cell("guess"));
+    // "approx 2014" is a guess even when this column is blank.
+    if (guess.value) record.row.installYearIsGuess = true;
+    if (guess.note) record.changes.push(`${guess.note}: the install year isn't marked a guess`);
+  }
 
   // Cost each, or a total divided by the quantity.
   const totalCell = cell("total");
@@ -488,9 +557,22 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
   if (condition.note) record.changes.push(condition.note);
   if (condition.keep) record.details.push(`Condition: ${condition.keep}`);
 
+  if (hasRole(columns, "replaceNow")) {
+    const now = readYesNo(cell("replaceNow"));
+    record.row.replaceNow = now.value === true;
+    if (now.note) record.changes.push(`${now.note}, so it isn't planned for this year`);
+  }
+
+  // Line breaks in notes are kept.
   for (const [i, role] of columns.entries()) {
-    const text = role === "notes" ? cellText(row[i]) : "";
+    const text = role === "notes" ? cellLines(row[i]) : "";
     if (text !== "") record.details.push(text);
+  }
+
+  // The calculator needs a useful life to forecast it, and an account to save it.
+  // (A row with no name may get one from the owner, and the library's typical life with it.)
+  if (record.row.name !== "" && record.row.usefulLife === "" && !record.issues.some((i) => i.field === "usefulLife")) {
+    record.issues.push({ field: "usefulLife", text: "No useful life yet. Type how many years it lasts." });
   }
   return record;
 }
@@ -558,6 +640,8 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       key,
       sheetRow: index + 1,
       location,
+      building: "",
+      id: null,
       row: {
         librarySlug: item.slug,
         category: item.category,
@@ -570,6 +654,7 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
         costEach: "",
         condition: null,
         notes: "",
+        replaceNow: false,
       },
       changes: sqFt ? [COUNTED_APARTMENTS] : [],
       issues: [],
@@ -645,6 +730,10 @@ export function mergedNotes(label: string, members: readonly { location: string;
 function mergeKey(r: Record_): string {
   const { row } = r;
   return JSON.stringify([
+    // A row with a CapexClock ID stands for one row of the list, so it stays on its own.
+    r.id === null ? "" : r.key,
+    r.building,
+    row.replaceNow,
     row.librarySlug ?? `own:${row.name.trim().toLowerCase()}`,
     row.category,
     row.unitLabel,
@@ -696,8 +785,50 @@ function merge(records: Record_[], locationLabel: string): PreviewRow[] {
       issues,
       question: question?.key ?? null,
       lifeIsTypical: first.lifeIsTypical,
+      building: first.building,
+      capexclockId: first.id,
     };
   });
+}
+
+/** A building's name in a form that ignores case, spaces and punctuation, so "Bldg A" and "bldg a." match. */
+export function buildingKey(name: string): string {
+  return words(name);
+}
+
+/**
+ * Counts a row toward its building, and takes the building's unit count and year
+ * built from the first row that gives them. Rows that give different ones are noted.
+ */
+function noteBuilding(
+  buildings: Map<string, BuildingInfo>,
+  building: { key: string; name: string },
+  row: readonly Cell[],
+  columns: readonly ColumnRole[],
+  records: number,
+  currentYear: number,
+) {
+  let info = buildings.get(building.key);
+  if (!info) {
+    info = { key: building.key, name: building.name, unitCount: null, yearBuilt: null, records: 0, notes: [] };
+    buildings.set(building.key, info);
+  }
+  info.records += records;
+  const note = (text: string) => {
+    if (!info.notes.includes(text)) info.notes.push(text);
+  };
+  if (columns.includes("unitCount")) {
+    const units = readUnitCount(cellFor(row, columns, "unitCount"));
+    if (units.problem) note(units.problem);
+    else if (units.value !== null && info.unitCount === null) info.unitCount = units.value;
+    else if (units.value !== null && units.value !== info.unitCount) note(`Rows give more than one unit count. We used the first, ${info.unitCount}.`);
+  }
+  if (columns.includes("yearBuilt")) {
+    const year = readYearBuilt(cellFor(row, columns, "yearBuilt"), currentYear);
+    if (year.problem) note(year.problem);
+    else if (year.value !== null && info.yearBuilt === null) info.yearBuilt = year.value;
+    else if (year.value !== null && year.value !== info.yearBuilt) note(`Rows give more than one year built. We used the first, ${info.yearBuilt}.`);
+  }
 }
 
 /** The last row with anything in it; blank rows after it aren't listed. */
@@ -721,12 +852,15 @@ export function buildPreview(
   library: readonly LibraryComponent[],
   match: NameMatcher,
   currentYear: number,
+  known: ReadonlyMap<string, KnownRow> = new Map(),
 ): Preview {
   const { grid, headerRow } = sheet;
   const heads = headings(grid, headerRow);
   const { columns, layout } = choices;
   const units = layout === "rows" ? sameUnitsColumn(heads, columns, columnValues(grid, headerRow)) : null;
-  const unitsAnswer = !units ? null : columns[units.column] === "quantity" ? "quantity" : choices.unitsAnswered ? "building" : null;
+  const unitsRole = units ? columns[units.column] : null;
+  const unitsAnswer =
+    unitsRole === "quantity" ? "quantity" : unitsRole === "unitCount" || (units && choices.unitsAnswered) ? "building" : null;
   const ctx: Context = {
     library: new Map(library.map((c) => [c.slug, c])),
     match,
@@ -735,6 +869,7 @@ export function buildPreview(
     unitsPending: units && unitsAnswer === null ? units.column : null,
     quantityInSqFt: headingSaysSqFt(heads[columns.indexOf("quantity")] ?? ""),
     costInSqFt: headingSaysSqFt(heads[columns.indexOf("cost")] ?? ""),
+    known,
   };
   const skipped: Skipped[] = [];
   const records: Record_[] = [];
@@ -742,6 +877,10 @@ export function buildPreview(
 
   let section: string | null = null;
   const last = lastFilledRow(grid);
+  const buildings = new Map<string, BuildingInfo>();
+  // Rows under a building's name belong to it until the next name, as with merged cells.
+  let building = { key: "", name: "" };
+  const only = choices.building ?? null;
   for (let i = headerRow + 1; i <= last; i++) {
     const row = grid[i] ?? [];
     const skip = (reason: SkipReason) => skipped.push({ sheetRow: i + 1, reason });
@@ -753,17 +892,22 @@ export function buildPreview(
       skip("repeated_headings");
       continue;
     }
+    let result: Record_[] | SkipReason;
     if (layout === "columns") {
-      if (isTotalRow(row, cellText(cellFor(row, columns, "location")))) {
-        skip("total");
-        continue;
+      if (isTotalRow(row, cellText(cellFor(row, columns, "location")))) result = "total";
+      else {
+        const found = columnRecords(ctx, row, i, heads);
+        result = found.length > 0 ? found : "nothing_listed";
       }
-      const found = columnRecords(ctx, row, i, heads);
-      if (found.length === 0) skip("nothing_listed");
-      records.push(...found);
-      continue;
+    } else {
+      const found = rowRecord(ctx, row, i, section);
+      result = typeof found === "string" ? found : [found];
     }
-    const result = rowRecord(ctx, row, i, section);
+    if (result !== "total") {
+      const named = cellText(cellFor(row, columns, "building"));
+      if (named !== "") building = { key: buildingKey(named), name: clip(named, 200) };
+      noteBuilding(buildings, building, row, columns, typeof result === "string" ? 0 : result.length, currentYear);
+    }
     if (typeof result === "string") {
       skip(result);
       if (result === "section") {
@@ -773,7 +917,12 @@ export function buildPreview(
       }
       continue;
     }
-    records.push(result);
+    if (only !== null && building.key !== only) {
+      skip("other_building");
+      continue;
+    }
+    for (const r of result) r.building = building.key;
+    records.push(...result);
   }
 
   const locationColumn = columns.indexOf("location");
@@ -810,6 +959,8 @@ export function buildPreview(
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
     withoutCost: rows.filter((r) => r.row.costEach === "").length,
+    buildings: [...buildings.values()].filter((b) => b.records > 0),
+    idColumn: used.has("id"),
     counts: {
       rows: rows.length,
       ready: count("ready"),

@@ -7,18 +7,24 @@ export const MAX_BYTES = 5 * 1024 * 1024;
 /** Widest sheet; a wider one is almost certainly not a component list. */
 export const MAX_COLUMNS = 100;
 
-/** Why an import stopped, as the import_failed event names it. */
-export type FailReason = "too_big" | "no_header" | "unsupported" | "unreadable";
+/**
+ * Why an import stopped, as the import_failed event names it. "forecast_file" is
+ * our forecast download, which lists replacements, not components.
+ */
+export type FailReason = "too_big" | "no_header" | "unsupported" | "unreadable" | "forecast_file";
 
-export type ImportSource = "paste" | "file";
+/** Where the rows came from: pasted, a CSV or text file, or an Excel file. */
+export type ImportSource = "paste" | "file" | "xlsx";
 
 export const FAIL_TEXT: Record<FailReason, string> = {
   too_big: "That's more than we can read at once. Import up to 2,000 rows and 5 MB at a time, or split the sheet.",
   no_header:
     "We couldn't find the headings. Copy the heading row too (like Item, Qty, Year installed, Cost) and try again.",
   unsupported:
-    "We can't read that kind of file yet. In Excel or Numbers, save it as CSV (File > Save As, or Export), or copy the rows and paste them here.",
-  unreadable: "We couldn't read that file. Make sure it's a CSV file, or copy the rows and paste them here.",
+    "We can't read that kind of file. Save it as .xlsx or CSV (File > Save As in Excel, File > Export in Numbers, File > Download in Google Sheets), or copy the rows and paste them here. If the file has a password, take it off first.",
+  unreadable: "We couldn't read that file. Make sure it's an .xlsx or CSV file, or copy the rows and paste them here.",
+  forecast_file:
+    "That's a forecast download, with a row for each replacement, so it can't be read back in. Use Download component list (CSV) instead, and import that file.",
 };
 
 /**
@@ -44,12 +50,19 @@ export function failedReason(problem: Problem): FailReason | null {
   return problem === "empty_file" ? "no_header" : problem;
 }
 
-/** What a chosen file is, by its name and type: text we can read, a spreadsheet file, or neither. */
-export function fileKind(name: string, type: string): "text" | "spreadsheet" | "other" {
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * What a chosen file is, by its name and type: text we can read, an Excel file we
+ * can read, another spreadsheet file we can't (.xls, .ods, Numbers), or neither.
+ */
+export function fileKind(name: string, type: string): "text" | "xlsx" | "spreadsheet" | "other" {
   const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
   if (["csv", "tsv", "txt", "tab"].includes(ext)) return "text";
-  if (["xlsx", "xlsm", "xls", "xlsb", "ods", "numbers"].includes(ext)) return "spreadsheet";
+  if (["xlsx", "xlsm"].includes(ext)) return "xlsx";
+  if (["xls", "xlsb", "ods", "numbers"].includes(ext)) return "spreadsheet";
   if (/^text\/(csv|plain|tab-separated-values)$/.test(type) || type === "application/csv") return "text";
+  if (type === XLSX_TYPE) return "xlsx";
   return "other";
 }
 
