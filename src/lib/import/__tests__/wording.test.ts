@@ -132,6 +132,7 @@ describe("import wording", () => {
       missingItemColumn: false,
       noQuantityColumn: false,
       quantityFromTotals: false,
+      areaColumn: false,
       quantityQuestion: null,
       noYearColumn: false,
       doubtfulYears: [],
@@ -149,6 +150,9 @@ describe("import wording", () => {
     ]);
     expect(previewHints({ ...base, noQuantityColumn: true, quantityFromTotals: true })).toEqual([
       "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.",
+    ]);
+    expect(previewHints({ ...base, noQuantityColumn: true, areaColumn: true })).toEqual([
+      "There's no quantity column, so each row counts as one, and identical rows are added up. Items priced per sq ft use the Square feet column instead.",
     ]);
     expect(previewHints({ ...base, withoutCost: 8 })).toEqual([
       "8 rows have no cost yet. Add costs after importing to include them in the forecast.",

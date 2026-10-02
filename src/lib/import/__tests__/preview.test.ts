@@ -700,6 +700,8 @@ describe("a Square feet column", () => {
   it("asks whether the cost is per sq ft when the library prices the item that way and the sheet doesn't say", () => {
     const sheet = ["Item,Area (SF),Unit cost", "Carpet,9600,$4"].join("\n");
     expect(open(sheet).columns).toEqual(["item", "area", "cost"]);
+    expect(preview(sheet)).toMatchObject({ noQuantityColumn: true, areaColumn: true });
+    expect(preview(["Item,Unit cost", "Carpet,$4"].join("\n")).areaColumn).toBe(false);
     const carpet = byName(preview(sheet), "Carpet");
     expect(carpet.status).toBe("needs_you");
     expect(carpet.issues).toEqual([

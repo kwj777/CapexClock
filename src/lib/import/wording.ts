@@ -134,10 +134,11 @@ export function previewHints(preview: Preview): string[] {
   if (preview.missingItemColumn) hints.push("Choose which column has the item names.");
   // While the quantity question is open, it says what happens instead.
   if (preview.noQuantityColumn && !preview.missingItemColumn && preview.quantityQuestion?.answer !== null) {
+    const area = preview.areaColumn ? " Items priced per sq ft use the Square feet column instead." : "";
     hints.push(
       preview.quantityFromTotals
-        ? "There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up."
-        : "There's no quantity column, so each row counts as one, and identical rows are added up.",
+        ? `There's no quantity column, so we worked out quantities from the totals where they divide evenly. Other rows count as one, and identical rows are added up.${area}`
+        : `There's no quantity column, so each row counts as one, and identical rows are added up.${area}`,
     );
   }
   if (preview.noYearColumn && !preview.missingItemColumn) {

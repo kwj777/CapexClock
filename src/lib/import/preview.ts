@@ -111,6 +111,8 @@ export interface Preview {
   noQuantityColumn: boolean;
   /** With no quantity column, a total and a cost each give each row's quantity. */
   quantityFromTotals: boolean;
+  /** A Square feet column, so items priced per sq ft use it as their quantity. */
+  areaColumn: boolean;
   /**
    * A column that may or may not be the quantity ("#", "No.", "Units", or one number
    * on every row): is it how many of each item, or something else, so each row
@@ -927,6 +929,7 @@ export function buildPreview(
     missingItemColumn: layout === "rows" && !used.has("item"),
     noQuantityColumn: layout === "rows" && !used.has("quantity"),
     quantityFromTotals: layout === "rows" && !used.has("quantity") && used.has("total") && used.has("cost"),
+    areaColumn: layout === "rows" && used.has("area"),
     quantityQuestion: doubt && { ...doubt, heading: heads[doubt.column], answer: quantityAnswer },
     noYearColumn: layout === "rows" && !(["installYear", "age", "remaining", "replaceBy"] as const).some((r) => used.has(r)),
     doubtfulYears: layout === "rows" ? doubtfulYearColumns(heads, columns) : [],
