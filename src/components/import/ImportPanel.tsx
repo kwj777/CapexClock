@@ -39,6 +39,7 @@ import {
   duplicates,
   duplicateText,
   longListText,
+  NEEDS_YOU_TEXT,
   previewHints,
   previewSummary,
   quantityAnswers,
@@ -517,9 +518,7 @@ export default function ImportPanel({ id, library, draftRows, onAdd, onClose }: 
               </p>
             )}
             {(preview.counts.needsYou > 0 || unanswered > 0) && (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Rows that need you are added as they are, and the calculator shows what to fix.
-              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{NEEDS_YOU_TEXT.beforeAdd}</p>
             )}
             {sheetYearBad && (
               <p className="text-sm text-amber-800 dark:text-amber-300">Fix the year the sheet was last updated to add these rows.</p>

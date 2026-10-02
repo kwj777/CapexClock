@@ -10,6 +10,7 @@ import {
   previewHints,
   previewSummary,
   quantityAnswers,
+  rowLabel,
   quantityQuestionText,
   rowNumbers,
   skippedLines,
@@ -214,6 +215,11 @@ describe("import wording", () => {
     expect(longListText(290, 20)).toBe(
       "Adding these makes 310 rows in your list, and the calculator gets slow past about 300. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
     );
+  });
+
+  it("names a row for the fix boxes beside it", () => {
+    const p = preview(["Item,Qty,Year installed", "Gas furnace,12,Jun-14", "Water heater,1,1850", "Water heater,1,1850", ",3,2014"].join("\n"));
+    expect(p.rows.filter((r) => r.status === "needs_you").map(rowLabel)).toEqual(["Gas furnace, row 2", "Tank water heater, rows 3 and 4", "row 5"]);
   });
 
   it("names columns the way spreadsheets do", () => {

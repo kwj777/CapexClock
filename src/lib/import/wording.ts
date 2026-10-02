@@ -41,6 +41,17 @@ export function rowNumbers(rows: readonly number[]): string {
   return `${sorted.length === 1 ? "Row" : "Rows"} ${listText(shown)}`;
 }
 
+/**
+ * A preview row as a screen reader hears it beside its fix boxes, so each box and
+ * Apply says which row it's for: "Gas furnace, row 5", or "row 9" with no name.
+ */
+export function rowLabel(row: Pick<PreviewRow, "row" | "sheetRows">): string {
+  const rows = rowNumbers(row.sheetRows);
+  const lower = `${rows.charAt(0).toLowerCase()}${rows.slice(1)}`;
+  const name = row.row.name.trim();
+  return name ? `${name}, ${lower}` : lower;
+}
+
 /** Skipped rows grouped by why: "Rows 1–2: above the headings". */
 export function skippedLines(skipped: readonly Skipped[]): string[] {
   const byReason = new Map<SkipReason, number[]>();
@@ -193,6 +204,14 @@ export function quantityAnswers(
     ],
   ];
 }
+
+/** Under the Needs you heading, and above Add while any row still needs the owner. */
+export const NEEDS_YOU_TEXT = {
+  section:
+    "Fix these here if you can. If you add them as they are, the calculator flags anything missing or unreadable, and the rest go in as each one says.",
+  beforeAdd:
+    "Rows that still need you are added too. The calculator flags anything missing or unreadable, and the rest go in as each one says.",
+};
 
 /** The label of each field the preview lets the owner fix. */
 export const FIX_LABEL: Record<FixField, string> = {
