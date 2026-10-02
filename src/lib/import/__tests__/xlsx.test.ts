@@ -293,6 +293,12 @@ const BUILDING_COLUMN: FixtureTab = {
   ],
 };
 
+// The plan (T2 step 5) asks for these tests to use files rebuilt from Kevin's
+// interview sheets. Until he sends some, the workbooks above and below are made up.
+describe("workbooks rebuilt from interview sheets", () => {
+  it.todo("reads each layout from Kevin's interview sheets, once he sends them, with names, addresses and numbers changed");
+});
+
 describe("one tab with a Building column", () => {
   it("lists each building with its unit count and year built, filling names down", async () => {
     const [tab] = await read([BUILDING_COLUMN]);

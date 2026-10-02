@@ -3,6 +3,10 @@
  * committed. Each file is a zip (stored, or deflated as Excel saves it) with one
  * worksheet per tab, inline strings, and a date style for Date cells, which is
  * all read-excel-file needs to read it as Excel would have saved it.
+ *
+ * The workbooks in these tests are made up. The plan (T2 step 5) asks for test
+ * files rebuilt from Kevin's interview sheets, and none have arrived yet: when
+ * they do, rebuild their layouts here with the names, addresses and numbers changed.
  */
 import { deflateRawSync } from "node:zlib";
 

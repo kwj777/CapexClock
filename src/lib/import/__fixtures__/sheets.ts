@@ -1,6 +1,11 @@
 /**
  * Made-up landlord sheets in the layouts real owners use. Names, addresses and
  * numbers are invented; real owner sheets are never committed.
+ *
+ * Still waiting on Kevin: the plan (T2 steps 4 and 5) asks for test files rebuilt
+ * from the sheets owners shared in interviews. None have arrived, so every
+ * layout here is our own guess at one. When they come, rebuild each layout with
+ * the names, addresses and numbers changed, and add a test for it.
  */
 import Papa from "papaparse";
 import { COMPONENT_LIBRARY } from "@/lib/library/components";
