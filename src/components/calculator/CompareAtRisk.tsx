@@ -19,6 +19,7 @@ import {
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
   eitherWayVariants,
+  focusStep,
   ifYouWait,
   itemDetail,
   leadVariants,
@@ -60,6 +61,7 @@ export default function CompareAtRisk({
   setDraft,
   state,
   setState,
+  forecastPending = false,
 }: {
   startYear: number;
   unitCount: number;
@@ -71,6 +73,8 @@ export default function CompareAtRisk({
   setDraft: Dispatch<SetStateAction<Draft>>;
   state: CompareState;
   setState: Dispatch<SetStateAction<CompareState>>;
+  /** True while `components` are still from an earlier draft (the calculator defers the forecast). */
+  forecastPending?: boolean;
 }) {
   const { open, percentText, unticked, applied } = state;
   const baseId = useId();
@@ -113,7 +117,10 @@ export default function CompareAtRisk({
 
   useEffect(() => {
     if (!focusNext.current) return;
-    document.getElementById(focusNext.current)?.focus();
+    const target = document.getElementById(focusNext.current);
+    const step = focusStep(target instanceof HTMLButtonElement ? target : null, forecastPending);
+    if (step === "wait") return;
+    if (step === "focus") target?.focus();
     focusNext.current = null;
   });
 

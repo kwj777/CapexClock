@@ -730,6 +730,7 @@ function CalculatorBody({
                 setDraft={setDraft}
                 state={compare}
                 setState={setCompare}
+                forecastPending={forecastDraft !== draft}
               />
             </AtRisk>
             <DueTable forecast={forecast} rows={rowsById} />
