@@ -173,7 +173,7 @@ export function previewHints(preview: Preview): string[] {
  * Past this many rows, typing in the calculator can lag on a slower computer: it
  * redraws only the row being edited, but the forecast still works through every row.
  */
-export const SLOW_ROWS = 1000;
+export const SLOW_ROWS = 500;
 
 /** The warning above Add when the list would get long enough to slow the calculator, or "" when it won't. */
 export function longListText(rowsNow: number, adding: number): string {

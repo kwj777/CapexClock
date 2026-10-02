@@ -210,14 +210,14 @@ describe("import wording", () => {
 
   it("warns before a list gets long enough to slow the calculator", () => {
     expect(longListText(0, SLOW_ROWS)).toBe("");
-    expect(longListText(950, 50)).toBe("");
+    expect(longListText(450, 50)).toBe("");
     expect(longListText(0, 0)).toBe("");
-    expect(longListText(1400, 0)).toBe("");
+    expect(longListText(900, 0)).toBe("");
     expect(longListText(0, 2000)).toBe(
-      "That's 2,000 rows, and the calculator gets slow past about 1,000. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
+      "That's 2,000 rows, and the calculator gets slow past about 500. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
     );
-    expect(longListText(990, 20)).toBe(
-      "Adding these makes 1,010 rows in your list, and the calculator gets slow past about 1,000. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
+    expect(longListText(490, 20)).toBe(
+      "Adding these makes 510 rows in your list, and the calculator gets slow past about 500. Typing may lag. To keep it quick, put each item on one row with a quantity, or import part of the sheet at a time.",
     );
   });
 
