@@ -17,6 +17,7 @@ import {
 import { fetchAllRows } from "@/lib/properties/load";
 import {
   compareSaved,
+  detailsDropped,
   DETAILS_NOT_SAVED_TEXT,
   FUNCTION_NOT_FOUND,
   SAVE_FAILURE_TEXT,
@@ -401,8 +402,9 @@ export default function PropertyEditor({
       setSaved({ name: sent.name, draft: sent.draft, updatedAt: null });
     } else {
       const match = compareSaved(input, back.property, back.components);
-      if (match === "different") {
-        // Another tab or device saved right after this one.
+      const lastSaved = toSaveInput(saved.name, saved.draft, currentYear, id);
+      if (match === "different" || (match === "without_details" && !detailsDropped(lastSaved, back.components))) {
+        // Another tab or device saved right after this one, maybe only condition or notes.
         setSave({ kind: "failed", failure: "conflict" });
         return;
       }
