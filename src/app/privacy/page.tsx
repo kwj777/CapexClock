@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 // Keep this page in step with what the code does (src/lib/analytics.ts,
-// src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
+// netlify/edge-functions/posthog-relay.ts, src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
 // src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
 const UPDATED = "October 2, 2026";
 
@@ -126,7 +126,13 @@ export default function PrivacyPage() {
               When you&apos;re signed in, these are linked to your account&apos;s random ID, never your email. PostHog
               keeps a random ID in a cookie and in your browser&apos;s local storage so it can tell visits apart. The
               cookie lasts one year. We also keep the date of your last visit in your browser to count return visits.
-              We don&apos;t record your screen. If you block cookies or use a tracker blocker, the site still works.
+              We don&apos;t record your screen. If you block cookies, the site still works.
+            </p>
+            <p className="mt-3">
+              Analytics go to PostHog through capexclock.com rather than straight to PostHog, so most tracker blockers
+              don&apos;t stop them. On the way, we pass on only what PostHog needs and your IP address (for the rough
+              location above). Apart from the random ID PostHog keeps in its cookie, your cookies for this site,
+              including your sign-in, are never passed on.
             </p>
           </Section>
 

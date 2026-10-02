@@ -2,23 +2,27 @@ import type { CaptureResult } from "posthog-js";
 import {
   captureOptions,
   daysSinceLastVisit,
-  DEFAULT_POSTHOG_HOST,
   identifyPerson,
   localDay,
-  posthogHost,
+  POSTHOG_UI_HOST,
+  posthogHosts,
+  RELAY_PATH,
   recordVisit,
   withoutPageTitle,
 } from "../analytics";
 
-describe("posthogHost", () => {
-  it("uses the default host when the setting is missing or blank", () => {
-    expect(posthogHost(undefined)).toBe(DEFAULT_POSTHOG_HOST);
-    expect(posthogHost("")).toBe(DEFAULT_POSTHOG_HOST);
-    expect(posthogHost("  ")).toBe(DEFAULT_POSTHOG_HOST);
+describe("posthogHosts", () => {
+  it("goes through this site's relay when the setting is missing or blank", () => {
+    const relay = { api_host: "/clockwork", ui_host: "https://us.posthog.com" };
+    expect(posthogHosts(undefined)).toEqual(relay);
+    expect(posthogHosts("")).toEqual(relay);
+    expect(posthogHosts("  ")).toEqual(relay);
+    expect(relay).toEqual({ api_host: RELAY_PATH, ui_host: POSTHOG_UI_HOST });
   });
 
-  it("keeps a host that is set", () => {
-    expect(posthogHost("https://eu.i.posthog.com")).toBe("https://eu.i.posthog.com");
+  it("uses a host that is set as it is, and lets PostHog work out its app's address", () => {
+    expect(posthogHosts("https://us.i.posthog.com")).toEqual({ api_host: "https://us.i.posthog.com" });
+    expect(posthogHosts(" https://eu.i.posthog.com ")).toEqual({ api_host: "https://eu.i.posthog.com" });
   });
 });
 

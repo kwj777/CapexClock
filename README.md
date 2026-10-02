@@ -33,7 +33,7 @@ npm run build
 | Name | Required | Notes |
 | --- | --- | --- |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project API key. Unset = analytics off. |
-| `NEXT_PUBLIC_POSTHOG_HOST` | No | Defaults to `https://us.i.posthog.com`. |
+| `NEXT_PUBLIC_POSTHOG_HOST` | No | Leave unset on Netlify, so analytics go through the site's relay (see [Analytics relay](#analytics-relay)). Set it to `https://us.i.posthog.com` when running without Netlify. |
 | `NEXT_PUBLIC_SUPABASE_URL` | For accounts | Supabase project URL. Unset = no sign-in; the calculator still works. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For accounts | The `sb_publishable_…` key. Never use the secret key here. |
 | `NEXT_PUBLIC_TEST_BUTTONS` | No | `off` hides the three paid-idea test buttons. Unset = shown. See [Paid-idea test buttons](#paid-idea-test-buttons). |
@@ -79,7 +79,29 @@ Submissions only work on a Netlify deploy (or `netlify dev`), not `next dev`.
    **Forms** after that deploy.
 3. **Test it.** Submit the form once on the live site or a deploy preview and confirm the
    entry shows up.
-4. **(Optional) Analytics.** Add `NEXT_PUBLIC_POSTHOG_KEY` as above and redeploy.
+4. **(Optional) Analytics.** Add `NEXT_PUBLIC_POSTHOG_KEY` as above and redeploy. Leave
+   `NEXT_PUBLIC_POSTHOG_HOST` unset so analytics go through the relay below.
+
+### Analytics relay
+
+Safari's private windows and ad blockers block PostHog's own domains, so the browser sends
+analytics to `capexclock.com/clockwork/…` instead, and a Netlify edge function
+(`netlify/edge-functions/posthog-relay.ts`) passes them on to PostHog's US cloud. It passes on
+only the headers PostHog's script sends it plus the visitor's IP (for rough location), never this
+site's cookies, so the Supabase sign-in never reaches PostHog. The privacy page says so; keep it in
+step if the relay changes. The path is deliberately not a tracker
+word like `/ingest` or `/posthog`, which blocklists catch. If you change it, change `RELAY_PATH`
+in `src/lib/analytics.ts` and both paths in the edge function together (a test checks they match).
+
+To check it after a deploy, open the site, then in the browser's developer tools **Network** tab
+look for requests to `/clockwork/…` returning 200. In PostHog, new events carry
+`$lib_custom_api_host` = `/clockwork`. The relay only runs on Netlify, so `npm run dev` needs
+`NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com` to send analytics.
+
+PostHog counts go up from the day the relay goes live, because visitors whose browsers used to
+block PostHog are now counted. Note that date for the Monday tally, and don't read that week's
+rise as growth or compare raw counts across it. Ratios such as the import finish rate are mostly
+unaffected. Events from before the relay have no `$lib_custom_api_host`.
 
 Every pull request gets a deploy preview at `deploy-preview-<PR number>--capexclock.netlify.app`.
 
@@ -430,7 +452,8 @@ setting and redeploy.
 
 ## Monday numbers
 
-Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tally.
+Each Monday, paste these in the thread (about 10 minutes). Claude keeps the tally. Counts step up
+the week the [analytics relay](#analytics-relay) goes live, so compare across that week with care.
 
 1. **PostHog:** the numbers on the dashboard below (a screenshot of each tile is fine).
 2. **Netlify:** **Forms → paid-interest** and **Forms → early-access**: how many new entries
