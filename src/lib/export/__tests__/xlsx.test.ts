@@ -77,6 +77,11 @@ describe("listSheet", () => {
     expect((row[column("Notes")] as CellObject).type).toBe(String);
   });
 
+  it("wraps text with line breaks, so Excel shows a two-line note on two lines", () => {
+    expect((row[column("Notes")] as CellObject).wrap).toBe(true);
+    expect((row[column("Component")] as CellObject).wrap).toBeUndefined();
+  });
+
   it("leaves empty cells empty", () => {
     expect(row[column("Condition")]).toBeNull();
     expect(row[column("CapexClock ID")]).toBeNull();
@@ -130,6 +135,22 @@ describe("the Excel files", () => {
     expect(read.grid[1][column("Units")]).toBe(12);
     expect(read.grid[1][column("Cost each")]).toBe(1400);
     expect(read.grid[1][column("CapexClock ID")]).toBe("1b4e28ba-2fa1-11d2-883f-0016d3cca427");
+  });
+
+  // write-excel-file 4.1.1 looked shared strings up in a plain object, so these came out as
+  // "function Object() ..." and broke the whole file. patches/write-excel-file+4.1.1.patch fixes it.
+  it("keep text that names a built-in, like a note that just says constructor", async () => {
+    const names = ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"];
+    const list: ListGrid = [FORMAT_HEADINGS.slice(), ...names.map((n) => oneRow({ Building: n, Component: n, Notes: n })[1])];
+    const [tab] = await readBack(list);
+    expect(tab.grid.slice(1).map((r) => [r[column("Building")], r[column("Component")], r[column("Notes")]])).toEqual(
+      names.map((n) => [n, n, n]),
+    );
+  });
+
+  it("keep a replacement character, as a note pasted with a garbled apostrophe has, the same as the CSV", async () => {
+    const [tab] = await readBack(oneRow({ Component: "Water heater", Notes: "Owner\uFFFDs manual in the closet" }));
+    expect(tab.grid[1][column("Notes")]).toBe("Owner\uFFFDs manual in the closet");
   });
 
   it("hold the blank template's headings and nothing else", async () => {

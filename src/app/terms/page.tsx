@@ -106,7 +106,7 @@ export default function TermsPage() {
           <Section title="Condition report ($29)">
             <p>
               {report.includes} {report.delivery} You send us your building&apos;s details by email: a spreadsheet,
-              or a PDF or CSV export from the calculator. Please remove tenant names first. We&apos;re taking up to 20
+              or a PDF, Excel or CSV export from the calculator. Please remove tenant names first. We&apos;re taking up to 20
               orders while we make them by hand.{" "}
               <a href={SAMPLE_REPORT_PATH} className={link}>
                 See a sample report (PDF)

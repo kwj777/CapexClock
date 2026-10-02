@@ -32,7 +32,8 @@ export function exactNumber(text: string): number | null {
 function cell(text: string, field: FieldKind): Cell {
   if (text === "") return null;
   const value = NUMBER_FIELDS.has(field) ? exactNumber(text) : null;
-  if (value === null) return { value: text, type: String };
+  // Excel shows a line break in a cell only with wrap on, so a note typed on two lines shows on two.
+  if (value === null) return /[\r\n]/.test(text) ? { value: text, type: String, wrap: true } : { value: text, type: String };
   // Whole-dollar costs read 38,000. Others, like $0.15 a sq ft, show as they are.
   return field === "cost" && Number.isInteger(value) ? { value, type: Number, format: "#,##0" } : { value, type: Number };
 }

@@ -63,7 +63,12 @@ export default function ComponentListButton({
 
   return (
     <>
-      <button type="button" onClick={() => void exportList()} aria-disabled={busy} className={className}>
+      <button
+        type="button"
+        onClick={() => void exportList()}
+        aria-disabled={busy}
+        className={`${className} aria-disabled:cursor-wait aria-disabled:opacity-60`}
+      >
         {LABEL[format]}
       </button>
       {failed && (

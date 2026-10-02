@@ -78,7 +78,7 @@ export function quickSystems(library: LibraryComponent[], costs: TypicalCost[]):
 }
 
 /**
- * How the year built is used. Recommended, and waiting for Kevin to choose in
+ * How the year built is used. Kevin chose spreading (true) on October 2, 2026, in
  * typical-costs.md ("A choice for you"). True: each system lasts anywhere in its
  * lifespan range, and each replacement lands up to GIVE_OR_TAKE_YEARS early or
  * late, so its cost is spread over the years it could come due. False: each lasts

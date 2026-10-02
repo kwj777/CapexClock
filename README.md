@@ -215,9 +215,10 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   columns, so running it again changes no costs and never puts back one edited or blanked in the
   dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
   Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
-  says it isn't available and no hints show. The numbers, and how the quick estimate uses the
-  year built, are still waiting for Kevin's approval in `typical-costs.md` (phase 3 project
-  files); `SPREAD_REPLACEMENTS` in `src/lib/reserve/quick-estimate.ts` switches the method.
+  says it isn't available and no hints show. Kevin approved the numbers, and spreading each
+  replacement over its lifespan range for the year built, on October 2, 2026 (sources in
+  `typical-costs.md`, phase 3 project files); `SPREAD_REPLACEMENTS` in
+  `src/lib/reserve/quick-estimate.ts` switches the method.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
