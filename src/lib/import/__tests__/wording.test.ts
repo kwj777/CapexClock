@@ -6,6 +6,7 @@ import {
   detailsText,
   duplicates,
   duplicateText,
+  issueBeforeCreate,
   longListText,
   previewHints,
   previewSummary,
@@ -242,5 +243,19 @@ describe("import wording", () => {
 
   it("names columns the way spreadsheets do", () => {
     expect([0, 1, 25, 26, 27, 51, 52, 701, 702].map(columnLetter)).toEqual(["A", "B", "Z", "AA", "AB", "AZ", "BA", "ZZ", "AAA"]);
+  });
+});
+
+describe("an issue on My properties, where a row can't be saved as a guess", () => {
+  it("drops what would happen if it were left", () => {
+    expect(issueBeforeCreate("Answer the question about column B above, or type the quantity. If you don't, it's added as 12.")).toBe(
+      "Answer the question about column B above, or type the quantity.",
+    );
+    expect(issueBeforeCreate("The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft.")).toBe(
+      "The cost is per sq ft. Type the square feet.",
+    );
+    expect(issueBeforeCreate('Which item is "Roof"? Answer above, or it\'s added as its own item.')).toBe('Which item is "Roof"? Answer above.');
+    // Words without such an ending stay as they are.
+    expect(issueBeforeCreate("No useful life yet. Type how many years it lasts.")).toBe("No useful life yet. Type how many years it lasts.");
   });
 });

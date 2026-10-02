@@ -231,9 +231,20 @@ export function quantityAnswers(
 export const NEEDS_YOU_TEXT = {
   section:
     "Fix these here if you can. If you add them as they are, the calculator flags anything missing or unreadable, and the rest go in as each one says.",
+  /** On My properties, where rows are saved straight away, so none is saved as a guess. */
+  beforeCreate: "Answer or fix each of these. A property can't be created while any of its rows still need you.",
   beforeAdd:
     "Rows that still need you are added too. The calculator flags anything missing or unreadable, and the rest go in as each one says.",
 };
+
+/**
+ * An issue's words where a row that needs the owner can't be saved as it is (My
+ * properties): what would happen if it were left goes, since it can't be left.
+ * "…or type the quantity. If you don't, it's added as 12." ends "…or type the quantity."
+ */
+export function issueBeforeCreate(text: string): string {
+  return text.replace(/\s*If you don't, [^.]*\.$/, "").replace(/, or it's added as its own item\.$/, ".");
+}
 
 /** The label of each field the preview lets the owner fix. */
 export const FIX_LABEL: Record<FixField, string> = {

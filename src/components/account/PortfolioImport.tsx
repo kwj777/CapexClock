@@ -467,6 +467,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       currentYear={currentYear}
                       summary={previewSummary(review.preview.counts)}
                       duplicateIds={NO_DUPLICATES}
+                      beforeCreate
                     />
                   </div>
                 )}

@@ -38,6 +38,8 @@ export interface SheetReviewProps {
   duplicateIds: ReadonlySet<string>;
   /** What each row does to the list, for a component list download: "Updates: install year from 2012 to 2014". */
   listNotes?: ReadonlyMap<string, string>;
+  /** On My properties: a row that needs the owner holds its property back (see PreviewRows). */
+  beforeCreate?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export default function SheetReview({
   summary,
   duplicateIds,
   listNotes,
+  beforeCreate = false,
 }: SheetReviewProps) {
   const baseId = useId();
   const summaryId = `${baseId}-summary`;
@@ -238,7 +241,10 @@ export default function SheetReview({
             Which items are these?
           </h4>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            We weren&apos;t sure, so we haven&apos;t matched them. Any you leave are added as their own items.
+            We weren&apos;t sure, so we haven&apos;t matched them.{" "}
+            {beforeCreate
+              ? "Answer each one, or keep it as its own item, before creating the properties."
+              : "Any you leave are added as their own items."}
           </p>
           <div className="mt-2 space-y-3">
             {preview.questions.map((q, qi) => (
@@ -290,6 +296,7 @@ export default function SheetReview({
             listNotes={listNotes}
             fallbackFocusId={summaryId}
             onFix={fix}
+            beforeCreate={beforeCreate}
           />
         </div>
       </section>

@@ -3,7 +3,16 @@
 import { memo, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { FixField, Preview, PreviewRow, RowStatus } from "@/lib/import/preview";
 import { clip } from "@/lib/import/text";
-import { detailsText, FIX_LABEL, NEEDS_YOU_TEXT, rowLabel, rowNumbers, skippedLines, STATUS_TEXT } from "@/lib/import/wording";
+import {
+  detailsText,
+  FIX_LABEL,
+  issueBeforeCreate,
+  NEEDS_YOU_TEXT,
+  rowLabel,
+  rowNumbers,
+  skippedLines,
+  STATUS_TEXT,
+} from "@/lib/import/wording";
 
 const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
@@ -39,10 +48,17 @@ export interface PreviewRowsProps {
   /** Where focus goes when the last row that needed fixing is fixed. */
   fallbackFocusId: string;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
+  /**
+   * The rows are saved as soon as they're created (My properties), so a row that
+   * needs the owner holds its property back instead of going in as a guess.
+   */
+  beforeCreate?: boolean;
 }
 
+const asIs = (text: string) => text;
+
 /** The preview's rows by status, Needs you first, then the skipped rows. */
-function PreviewRows({ preview, duplicateIds, listNotes, fallbackFocusId, onFix }: PreviewRowsProps) {
+function PreviewRows({ preview, duplicateIds, listNotes, fallbackFocusId, onFix, beforeCreate = false }: PreviewRowsProps) {
   const baseId = useId();
   const formId = (rowId: string) => `${baseId}-${rowId}-fix`;
   // After a fix, focus stays with the row if it still needs something, else moves to the next one.
@@ -72,7 +88,13 @@ function PreviewRows({ preview, duplicateIds, listNotes, fallbackFocusId, onFix 
         const rows = preview.rows.filter((r) => r.status === status);
         if (rows.length === 0) return null;
         return (
-          <RowSection key={status} title={STATUS_TEXT[status]} count={rows.length} blurb={blurb} badge={badge}>
+          <RowSection
+            key={status}
+            title={STATUS_TEXT[status]}
+            count={rows.length}
+            blurb={beforeCreate && status === "needs_you" ? NEEDS_YOU_TEXT.beforeCreate : blurb}
+            badge={badge}
+          >
             {(shown) =>
               rows.slice(0, shown).map((r) => (
                 <Row
@@ -82,6 +104,7 @@ function PreviewRows({ preview, duplicateIds, listNotes, fallbackFocusId, onFix 
                   listNote={listNotes?.get(r.id)}
                   formId={formId(r.id)}
                   onFix={fix}
+                  say={beforeCreate ? issueBeforeCreate : asIs}
                 />
               ))
             }
@@ -150,12 +173,15 @@ function Row({
   listNote,
   formId,
   onFix,
+  say,
 }: {
   row: PreviewRow;
   duplicate: boolean;
   listNote: string | undefined;
   formId: string;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
+  /** An issue's words as shown here. */
+  say: (text: string) => string;
 }) {
   const { name, notes } = row.row;
   return (
@@ -190,7 +216,7 @@ function Row({
           ))}
         </ul>
       )}
-      {row.status === "needs_you" && <FixForm row={row} formId={formId} onFix={onFix} />}
+      {row.status === "needs_you" && <FixForm row={row} formId={formId} onFix={onFix} say={say} />}
     </li>
   );
 }
@@ -200,10 +226,12 @@ function FixForm({
   row,
   formId,
   onFix,
+  say,
 }: {
   row: PreviewRow;
   formId: string;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
+  say: (text: string) => string;
 }) {
   const [values, setValues] = useState<Partial<Record<FixField, string>>>({});
   // A name question is answered above; its words are shown here without a box.
@@ -227,7 +255,7 @@ function FixForm({
     >
       {asked.map((issue) => (
         <p key={issue.text} className="text-sm wrap-anywhere text-amber-900 dark:text-amber-200">
-          {issue.text}
+          {say(issue.text)}
         </p>
       ))}
       {fields.map((field) => {
@@ -251,7 +279,7 @@ function FixForm({
             <p id={textId} className="mt-1 text-sm wrap-anywhere text-amber-900 dark:text-amber-200">
               {fixable
                 .filter((i) => i.field === field)
-                .map((i) => i.text)
+                .map((i) => say(i.text))
                 .join(" ")}
             </p>
           </div>
