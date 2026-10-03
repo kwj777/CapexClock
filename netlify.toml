@@ -18,3 +18,8 @@
 # ES modules with WebAssembly that bundling can break.
 [functions]
   external_node_modules = ["@react-pdf/renderer"]
+  # pdfkit (under @react-pdf/renderer) loads its built-in fonts and color profile
+  # through package "imports" paths at run time, which Netlify's file tracing
+  # misses, so they're listed here. Without them the condition report crashes with
+  # "Cannot find module .../pdfkit/js/standard-fonts/Helvetica.cjs".
+  included_files = ["node_modules/pdfkit/js/standard-fonts/**", "node_modules/pdfkit/js/data/**"]
