@@ -7,8 +7,8 @@ import {
   budgetSummary,
   reminderKey,
   remindersDue,
-  type SavedComponent,
   type SavedProperty,
+  type SavedReportComponent,
 } from "@/verticals/landlord";
 import { ONE_CLICK_PATH, unsubscribeUrl, type EmailKind } from "./kinds";
 import { localDate, openJobs, previewJobs, reminderGapPassed, type OpenJobs } from "./schedule";
@@ -36,7 +36,7 @@ export interface Member {
 
 export interface OwnerData {
   readonly properties: readonly SavedProperty[];
-  readonly components: readonly SavedComponent[];
+  readonly components: readonly SavedReportComponent[];
 }
 
 export type LogEntry = Pick<EmailLogRow, "kind" | "year" | "component_id"> & { readonly sent_at?: string };

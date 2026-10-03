@@ -12,3 +12,9 @@
 # any Next.js code). Without it, deploys publish raw .next output and 404.
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# The daily member emails (netlify/functions/owner-emails.mts). @react-pdf/renderer
+# is loaded from node_modules as it is, rather than bundled, because it ships
+# ES modules with WebAssembly that bundling can break.
+[functions]
+  external_node_modules = ["@react-pdf/renderer"]

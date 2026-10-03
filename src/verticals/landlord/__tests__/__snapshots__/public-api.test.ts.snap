@@ -110,6 +110,7 @@ exports[`has a deliberate public API 1`] = `
   "rowFromLibrary",
   "rowTotal",
   "sampleReport",
+  "savedConditionReport",
   "statusText",
   "subjectFor",
   "summarizePortfolio",

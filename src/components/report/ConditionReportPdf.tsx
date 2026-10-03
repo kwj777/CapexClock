@@ -17,9 +17,9 @@ import {
   type ReportRow,
 } from "@/verticals/landlord";
 
-// A condition report as a PDF. Only the sample is made with it for now
-// (scripts/sample-report.tsx, which registers the font first): paid reports
-// are made by hand until one of the paid ideas wins (plan T6).
+// A condition report as a PDF: the sample (scripts/sample-report.tsx) and members'
+// yearly reports (src/lib/owner-emails/condition-report.tsx). Whoever renders it
+// registers the font first. The $29 one-off reports are still made by hand.
 
 /** Registered by whoever renders the report, from public/fonts. */
 export const REPORT_FONT = "DejaVu Sans";
@@ -76,7 +76,8 @@ const cols = { name: 124, qty: 58, installed: 46, age: 56, life: 38, remaining: 
 export interface ConditionReportProps {
   propertyName: string;
   unitCount: number;
-  yearBuilt: number;
+  /** Null when the owner didn't enter one; the subtitle then leaves it out. */
+  yearBuilt: number | null;
   rows: ReportRow[];
   forecast: LandlordForecast;
   components: readonly Component[];
@@ -132,7 +133,15 @@ export default function ConditionReportPdf({
         {header}
         <Text style={s.title}>{propertyName}</Text>
         <Text style={s.subtitle}>
-          {units} · built {yearBuilt} · prepared {preparedOn}
+          {yearBuilt === null ? (
+            <>
+              {units} · prepared {preparedOn}
+            </>
+          ) : (
+            <>
+              {units} · built {yearBuilt} · prepared {preparedOn}
+            </>
+          )}
         </Text>
 
         <View style={s.label}>
@@ -159,7 +168,7 @@ export default function ConditionReportPdf({
         <Text style={s.h2}>Property</Text>
         <View style={s.facts}>
           <Fact name="Units" value={units} />
-          <Fact name="Year built" value={String(yearBuilt)} />
+          <Fact name="Year built" value={yearBuilt === null ? "Not entered" : String(yearBuilt)} />
           <Fact name="Components listed" value={String(rows.length)} />
           <Fact
             name="Condition, rated by the owner"
