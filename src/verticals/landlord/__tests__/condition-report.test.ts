@@ -4,7 +4,6 @@ import type { ForecastComponent } from "@/lib/forecast";
 import {
   ageText,
   conditionCounts,
-  lifeStatus,
   remainingLifeText,
   reportRows,
   statusText,
@@ -31,12 +30,16 @@ const input = (over: Partial<ForecastComponent>, rest: Partial<ReportInput> = {}
   ...rest,
 });
 
-describe("lifeStatus", () => {
+describe("status", () => {
   it("matches the forecast's at risk: past end of life, or within 2 years", () => {
-    expect(lifeStatus(-1)).toBe("overdue");
-    expect(lifeStatus(0)).toBe("due_soon");
-    expect(lifeStatus(2)).toBe("due_soon");
-    expect(lifeStatus(3)).toBe("ok");
+    // A 10-year life, so 1 year past, due this year, 2 years left and 3 years left.
+    const rows = reportRows([2015, 2016, 2018, 2019].map((installYear) => input({ id: String(installYear), installYear })), 2026);
+    expect(rows.map((r) => [r.remainingLife, r.status])).toEqual([
+      [-1, "overdue"],
+      [0, "due_soon"],
+      [2, "due_soon"],
+      [3, "ok"],
+    ]);
   });
 });
 

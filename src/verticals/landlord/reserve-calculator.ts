@@ -1,4 +1,4 @@
-import { MAX_YEARS_UNTIL_DUE, type PlannedExpense } from "@/lib/reserve/sinking-fund";
+import { MAX_YEARS_UNTIL_DUE, planExpenses, type FundingYear, type PlannedExpense } from "@/engine";
 import { readNumber } from "./parse";
 
 export interface ExpenseFields {
@@ -42,7 +42,7 @@ function looksLikeYear(years: number): boolean {
  * reported rather than treated as blank, so a balance of "$30k" isn't
  * silently counted as no balance.
  */
-export function readReserveInputs(rows: ExpenseFields[], balance: string, units: string): ReserveInputs {
+export function readReserveInputs(rows: readonly ExpenseFields[], balance: string, units: string): ReserveInputs {
   const expenses: PlannedExpense[] = [];
   const rowProblems = new Map<number, ExpenseRowProblem>();
   for (const r of rows) {
@@ -76,4 +76,47 @@ export function readReserveInputs(rows: ExpenseFields[], balance: string, units:
     units: unitsOk ? (unitsValue ?? 0) : 0,
     unitsProblem: unitsOk ? null : UNITS_PROBLEM,
   };
+}
+
+export interface ReserveCalculatorResult {
+  /** Smallest level monthly deposit that pays every expense on time. */
+  readonly monthly: number;
+  /** monthly ÷ units, or null when units is 0. */
+  readonly perUnit: number | null;
+  /** Cost due now that the current balance can't cover. */
+  readonly shortfallNow: number;
+  readonly total: number;
+  /** One row per year from next year to the last year anything is due. */
+  readonly schedule: readonly FundingYear[];
+}
+
+/** The reserve calculator's figures: the engine's expense plan, plus per unit. */
+export function reserveFromExpenses(
+  expenses: readonly PlannedExpense[],
+  currentBalance: number,
+  units: number,
+): ReserveCalculatorResult {
+  const plan = planExpenses(expenses, currentBalance);
+  return {
+    monthly: plan.monthly,
+    perUnit: units > 0 ? plan.monthly / units : null,
+    shortfallNow: plan.shortfallNow,
+    total: plan.total,
+    schedule: plan.schedule,
+  };
+}
+
+/**
+ * What the reserve calculator shows for its fields: what was read from them, and
+ * the figures, or null until there's an expense and nothing needs fixing (a bad
+ * unit count only leaves out the per-unit figure).
+ */
+export function reserveCalculator(
+  rows: readonly ExpenseFields[],
+  balance: string,
+  units: string,
+): { inputs: ReserveInputs; result: ReserveCalculatorResult | null } {
+  const inputs = readReserveInputs(rows, balance, units);
+  const ready = inputs.expenses.length > 0 && inputs.rowProblems.size === 0 && !inputs.balanceProblem;
+  return { inputs, result: ready ? reserveFromExpenses(inputs.expenses, inputs.balance, inputs.units) : null };
 }

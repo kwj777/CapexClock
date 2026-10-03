@@ -33,10 +33,28 @@ describe("when a component replaced on schedule is next due", () => {
         for (const life of [1, 2, 3, 10, 25, 40, 100]) {
           const due = nextDueDistribution(since, life, 2026, giveOrTake);
           expect(sum(due)).toBeCloseTo(1, 9);
-          for (const year of due.keys()) expect(year).toBeGreaterThan(2026);
+          for (const year of due.keys()) {
+            expect(year).toBeGreaterThan(2026);
+            expect(year).toBeLessThanOrEqual(2026 + life + giveOrTake);
+          }
         }
       }
     }
+  });
+
+  it("evens out for a component installed long ago, as early and late replacements add up", () => {
+    // Over 20 replacements since 1800, no year is likelier than another: a tenth in each of the next
+    // 8 years, then less in each year after, as only the replacements that run late are left.
+    const due = nextDueDistribution(1800, 10, 2026, 2);
+    for (let year = 2027; year <= 2034; year++) expect(due.get(year)).toBeCloseTo(0.1, 3);
+    expect([2035, 2036, 2037, 2038].map((year) => due.get(year))).toEqual([
+      expect.closeTo(0.08, 3),
+      expect.closeTo(0.06, 3),
+      expect.closeTo(0.04, 3),
+      expect.closeTo(0.02, 3),
+    ]);
+    // Neighbouring install years come out the same.
+    expect(nextDueDistribution(1801, 10, 2026, 2).get(2027)).toBeCloseTo(0.1, 3);
   });
 
   it("refuses years, lives or give-or-take it can't use", () => {

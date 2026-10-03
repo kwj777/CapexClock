@@ -1,3 +1,4 @@
+import { replacementCost } from "@/engine";
 import { defaultLife, type LibraryComponent } from "../library/components";
 import type { TypicalCost } from "../library/typical-costs";
 import { parseNumber } from "../parse";
@@ -124,7 +125,7 @@ export function rowTotal(row: Pick<DraftRow, "quantity" | "costEach">): { quanti
   const each = parseNumber(row.costEach);
   if (quantity === null || each === null || !Number.isFinite(quantity) || !Number.isFinite(each)) return null;
   if (quantity <= 0 || each < 0) return null;
-  return { quantity, each, total: quantity * each };
+  return { quantity, each, total: replacementCost({ quantity, replacementCostEach: each }) };
 }
 
 /** What one "cost" pays for in a row. */

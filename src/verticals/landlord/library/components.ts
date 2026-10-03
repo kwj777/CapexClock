@@ -1,3 +1,4 @@
+import type { LibraryEntry } from "../../vertical";
 import type { UnitLabel } from "../units";
 
 /**
@@ -17,13 +18,9 @@ export const CHART_CATEGORIES = [
 
 export type ChartCategory = (typeof CHART_CATEGORIES)[number];
 
-export interface LibraryComponent {
-  slug: string;
-  category: string;
-  name: string;
-  lifeLow: number;
-  lifeHigh: number;
-  unitLabel: UnitLabel;
+/** A landlord library entry: the shared fields, plus how it is counted and priced. */
+export interface LibraryComponent extends LibraryEntry {
+  readonly unitLabel: UnitLabel;
 }
 
 // Mirrors the component_library seed. Useful-life ranges in years.

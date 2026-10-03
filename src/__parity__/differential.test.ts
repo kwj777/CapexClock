@@ -1,52 +1,151 @@
 // Side by side: the frozen copy of today's forecast math (./legacy) against the
-// code the site runs, on thousands of seeded made-up buildings. Every number must
-// be the same to the last bit (Object.is), not merely close. While the site still
-// runs today's code this only proves the copy is faithful; once the code moves,
-// it proves the move changed no number. Only the "current code" block below
-// changes when the code moves.
+// engine and the landlord vertical, on thousands of seeded made-up buildings and
+// typed fields. Every number must be the same to the last bit (Object.is), not
+// merely close, so moving the site onto the engine changes no number. The
+// "current code" block below turns the new results into today's shapes.
 
-import { mockupReservePerUnit } from "@/components/ForecastMockup";
 import {
-  atRiskItems,
-  compareReplaceNow,
+  assertForecastOptions,
   computeForecast,
+  findAtRisk,
   levelMonthlyReserve,
   nextReplacementReserve,
+  type AtRiskComponent,
+  type Component,
+  type PlannedExpense,
+  type Replacement,
+} from "@/engine";
+import {
+  assertUnitCount,
+  byUrgencyThenName,
+  COMPONENT_LIBRARY,
+  compareReplaceAtRiskNow,
+  LANDLORD_RULES,
+  landlordForecast,
+  landlordOptions,
+  lifespanEstimate,
+  mockupReservePerUnit,
+  quickEstimate,
+  quickSystems,
+  reserveCalculator,
+  reserveFromExpenses,
+  withLandlordMetrics,
   type CompareOptions,
-  type Forecast,
-  type ForecastComponent,
-} from "@/lib/forecast";
-import { sinkingFund, type PlannedExpense } from "@/lib/reserve/sinking-fund";
-import { COMPONENT_LIBRARY, quickEstimate, quickSystems, type TypicalCost } from "@/verticals/landlord";
+  type ExpenseFields,
+  type LandlordForecast,
+  type LibraryComponent,
+  type ReserveCalculatorResult,
+  type TypicalCost,
+} from "@/verticals/landlord";
 import { corpusCase, mulberry32, type CorpusComponent } from "./generate";
 import * as legacy from "./legacy/forecast";
 import * as legacyCompare from "./legacy/compare";
+import { legacyLifespanEstimate } from "./legacy/lifespan-estimator";
 import * as lq from "./legacy/quick-estimate";
+import { legacyReserveCalculator } from "./legacy/reserve-calculator";
 import { sinkingFund as legacySinkingFund } from "./legacy/sinking-fund";
-import type { Forecast as LegacyForecast } from "./legacy/types";
+import type { AtRiskItem, Forecast as LegacyForecast, Replacement as LegacyReplacement } from "./legacy/types";
 
 // ---------------------------------------------------------------------------
-// The current code, as the site calls it. Each function returns the shape the
-// legacy code returns, so the two can be compared field by field.
+// The current code, as the site calls it: the engine through the landlord
+// vertical. Each function returns the shape the legacy code returns, so the two
+// can be compared field by field.
 // ---------------------------------------------------------------------------
+const toEngine = (c: CorpusComponent): Component => ({
+  id: c.id,
+  category: c.category,
+  name: c.name,
+  quantity: c.quantity,
+  installYear: c.installYear,
+  usefulLifeYears: c.usefulLifeYears,
+  replacementCostEach: c.replacementCostEach,
+  ...(c.scenario ? { scenario: c.scenario } : {}),
+  ...(c.installYearIsEstimate !== undefined ? { estimated: { installYear: c.installYearIsEstimate } } : {}),
+});
+
+const asLegacyReplacement = (r: Replacement): LegacyReplacement => ({
+  componentId: r.componentId,
+  name: r.name,
+  category: r.category,
+  year: r.year,
+  cost: r.cost,
+  overdue: r.overdue,
+  installYearIsEstimate: r.estimated.installYear,
+});
+
+const asLegacyAtRisk = (a: AtRiskComponent): AtRiskItem => ({
+  componentId: a.componentId,
+  name: a.name,
+  category: a.category,
+  endOfLifeYear: a.endOfLifeYear,
+  yearsRemaining: a.yearsRemaining,
+  status: a.status,
+  installYearIsEstimate: a.estimated.installYear,
+});
+
+function asLegacyForecast(f: LandlordForecast): LegacyForecast {
+  return {
+    startYear: f.startYear,
+    endYear: f.endYear,
+    years: f.years.map((y) => ({ year: y.year, total: y.total, byCategory: { ...y.byCategory }, replacements: y.replacements.map(asLegacyReplacement) })),
+    total: f.horizonTotal,
+    neededNow: f.neededNow,
+    monthlyReserve: f.monthlyReserve,
+    monthlyReservePerUnit: f.monthlyReservePerUnit,
+    savingAhead: f.savingAhead.map(asLegacyReplacement),
+    atRisk: f.atRisk.map(asLegacyAtRisk),
+  };
+}
+
+const asLegacyReserve = (r: ReserveCalculatorResult) => ({
+  monthly: r.monthly,
+  perUnit: r.perUnit,
+  shortfallNow: r.shortfallNow,
+  total: r.total,
+  schedule: r.schedule.map((y) => ({ year: y.yearsFromStart, deposits: y.deposits, spent: y.spent, endBalance: y.endBalance })),
+});
+
 const current = {
   forecast(components: CorpusComponent[], unitCount: number, startYear: number, years?: number): LegacyForecast {
-    return computeForecast({ startYear, years, unitCount, components: components.map((c): ForecastComponent => ({ ...c })) });
+    if (years === undefined) return asLegacyForecast(landlordForecast(components.map(toEngine), unitCount, startYear));
+    // The site always shows 10 years; other windows go through the engine with the landlord's checks and order.
+    const options = { ...landlordOptions(startYear), horizonYears: years };
+    assertForecastOptions(options);
+    assertUnitCount(unitCount);
+    return asLegacyForecast(withLandlordMetrics(computeForecast({ ...options, components: components.map(toEngine) }), unitCount));
   },
   atRisk(components: CorpusComponent[], startYear: number) {
-    return atRiskItems(components, startYear);
+    return [...findAtRisk(components.map(toEngine), startYear, LANDLORD_RULES.atRiskYears)].sort(byUrgencyThenName).map(asLegacyAtRisk);
   },
   compare(components: CorpusComponent[], unitCount: number, startYear: number, options: CompareOptions) {
-    return compareReplaceNow({ startYear, unitCount, components }, options);
+    const c = compareReplaceAtRiskNow({ startYear, unitCount, components: components.map(toEngine) }, options);
+    return { ...c, items: c.items.map(asLegacyAtRisk) };
+  },
+  compareItems(components: CorpusComponent[], unitCount: number, startYear: number, options: CompareOptions) {
+    return compareReplaceAtRiskNow({ startYear, unitCount, components: components.map(toEngine) }, options).items;
   },
   sinkingFund(expenses: PlannedExpense[], currentBalance: number, units: number) {
-    return sinkingFund({ expenses, currentBalance, units });
+    return asLegacyReserve(reserveFromExpenses(expenses, currentBalance, units));
+  },
+  reserveCalculator(rows: ExpenseFields[], balance: string, units: string) {
+    const { inputs, result } = reserveCalculator(rows, balance, units);
+    return { inputs, result: result && asLegacyReserve(result) };
   },
   nextReplacementReserve(c: CorpusComponent, startYear: number) {
-    return nextReplacementReserve(c, startYear);
+    return nextReplacementReserve(toEngine(c), startYear);
+  },
+  lifespan(item: LibraryComponent, installYear: string, quantity: string, costEach: string, currentYear: number) {
+    const { badYear, result: r, moneyHint } = lifespanEstimate({ item, installYear, quantity, costEach, currentYear });
+    return {
+      result: r && { due: r.due, low: r.low, high: r.high, monthly: r.monthly, neededNow: r.neededNow, savingFor: r.savingFor },
+      moneyHint,
+      yearsLeft: r ? r.yearsLeft : 0,
+      forecastCountsFrom: r ? r.forecastCountsFrom : null,
+      badYear,
+    };
   },
   levelMonthlyReserve(totals: number[]): number {
-    return levelMonthlyReserve(totals.map((total, year) => ({ year, total, byCategory: {}, replacements: [] })));
+    return levelMonthlyReserve(totals).monthly;
   },
   mockupReservePerUnit,
   quickSystems,
@@ -92,7 +191,7 @@ const errorOf = (f: () => unknown): string => {
 };
 
 // Figures of a forecast both sides have, field by field.
-function view(f: Forecast | LegacyForecast) {
+function view(f: LegacyForecast) {
   return {
     startYear: f.startYear,
     endYear: f.endYear,
@@ -308,6 +407,79 @@ describe("side by side: the comparison and the quick estimate", () => {
         current.quickEstimate(newSystems, ticked, units, yearBuilt, 2026, spread),
         lq.quickEstimate(oldSystems, ticked, units, yearBuilt, 2026, spread),
         `year built ${yearBuilt}`,
+      );
+    }
+  });
+});
+
+describe("side by side: what pages worked out from their fields", () => {
+  it("each compared item's cost and whether it's paid in the first year either way, on 1,500 comparisons", () => {
+    const rand = mulberry32(23);
+    for (let i = 0; i < 1500; i++) {
+      const { startYear, unitCount, components } = corpusCase(rand);
+      const byId = new Map(components.map((c) => [c.id, c]));
+      const items = current.compareItems(components, unitCount, startYear, {});
+      // Today the panel works these out itself: quantity × cost each, and end of life ≤ this year.
+      const today = legacyCompare.compareReplaceNow({ startYear, unitCount, components }).items.map((item) => {
+        const c = byId.get(item.componentId)!;
+        return [item.componentId, legacy.replacementCost(c), legacy.endOfLifeYear(c) <= startYear];
+      });
+      exact(items.map((x) => [x.componentId, x.cost, x.paidInFirstYearEitherWay]), today, `case ${i}`);
+    }
+  });
+
+  it("the comparison refuses what today's refuses, with the same first error", () => {
+    const rand = mulberry32(29);
+    let checked = 0;
+    for (let i = 0; i < 300; i++) {
+      const { startYear, unitCount, components } = corpusCase(rand);
+      if (components.length === 0) continue;
+      const bad = [...components];
+      const k = Math.floor(rand() * bad.length);
+      bad[k] = { ...bad[k], quantity: [0, -1, Number.NaN][i % 3] };
+      for (const [units, year] of [[unitCount, startYear], [-1, startYear], [-1, startYear + 0.5]]) {
+        const a = errorOf(() => legacyCompare.compareReplaceNow({ startYear: year, unitCount: units, components: bad }));
+        expect(a).not.toBe("");
+        expect(errorOf(() => current.compare(bad, units, year, {}))).toBe(a);
+      }
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(200);
+  });
+
+  it("the reserve calculator on 3,000 sets of typed fields: what it reads and when it shows figures", () => {
+    const rand = mulberry32(37);
+    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
+    const costs = ["", "", "12000", "$60,000", "1.4k", "-5", "0", "0.1", "1e308", "abc", " 2 500 ", String(Math.floor(rand() * 2e5))];
+    const years = ["", "", "0", "1", "5", "2.5", "30", "100", "101", "2031", "1900", "-1", "abc", "1e400"];
+    for (let i = 0; i < 3000; i++) {
+      const rows: ExpenseFields[] = Array.from({ length: Math.floor(rand() * 5) }, (_, id) => ({
+        id,
+        cost: pick(costs),
+        years: pick([...years, String(Math.floor(rand() * 101))]),
+      }));
+      const balance = pick(["", "", "30,000", "$30k", "-5000", "4000", "abc", String(rand() * 1e5)]);
+      const units = pick(["", "12", "12.5", "0", "abc", "1,000"]);
+      exact(current.reserveCalculator(rows, balance, units), legacyReserveCalculator(rows, balance, units), `case ${i}`);
+    }
+  });
+
+  it("lifespan pages on 5,000 sets of typed fields", () => {
+    const rand = mulberry32(43);
+    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
+    const years = ["", "  ", "98", "1899", "1900", "2014", "2014.5", "abc", "1e400", "2,014"];
+    const quantities = ["", "0", "1", "12", "1,200", "lots", "-3", "2.5", "1e200"];
+    const costs = ["", "0", "1400", "$1,400", "1.4k", "-5", "0.25", "1e200", "38000"];
+    for (let i = 0; i < 5000; i++) {
+      const item = pick(COMPONENT_LIBRARY);
+      const currentYear = 2020 + Math.floor(rand() * 16);
+      const installYear = rand() < 0.5 ? String(1890 + Math.floor(rand() * 150)) : pick([...years, String(currentYear), String(currentYear + 1)]);
+      const quantity = pick([...quantities, String(rand() * 1000)]);
+      const cost = pick([...costs, String(Math.round(rand() * 1e6) / 100)]);
+      exact(
+        current.lifespan(item, installYear, quantity, cost, currentYear),
+        legacyLifespanEstimate(item, installYear, quantity, cost, currentYear),
+        `case ${i}`,
       );
     }
   });

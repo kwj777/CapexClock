@@ -1,5 +1,12 @@
-import { sinkingFund } from "@/lib/reserve/sinking-fund";
-import { BALANCE_PROBLEM, readReserveInputs, ROW_PROBLEM, UNITS_PROBLEM, YEAR_TYPED_PROBLEM } from "../reserve-calculator";
+import {
+  BALANCE_PROBLEM,
+  readReserveInputs,
+  reserveCalculator,
+  reserveFromExpenses,
+  ROW_PROBLEM,
+  UNITS_PROBLEM,
+  YEAR_TYPED_PROBLEM,
+} from "../reserve-calculator";
 
 const row = (cost: string, years: string, id = 1) => ({ id, cost, years });
 
@@ -71,7 +78,62 @@ describe("reading the reserve calculator's fields", () => {
 describe("the $30k balance example from the review", () => {
   it("counts a readable balance and refuses an unreadable one", () => {
     const ok = readReserveInputs([row("60000", "5")], "30,000", "");
-    expect(sinkingFund({ expenses: ok.expenses, currentBalance: ok.balance, units: ok.units }).monthly).toBeCloseTo(500);
+    expect(reserveFromExpenses(ok.expenses, ok.balance, ok.units).monthly).toBeCloseTo(500);
     expect(readReserveInputs([row("60000", "5")], "$30k", "").balanceProblem).not.toBeNull();
+  });
+});
+
+describe("the reserve calculator's figures", () => {
+  it("adds the per-unit figure to the engine's plan", () => {
+    const r = reserveFromExpenses([{ cost: 12000, yearsUntilDue: 5 }], 0, 4);
+    expect(r.monthly).toBeCloseTo(200);
+    expect(r.perUnit).toBe(r.monthly / 4);
+    expect(r.shortfallNow).toBe(0);
+    expect(r.total).toBe(12000);
+    expect(r.schedule.map((y) => y.yearsFromStart)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("allows a fractional unit count and has no per-unit figure without units", () => {
+    expect(reserveFromExpenses([{ cost: 12000, yearsUntilDue: 5 }], 0, 2.5).perUnit).toBeCloseTo(80);
+    expect(reserveFromExpenses([{ cost: 12000, yearsUntilDue: 5 }], 0, 0).perUnit).toBeNull();
+  });
+
+  it("pays anything due now from the balance and reports the shortfall", () => {
+    const r = reserveFromExpenses(
+      [
+        { cost: 10000, yearsUntilDue: 0 },
+        { cost: 12000, yearsUntilDue: 1 },
+      ],
+      4000,
+      2,
+    );
+    expect(r.shortfallNow).toBe(6000);
+    expect(r.monthly).toBeCloseTo(1000);
+    expect(r.perUnit).toBeCloseTo(500);
+  });
+});
+
+describe("when the reserve calculator shows figures", () => {
+  it("shows them once there's an expense and nothing to fix", () => {
+    const { inputs, result } = reserveCalculator([row("12000", "5")], "", "4");
+    expect(inputs.expenses).toEqual([{ cost: 12000, yearsUntilDue: 5 }]);
+    expect(result).toEqual(reserveFromExpenses(inputs.expenses, 0, 4));
+  });
+
+  it("shows nothing until an expense is entered", () => {
+    expect(reserveCalculator([row("", "")], "30000", "12").result).toBeNull();
+    expect(reserveCalculator([], "", "").result).toBeNull();
+  });
+
+  it("shows nothing while a row or the balance needs fixing", () => {
+    expect(reserveCalculator([row("12000", "5"), row("1.4k", "5", 2)], "", "").result).toBeNull();
+    expect(reserveCalculator([row("12000", "5")], "$30k", "").result).toBeNull();
+  });
+
+  it("still shows the figures with a unit count it can't read, without the per-unit one", () => {
+    const { inputs, result } = reserveCalculator([row("12000", "5")], "", "12.5");
+    expect(inputs.unitsProblem).toBe(UNITS_PROBLEM);
+    expect(result?.monthly).toBeCloseTo(200);
+    expect(result?.perUnit).toBeNull();
   });
 });

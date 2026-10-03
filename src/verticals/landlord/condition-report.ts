@@ -3,8 +3,10 @@
 // is made from these. Everything comes from what the owner supplied; nothing
 // is filled in for them.
 
-import { AT_RISK_YEARS, endOfLifeYear, replacementCost, type ForecastComponent } from "@/lib/forecast";
+import { componentLife, type LifeStatus } from "@/engine";
+import type { ForecastComponent } from "@/lib/forecast";
 import type { ComponentCondition } from "./draft/model";
+import { LANDLORD_RULES } from "./rules";
 import type { UnitLabel } from "./units";
 
 export interface ReportInput {
@@ -14,9 +16,6 @@ export interface ReportInput {
   condition: ComponentCondition | null;
   notes: string;
 }
-
-/** Past end of life, due within AT_RISK_YEARS (both "at risk"), or neither. */
-export type LifeStatus = "overdue" | "due_soon" | "ok";
 
 export interface ReportRow {
   id: string;
@@ -32,6 +31,7 @@ export interface ReportRow {
   endOfLifeYear: number;
   /** Years left until end of life; negative once it's past. */
   remainingLife: number;
+  /** Past end of life, due within LANDLORD_RULES.atRiskYears (both "at risk"), or neither. */
   status: LifeStatus;
   condition: ComponentCondition | null;
   notes: string;
@@ -39,16 +39,11 @@ export interface ReportRow {
   replacementCost: number;
 }
 
-export function lifeStatus(remainingLife: number): LifeStatus {
-  if (remainingLife < 0) return "overdue";
-  return remainingLife <= AT_RISK_YEARS ? "due_soon" : "ok";
-}
-
 /** One row per component, the ones nearest the end of their life first. */
 export function reportRows(inputs: readonly ReportInput[], year: number): ReportRow[] {
   return inputs
     .map(({ component: c, unitLabel, condition, notes }): ReportRow => {
-      const eol = endOfLifeYear(c);
+      const life = componentLife(c, year, LANDLORD_RULES.atRiskYears);
       return {
         id: c.id,
         name: c.name,
@@ -57,14 +52,14 @@ export function reportRows(inputs: readonly ReportInput[], year: number): Report
         unitLabel,
         installYear: c.installYear,
         installYearIsEstimate: c.installYearIsEstimate ?? false,
-        age: Math.max(0, year - c.installYear),
+        age: life.age,
         usefulLife: c.usefulLifeYears,
-        endOfLifeYear: eol,
-        remainingLife: eol - year,
-        status: lifeStatus(eol - year),
+        endOfLifeYear: life.endOfLifeYear,
+        remainingLife: life.yearsRemaining,
+        status: life.status,
         condition,
         notes: notes.trim(),
-        replacementCost: replacementCost(c),
+        replacementCost: life.replacementCost,
       };
     })
     .sort((a, b) => a.remainingLife - b.remainingLife || a.name.localeCompare(b.name));
@@ -87,7 +82,7 @@ export function remainingLifeText(remainingLife: number): string {
 /** "Past end of life", "Due within 2 years" or "" for the at-risk marker. */
 export function statusText(status: LifeStatus): string {
   if (status === "overdue") return "Past end of life";
-  return status === "due_soon" ? `Due within ${years(AT_RISK_YEARS)}` : "";
+  return status === "due_soon" ? `Due within ${years(LANDLORD_RULES.atRiskYears)}` : "";
 }
 
 /** How many components were rated each way, in Good, Fair, Poor order, leaving out unrated ones. */

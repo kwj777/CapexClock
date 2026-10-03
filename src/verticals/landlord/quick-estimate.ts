@@ -1,8 +1,9 @@
-import { computeForecast, RESERVE_HORIZON_YEARS, validateComponent, type ForecastComponent } from "@/lib/forecast";
+import { computeForecast, replacementCycles, validateComponent, type Component } from "@/engine";
 import { badYearBuilt, YEAR_BUILT_TEXT } from "./draft/components";
 import { defaultLife, type LibraryComponent } from "./library/components";
 import type { TypicalCost } from "./library/typical-costs";
 import { readNumber } from "./parse";
+import { LANDLORD_RULES, landlordOptions } from "./rules";
 
 /**
  * The quick estimate: a per-unit monthly reserve range from a unit count, a year
@@ -92,65 +93,16 @@ export const SPREAD_REPLACEMENTS = true;
 export const GIVE_OR_TAKE_YEARS = 2;
 
 /**
- * When a system that lasts `life` years is next due after this year, if it's
- * been replaced on schedule since the building was built: the chance of each
- * year, adding up to 1. Spread, each replacement lands up to GIVE_OR_TAKE_YEARS
- * early or late (each equally likely, and never in the same year as the last
- * one), and those add up over the years, so the older the building, the more
- * evenly its next replacement spreads across the life. Not spread, it's exactly
- * every `life` years. Due this year counts as replaced this year, so nothing is
- * ever overdue.
+ * The lives a system is spread across. Spread: every whole year of its lifespan
+ * range, in equal parts, each replacement landing up to GIVE_OR_TAKE_YEARS early
+ * or late (see the engine's nextDueDistribution: the older the building, the more
+ * evenly its next replacement spreads across the life). Not spread: the middle of
+ * the range, replaced exactly on schedule.
  */
-export function nextDueYears(yearBuilt: number, life: number, currentYear: number, spread: boolean): Map<number, number> {
-  const giveOrTake = spread ? Math.min(GIVE_OR_TAKE_YEARS, life - 1) : 0;
-  const ways = 2 * giveOrTake + 1;
-  // replaced[i]: the chance it was put in or replaced in year yearBuilt + i, up to this year.
-  const replaced = new Array<number>(Math.max(currentYear - yearBuilt + 1, 1)).fill(0);
-  replaced[0] = 1;
-  const due = new Map<number, number>();
-  for (let i = 0; i < replaced.length; i++) {
-    if (replaced[i] === 0) continue;
-    for (let shift = -giveOrTake; shift <= giveOrTake; shift++) {
-      // Always a later year than i, since life - giveOrTake is at least 1.
-      const next = i + life + shift;
-      const chance = replaced[i] / ways;
-      if (yearBuilt + next <= currentYear) replaced[next] += chance;
-      else due.set(yearBuilt + next, (due.get(yearBuilt + next) ?? 0) + chance);
-    }
-  }
-  return due;
-}
-
-/** A share of a system on one replacement schedule. */
-export interface ReplacementCycle {
-  life: number;
-  /** When this share is next due, after this year. It's replaced every `life` years from then. */
-  due: number;
-  /** Its part of the system, out of 1. */
-  share: number;
-}
-
-/**
- * The schedules a system is split across. Spread: every lifespan in its range in
- * equal parts, each split by when it's next due (see nextDueYears). Not spread:
- * one schedule at the middle of its range.
- */
-export function replacementCycles(
-  item: LibraryComponent,
-  yearBuilt: number,
-  currentYear: number,
-  spread: boolean = SPREAD_REPLACEMENTS,
-): ReplacementCycle[] {
-  const lives = spread
+export function livesFor(item: LibraryComponent, spread: boolean): number[] {
+  return spread
     ? Array.from({ length: item.lifeHigh - item.lifeLow + 1 }, (_, i) => item.lifeLow + i)
     : [defaultLife(item)];
-  return lives.flatMap((life) =>
-    [...nextDueYears(yearBuilt, life, currentYear, spread)].map(([due, chance]) => ({
-      life,
-      due,
-      share: chance / lives.length,
-    })),
-  );
 }
 
 /** Each ticked system's share of its job: 1, or an equal split with the others ticked for the same job. */
@@ -174,7 +126,7 @@ export interface QuickEstimate {
  * The full calculator's reserve (the smallest level monthly deposit that pays
  * every replacement after this year on time, 30 years ahead) for the ticked
  * systems, at typical low and high costs. Each system is taken to have been
- * replaced on schedule since the building was built (see replacementCycles), so
+ * replaced on schedule since the building was built (see livesFor), so
  * nothing is overdue. Null when nothing ticked can be priced, there are no units,
  * or there are too many to work out.
  */
@@ -194,9 +146,10 @@ export function quickEstimate(
   const bills = new Map<string, { life: number; due: number; low: number; high: number }>();
   for (const s of included) {
     const amount = units * s.perApartment * (shares.get(s.item.slug) ?? 1);
-    for (const cycle of replacementCycles(s.item, yearBuilt, currentYear, spread)) {
+    const cycles = replacementCycles(livesFor(s.item, spread), yearBuilt, currentYear, spread ? GIVE_OR_TAKE_YEARS : 0);
+    for (const cycle of cycles) {
       // A share first due past the reserve's 30 years ahead adds nothing to it.
-      if (cycle.due > currentYear + RESERVE_HORIZON_YEARS) continue;
+      if (cycle.due > currentYear + LANDLORD_RULES.reserveHorizonYears) continue;
       const key = `${cycle.life}:${cycle.due}`;
       const bill = bills.get(key) ?? { life: cycle.life, due: cycle.due, low: 0, high: 0 };
       bill.low += amount * cycle.share * s.cost.low;
@@ -206,7 +159,7 @@ export function quickEstimate(
   }
   const perUnit = (end: "low" | "high") => {
     const components = [...bills.values()].map(
-      (bill, i): ForecastComponent => ({
+      (bill, i): Component => ({
         id: `bill-${i}`,
         category: "Quick estimate",
         name: `Due ${bill.due}`,
@@ -218,7 +171,7 @@ export function quickEstimate(
     );
     // So many units that a cost can't be worked out gives no estimate rather than an error.
     if (components.some((c) => validateComponent(c).length > 0)) return NaN;
-    return computeForecast({ startYear: currentYear, unitCount: units, components }).monthlyReserve / units;
+    return computeForecast({ ...landlordOptions(currentYear), components }).monthlyReserve / units;
   };
   const estimate = { perUnit: { low: perUnit("low"), high: perUnit("high") }, systems: included.length };
   return Number.isFinite(estimate.perUnit.low) && Number.isFinite(estimate.perUnit.high) ? estimate : null;
@@ -231,6 +184,19 @@ export function quickEstimate(
 export function roundEstimate(value: number): number {
   if (!(value > 0)) return 0;
   return value < 10 ? Math.ceil(value - 1e-6) : Math.ceil(value / 5 - 1e-6) * 5;
+}
+
+/** The estimate as shown: each end rounded up, and the building's figure from the rounded per-unit one. */
+export interface EstimateFigures {
+  perUnit: { low: number; high: number };
+  building: { low: number; high: number };
+}
+
+/** Rounds each end up (roundEstimate) and multiplies the rounded figures out, so the two always agree. */
+export function estimateFigures(estimate: QuickEstimate, units: number): EstimateFigures {
+  const low = roundEstimate(estimate.perUnit.low);
+  const high = roundEstimate(estimate.perUnit.high);
+  return { perUnit: { low, high }, building: { low: low * units, high: high * units } };
 }
 
 export interface QuickInputs {
