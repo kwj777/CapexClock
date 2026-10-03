@@ -40,7 +40,7 @@ describe("the pre-order panel", () => {
   const report = text(renderToStaticMarkup(<PresaleOffer offer="report" link="https://buy.stripe.com/r" />));
 
   it("sells the founding membership with its price, refund and promise", () => {
-    expect(membership).toContain("Founding members get it now, done by hand");
+    expect(membership).toContain("Founding members get it now, sent automatically");
     expect(membership).toContain("$12/month founding price, kept for as long as you stay a member.");
     expect(membership).toContain("$12 every month until you cancel. Cancel any time online.");
     expect(membership).toContain("Full refund within 30 days.");

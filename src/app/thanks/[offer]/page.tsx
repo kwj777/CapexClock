@@ -85,14 +85,22 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
               {offer === "membership" ? (
                 <>
                   <li>
-                    Within 2 business days, we email you from {CONTACT_EMAIL} to set up your reminders.
+                    <strong className="font-semibold text-slate-950 dark:text-white">Save your properties.</strong>{" "}
+                    <Link href="/app" prefetch={false} className={link}>
+                      Sign in to My properties
+                    </Link>{" "}
+                    with the email you paid with, and save each building with its components.
                   </li>
                   <li>
-                    <strong className="font-semibold text-slate-950 dark:text-white">Send us your components.</strong>{" "}
-                    {sendDetails} You can send them now, or reply to our email.
+                    Within 2 business days, we switch on your membership and email you from {CONTACT_EMAIL} when
+                    it&apos;s on.
                   </li>
                   <li>
-                    {OFFER_TEXT.membership.includes} {OFFER_TEXT.membership.delivery}
+                    {OFFER_TEXT.membership.includes} {OFFER_TEXT.membership.delivery} You can turn any of them off
+                    under Email settings in My properties.
+                  </li>
+                  <li>
+                    Rather we set it up for you? {sendDetails}
                   </li>
                 </>
               ) : (
