@@ -41,6 +41,9 @@ npm run build
 | `NEXT_PUBLIC_STRIPE_LINK_MEMBERSHIP` | No | Stripe Payment Link for the $12/month founding membership (`https://buy.stripe.com/…`). Only used when `NEXT_PUBLIC_STRIPE_PORTAL_LINK` is valid too and from the same Stripe mode (both test-mode links, with `test_` in them, or both live), so members can always cancel online. Unset (or no matching portal link) = the reminders panel keeps its email form and /pricing says "Not on sale right now". See [Pre-orders](#pre-orders-stripe-payment-links). |
 | `NEXT_PUBLIC_STRIPE_LINK_REPORT` | No | Stripe Payment Link for the $29 condition report (`https://buy.stripe.com/…`). Unset = the report panel keeps its email form. |
 | `NEXT_PUBLIC_STRIPE_PORTAL_LINK` | No | Stripe customer portal **login link** (`https://billing.stripe.com/p/login/…`), where members cancel. Unset = no "Manage or cancel membership" link, and the membership isn't on sale (the report still can be). |
+| `OWNER_EMAILS_MODE` | No | Server only. `off` (or unset) = no member emails. `preview` = every member's emails go to support@capexclock.com, whatever the date. `live` = members get them on schedule. See [Member emails](#member-emails). |
+| `RESEND_API_KEY` | For member emails | Server only. A Resend API key with sending access to capexclock.com. |
+| `SUPABASE_SECRET_KEY` | For member emails | Server only. The `sb_secret_…` key, read only by the daily email function. Never put it in a `NEXT_PUBLIC_` variable. |
 
 Set them in Netlify under **Project configuration → Environment variables**, then redeploy
 (they're baked in at build time).
@@ -429,8 +432,9 @@ preferences**). Then for each order:
 1. Forward Stripe's email to the CapexClock thread. Claude drafts the reply; you check it and
    send it from support@capexclock.com, to that one person only.
 2. **Membership:** the first email repeats "$12 every month until you cancel" and includes the
-   cancel link (your portal login link). Keep each member's components and due dates where you'll
-   see them, and send each reminder before the item comes due.
+   cancel link (your portal login link). Ask them to sign in and save their buildings (or send
+   their sheet so we can set it up), then make them a member (see [Member emails](#member-emails)):
+   their reminders, budget summary and condition report go out automatically from then on.
 3. **Report:** when the owner emails their sheet or export, forward it to the thread. Claude
    drafts the report (the sample's layout, with the same label on the cover); you check it and
    send it within 2 business days.
@@ -446,6 +450,39 @@ preferences**). Then for each order:
 The sample report is made from the calculator's example building by a script. After changing the
 report's layout or the example (or in a new year, so its dates stay current), run
 `npm run sample-report` and commit `public/sample-condition-report.pdf`.
+
+## Member emails
+
+Founding members get three emails, made from the properties they save in My properties:
+
+| Email | When (Central time) | What's in it |
+| --- | --- | --- |
+| Replacement reminders | From January 2 for everything due that year; after that, the day something newly due is saved. At most one a week. | Each component past its end of life, ending this year or marked Replace now, once per year it's due. |
+| Yearly budget summary | From November 2 | Next year's replacements, the 10-year total and the monthly reserve, per property and in all. |
+| Yearly condition report | From January 8 | The condition report PDF for each property. |
+
+A Netlify scheduled function (`netlify/functions/owner-emails.mts`) runs once a day at 15:00 UTC
+on the live site and sends through Resend from reminders@capexclock.com, with replies going to
+support@capexclock.com. Each email sent is logged in `email_log`, so none goes twice and a failed
+day is caught up the next day. Members switch each email off under Email settings in My properties,
+or with the Unsubscribe link in any of them (Gmail's and Apple Mail's own unsubscribe button works too).
+
+**Make someone a member:** Supabase → Table editor → `memberships` → Insert row: `user_id` = their
+id from Authentication → Users, `active` = true. To stop their emails, set `active` to false.
+They need an account with at least one saved property; there's nothing to send otherwise.
+
+**Turn it on (once):**
+
+1. Run `supabase/migrations/0006_owner_emails.sql` in the SQL editor.
+2. Resend → API Keys → Create (sending access, domain capexclock.com). In Netlify add
+   `RESEND_API_KEY`, `SUPABASE_SECRET_KEY` (Supabase → Project Settings → API Keys → secret key)
+   and `OWNER_EMAILS_MODE` = `preview`, then redeploy.
+3. Make your own account a member. Netlify → Logs → Functions → owner-emails → **Run now**.
+   Every email for every member lands in support@ with "[Preview for …]" in the subject.
+4. When they look right, set `OWNER_EMAILS_MODE` to `live` and redeploy. In preview mode the
+   previews repeat every day, so don't leave it there.
+
+The function's log shows counts only (sent, failed, left for tomorrow), never addresses.
 
 ## Sign-in CAPTCHA (Cloudflare Turnstile)
 
