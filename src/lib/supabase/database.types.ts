@@ -1,4 +1,4 @@
-// Hand-written to match supabase/migrations (0001_init.sql to 0004_condition_notes.sql), in the
+// Hand-written to match supabase/migrations (0001_init.sql to 0006_owner_emails.sql), in the
 // shape `supabase gen types typescript` produces. Only the tables the app uses so far.
 
 export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
@@ -56,6 +56,39 @@ export type ComponentLibraryRow = {
   typical_cost_low: number | null;
   typical_cost_high: number | null;
   typical_cost_per: TypicalCostPer | null;
+};
+
+/** 0006: a founding member. Owners can read their own row; only the dashboard (later Stripe) writes it. */
+export type MembershipRow = {
+  user_id: string;
+  active: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** 0006: which automatic emails an account gets. No row means all three are on. */
+export type EmailSettingsRow = {
+  user_id: string;
+  reminders: boolean;
+  budget_summary: boolean;
+  condition_report: boolean;
+  unsubscribe_token: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The three switches, the only columns an owner may write. */
+export type EmailSwitches = Pick<EmailSettingsRow, "reminders" | "budget_summary" | "condition_report">;
+
+/** 0006: one email sent. Only the daily sender (secret key) reads or writes it. */
+export type EmailLogRow = {
+  id: string;
+  user_id: string;
+  kind: "reminder" | "budget_summary" | "condition_report";
+  year: number;
+  component_id: string | null;
+  sent_at: string;
 };
 
 /** One component as sent to save_property. `id` only for rows already saved. */
@@ -123,6 +156,24 @@ export type Database = {
         Update: Partial<ComponentLibraryRow>;
         Relationships: [];
       };
+      memberships: {
+        Row: MembershipRow;
+        Insert: Partial<MembershipRow> & Pick<MembershipRow, "user_id">;
+        Update: Partial<MembershipRow>;
+        Relationships: [];
+      };
+      email_settings: {
+        Row: EmailSettingsRow;
+        Insert: Partial<EmailSwitches> & { user_id?: string };
+        Update: Partial<EmailSwitches>;
+        Relationships: [];
+      };
+      email_log: {
+        Row: EmailLogRow;
+        Insert: Omit<EmailLogRow, "id" | "sent_at"> & { id?: string; sent_at?: string };
+        Update: Partial<EmailLogRow>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -134,6 +185,11 @@ export type Database = {
           p_expected_updated_at?: string | null;
         };
         Returns: string;
+      };
+      /** 0006: what an unsubscribe link calls. False when the token matches no account. */
+      email_unsubscribe: {
+        Args: { p_token: string; p_kind: string };
+        Returns: boolean;
       };
     };
     Enums: {

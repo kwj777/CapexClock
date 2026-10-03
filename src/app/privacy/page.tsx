@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // netlify/edge-functions/posthog-relay.ts, src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
 // src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
-const UPDATED = "October 2, 2026";
+const UPDATED = "October 3, 2026";
 
 // The sign-in check is mentioned only on deploys that have it switched on.
 const CAPTCHA_ON = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) !== null;
@@ -58,6 +58,13 @@ export default function PrivacyPage() {
               built, and each component&apos;s details and costs. They are stored with Supabase, our database provider,
               and only your account can read or change them. Supabase also sends our sign-in emails. A cookie keeps you
               signed in on this browser until you sign out.
+            </p>
+            <p className="mt-3">
+              If you&apos;re a founding member, we email you replacement reminders, a yearly budget summary and a yearly
+              condition report, made from the properties you save. Resend, our email provider, delivers them and sees
+              your email address and what each email says. We keep a record of which emails we sent you, so none goes
+              twice. We don&apos;t track whether you open them or click their links. Turn each one off under Email
+              settings in My properties, or with the Unsubscribe link in any of them.
             </p>
             {CAPTCHA_ON && (
               <p className="mt-3">
@@ -139,7 +146,8 @@ export default function PrivacyPage() {
           <Section title="Who we share data with">
             <p>
               Only the services that run the site: Netlify (hosting, the early access list and idea sign-ups), Supabase
-              (accounts, saved properties and sign-in emails), PostHog (analytics), Stripe (payments),{" "}
+              (accounts, saved properties and sign-in emails), Resend (delivering our emails), PostHog (analytics), Stripe
+              (payments),{" "}
               {CAPTCHA_ON && "Cloudflare (the check on the sign-in page), "}and Anthropic (reading files you email us).
               We don&apos;t sell your data, and we don&apos;t share it with advertisers.
             </p>
