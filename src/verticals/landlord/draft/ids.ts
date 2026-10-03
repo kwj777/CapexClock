@@ -4,5 +4,6 @@
 let idCounter = 0;
 export function newRowId(): string {
   idCounter += 1;
+  // eslint-disable-next-line no-restricted-globals -- an id, never a number the owner sees
   return `row-${Date.now().toString(36)}-${idCounter}`;
 }

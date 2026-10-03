@@ -1,9 +1,28 @@
-import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import type { ComponentCondition } from "../draft/model";
 import { landlordForecast } from "../forecast";
-import { assetGroupFromSaved, forecastProperty } from "../property";
+import { assetGroupFromSaved, forecastProperty, type SavedComponent, type SavedProperty } from "../property";
+import type { UnitLabel } from "../units";
 
-// Saved rows as the database returns them: the vertical reads only the fields it
-// needs, so the database's own row types are passed straight in.
+// Saved rows as the database returns them, extra columns included: the vertical
+// reads only the fields it needs. (The app checks that the database's own row types
+// fit SavedProperty and SavedComponent.)
+type PropertyRow = SavedProperty & {
+  user_id: string;
+  city: string | null;
+  state: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type ComponentRow = SavedComponent & {
+  library_slug: string | null;
+  unit_label: UnitLabel;
+  condition: ComponentCondition | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 const property: PropertyRow = {
   id: "8f5a2b9e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
   user_id: "11111111-1111-1111-1111-111111111111",

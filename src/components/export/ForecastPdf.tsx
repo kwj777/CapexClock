@@ -166,6 +166,7 @@ const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84, condition: 56 
 // The notes column fills what's left of a letter page (612pt, less 40pt each side) after
 // the name and condition, less its own padding. Its 9pt type gives a line this many em.
 const NOTES_PADDING = 10;
+// eslint-disable-next-line no-restricted-syntax -- PDF column width in em, not a forecast figure
 const NOTES_LINE_EMS = Math.floor((612 - 2 * 40 - cols.name - cols.condition - NOTES_PADDING) / 9);
 // A longer table starts on a new page.
 const MAX_ROWS_KEPT_TOGETHER = 12;

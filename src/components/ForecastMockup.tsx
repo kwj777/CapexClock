@@ -86,6 +86,7 @@ export default function ForecastMockup() {
                 if (!v) return null;
                 const top = y(acc + v);
                 const h = y(acc) - top;
+                // eslint-disable-next-line no-restricted-syntax -- SVG bar stacking, not a forecast figure
                 acc += v;
                 return (
                   <rect key={s.key} x={x} y={top} width={barW} height={h} fill={s.color} rx={2} />
