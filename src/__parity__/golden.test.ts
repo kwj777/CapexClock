@@ -6,49 +6,60 @@
 // reorganized: the "Today's numbers unchanged" check fails if it does.
 
 import { forecastSummary } from "@/components/calculator/announce";
-import { toChartRows } from "@/components/calculator/chartData";
+import { toChartRows, tooltipTotal } from "@/components/calculator/chartData";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { mockupReservePerUnit } from "@/components/ForecastMockup";
 import { estimateText } from "@/components/reserve/estimate-text";
 import { forecastCsv } from "@/lib/export/csv";
 import { exportDetails, exportRows, sumTotals } from "@/lib/export/rows";
-import { compareReplaceNow, computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { forecastForProperty } from "@/lib/properties/convert";
-import { summarizePortfolio } from "@/lib/properties/portfolio";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import {
   ageText,
+  compareReplaceAtRiskNow,
   COMPONENT_LIBRARY,
   defaultLife,
   exampleDraft,
+  forecastProperty,
+  landlordForecast,
   lifeDrivers,
   lifespanDescription,
+  lifespanEstimate,
   lifespanTitle,
+  mockupBadgeReserve,
+  mockupReservePerUnit,
   parseUnitCount,
   quickEstimate,
   quickSystems,
   remainingLifeText,
+  reserveCalculator,
   roundEstimate,
   sampleReport,
   statusText,
+  summarizePortfolio,
   TICKED_BY_DEFAULT,
   toComponents,
   TYPICAL_COSTS,
   UNIT_LABEL_TEXT,
+  type Component,
   type Draft,
   type ExpenseFields,
 } from "@/verticals/landlord";
 import { corpus, CORPUS_SEED, type CorpusComponent } from "./generate";
-import { legacyLifespanEstimate } from "./legacy/lifespan-estimator";
-import { legacyReserveCalculator } from "./legacy/reserve-calculator";
 import { compactLine, forecastLines, n, type KeyOf } from "./view";
 
 // The forecast code as the site calls it. Only these adapters change when the code moves.
-const toComponent = (c: CorpusComponent): ForecastComponent => ({ ...c });
-const forecastOf = (components: ForecastComponent[], unitCount: number, startYear: number) =>
-  computeForecast({ startYear, unitCount, components });
-const lifespanEstimate = legacyLifespanEstimate;
-const reserveCalculator = legacyReserveCalculator;
+const toComponent = (c: CorpusComponent): Component => ({
+  id: c.id,
+  category: c.category,
+  name: c.name,
+  quantity: c.quantity,
+  installYear: c.installYear,
+  usefulLifeYears: c.usefulLifeYears,
+  replacementCostEach: c.replacementCostEach,
+  ...(c.scenario ? { scenario: c.scenario } : {}),
+  ...(c.installYearIsEstimate !== undefined ? { estimated: { installYear: c.installYearIsEstimate } } : {}),
+});
+const forecastOf = (components: readonly Component[], unitCount: number, startYear: number) =>
+  landlordForecast(components, unitCount, startYear);
 
 /** Row ids in the example change with the clock, so they're shown by library slug. */
 function keysOf(draft: Draft): KeyOf {
@@ -75,7 +86,7 @@ describe("the calculator's example building", () => {
           `monthly ${formatReserve(f.monthlyReserve)}`,
           `per unit ${f.monthlyReservePerUnit === null ? "–" : formatReserve(f.monthlyReservePerUnit)}`,
           `needed now ${formatMoney(f.neededNow)}`,
-          `10-year total ${formatMoney(f.total)}`,
+          `10-year total ${formatMoney(f.horizonTotal)}`,
           `announced: ${forecastSummary(f, 0)}`,
         ],
         chart: [
@@ -85,7 +96,7 @@ describe("the calculator's example building", () => {
               `${r.year} total ${n(r.total)}`,
               ...chart.present.map((c) => `${c}:${n(r[c])}`),
               // The chart's tooltip adds up the categories that have a cost, in chart order.
-              `tooltip ${n(chart.present.filter((c) => (r[c] ?? 0) > 0).reduce((sum, c) => sum + (r[c] ?? 0), 0))}`,
+              `tooltip ${n(tooltipTotal(chart.present.filter((c) => (r[c] ?? 0) > 0).map((c) => r[c] ?? 0)))}`,
             ].join(" "),
           ),
         ],
@@ -120,12 +131,12 @@ describe("lifespan pages", () => {
       ];
       for (const installYear of yearsFor(life)) {
         for (const [quantity, cost] of amounts) {
-          const e = lifespanEstimate(item, installYear, quantity, cost, 2026);
+          const e = lifespanEstimate({ item, installYear, quantity, costEach: cost, currentYear: 2026 });
           const r = e.result;
           lines.push(
             `[${installYear}|${quantity}|${cost}] ` +
               (r
-                ? `due ${r.due} range ${r.low}-${r.high} left ${e.yearsLeft} monthly ${n(r.monthly)} now ${n(r.neededNow)} for ${n(r.savingFor)} counts ${n(e.forecastCountsFrom)}`
+                ? `due ${r.due} range ${r.low}-${r.high} left ${r.yearsLeft} monthly ${n(r.monthly)} now ${n(r.neededNow)} for ${n(r.savingFor)} counts ${n(r.forecastCountsFrom)}`
                 : `no result${e.badYear ? " (bad year)" : ""}`) +
               (e.moneyHint ? ` hint ${e.moneyHint.field}${e.moneyHint.invalid ? "!" : ""} ${e.moneyHint.text}` : ""),
           );
@@ -170,7 +181,7 @@ describe("the reserve calculator", () => {
       if (result) {
         lines.push(
           `monthly ${n(result.monthly)} (${formatReserve(result.monthly)}) perUnit ${n(result.perUnit)} shortfall ${n(result.shortfallNow)} total ${n(result.total)}`,
-          ...result.schedule.map((y) => `${y.year}: +${n(y.deposits)} -${n(y.spent)} = ${n(y.endBalance)}`),
+          ...result.schedule.map((y) => `${y.yearsFromStart}: +${n(y.deposits)} -${n(y.spent)} = ${n(y.endBalance)}`),
         );
       } else {
         lines.push("no result");
@@ -231,7 +242,7 @@ describe("saved properties and the portfolio", () => {
   it("one property at a time", () => {
     const lines: string[] = [];
     for (const p of [a, b, c, d]) {
-      const { forecast, excluded } = forecastForProperty(p, rows.filter((r) => r.property_id === p.id), 2026);
+      const { forecast, excluded } = forecastProperty(p, rows.filter((r) => r.property_id === p.id), 2026);
       lines.push(`${p.name}: excluded ${excluded}`, ...forecastLines(forecast));
     }
     expect(lines).toMatchSnapshot();
@@ -251,7 +262,7 @@ describe("saved properties and the portfolio", () => {
 
 describe("the home page illustration", () => {
   it("works out its per-unit reserve", () => {
-    expect([`perUnit ${n(mockupReservePerUnit())}`, `badge $${Math.ceil(mockupReservePerUnit())}`]).toMatchSnapshot();
+    expect([`perUnit ${n(mockupReservePerUnit())}`, `badge $${mockupBadgeReserve()}`]).toMatchSnapshot();
   });
 });
 
@@ -264,7 +275,7 @@ describe("what if we replace everything at risk now", () => {
       const unitCount = parseUnitCount(draft.unitCount);
       const first = new Set([components.find((c) => c.name === "Tank water heater")?.id ?? ""]);
       const lines: string[] = [];
-      const options: [string, Parameters<typeof compareReplaceNow>[1]][] = [
+      const options: [string, Parameters<typeof compareReplaceAtRiskNow>[1]][] = [
         ["all", {}],
         ["all +25%", { emergencyPercent: 25 }],
         ["all +500%", { emergencyPercent: 500 }],
@@ -274,7 +285,7 @@ describe("what if we replace everything at risk now", () => {
         ["none", { only: new Set() }],
       ];
       for (const [name, opts] of options) {
-        const r = compareReplaceNow({ startYear: year, unitCount, components }, opts);
+        const r = compareReplaceAtRiskNow({ startYear: year, unitCount, components }, opts);
         const fig = (f: typeof r.asPlanned) =>
           `now ${n(f.neededNow)} total ${n(f.total)} monthly ${n(f.monthlyReserve)} perUnit ${n(f.monthlyReservePerUnit)}`;
         lines.push(
@@ -285,7 +296,7 @@ describe("what if we replace everything at risk now", () => {
       }
       // One already set to replace now is left out of the choices and counted.
       const roofNow = components.map((c) => (c.name === "Refrigerator" ? { ...c, scenario: "replace_now" as const } : c));
-      const r = compareReplaceNow({ startYear: year, unitCount: 0, components: roofNow }, { emergencyPercent: 37.5 });
+      const r = compareReplaceAtRiskNow({ startYear: year, unitCount: 0, components: roofNow }, { emergencyPercent: 37.5 });
       lines.push(
         `fridge already replacing, no units: items ${r.items.map((i) => key(i.componentId)).join(",")} already ${r.alreadyReplacing}`,
         `  as planned ${n(r.asPlanned.monthlyReserve)} ${n(r.asPlanned.monthlyReservePerUnit)} replace now ${n(r.replaceNow.monthlyReserve)}`,
@@ -354,7 +365,7 @@ describe("values that overflow", () => {
     };
     const { components } = toComponents(draft, 2026);
     const f = forecastOf(components, 12, 2026);
-    const compare = compareReplaceNow({ startYear: 2026, unitCount: 12, components }, { emergencyPercent: 25 });
+    const compare = compareReplaceAtRiskNow({ startYear: 2026, unitCount: 12, components }, { emergencyPercent: 25 });
     expect([
       ...forecastLines(f),
       `monthly ${formatReserve(f.monthlyReserve)}`,

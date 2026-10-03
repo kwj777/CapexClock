@@ -25,14 +25,14 @@ describe("condition, notes and a guessed install year", () => {
 
   it("treats a ticked guess as an estimate, like a blank year", () => {
     const draft = (r: DraftRow): Draft => ({ unitCount: "12", yearBuilt: "1998", rows: [r] });
-    expect(toComponents(draft(row), 2026).components[0].installYearIsEstimate).toBe(false);
+    expect(toComponents(draft(row), 2026).components[0].estimated?.installYear).toBe(false);
     expect(toComponents(draft({ ...row, installYearIsGuess: true }), 2026).components[0]).toMatchObject({
       installYear: 2016,
-      installYearIsEstimate: true,
+      estimated: { installYear: true },
     });
     expect(toComponents(draft({ ...row, installYear: "" }), 2026).components[0]).toMatchObject({
       installYear: 1998,
-      installYearIsEstimate: true,
+      estimated: { installYear: true },
     });
   });
 
@@ -64,7 +64,7 @@ describe("condition, notes and a guessed install year", () => {
     const upgraded = upgradeDraft(legacy, 2026);
     expect(upgraded.rows[0]).not.toHaveProperty("condition");
     expect(upgraded.rows[0]).not.toHaveProperty("notes");
-    expect(toComponents(upgraded, 2026).components[0].installYearIsEstimate).toBe(false);
+    expect(toComponents(upgraded, 2026).components[0].estimated?.installYear).toBe(false);
     expect(detailsSummary(upgraded.rows[0])).toBe("");
   });
 

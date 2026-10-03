@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ForecastComponent } from "@/lib/forecast";
+import type { Component } from "@/engine";
 import {
   ageText,
   conditionCounts,
@@ -12,7 +12,7 @@ import {
 import { exampleDraft } from "../draft/example";
 import { sampleReport, SAMPLE_NOTE } from "../sample-report";
 
-const component = (over: Partial<ForecastComponent>): ForecastComponent => ({
+const component = (over: Partial<Component>): Component => ({
   id: "c",
   category: "Plumbing",
   name: "Water heater",
@@ -22,7 +22,7 @@ const component = (over: Partial<ForecastComponent>): ForecastComponent => ({
   replacementCostEach: 1400,
   ...over,
 });
-const input = (over: Partial<ForecastComponent>, rest: Partial<ReportInput> = {}): ReportInput => ({
+const input = (over: Partial<Component>, rest: Partial<ReportInput> = {}): ReportInput => ({
   component: component(over),
   unitLabel: "per_unit",
   condition: null,
@@ -47,7 +47,7 @@ describe("reportRows", () => {
   const rows = reportRows(
     [
       input({ id: "roof", name: "Roof", installYear: 2008, usefulLifeYears: 22, quantity: 1, replacementCostEach: 38000 }),
-      input({ id: "fridge", name: "Refrigerator", installYear: 1998, installYearIsEstimate: true, usefulLifeYears: 13 }, {
+      input({ id: "fridge", name: "Refrigerator", installYear: 1998, estimated: { installYear: true }, usefulLifeYears: 13 }, {
         condition: "fair",
         notes: "  Mixed ages.  ",
       }),

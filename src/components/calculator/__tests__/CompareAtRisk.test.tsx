@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { compareReplaceNow, type ForecastComponent } from "@/lib/forecast";
-import { exampleDraft, toComponents } from "@/verticals/landlord";
+import { compareReplaceAtRiskNow, exampleDraft, toComponents, type Component } from "@/verticals/landlord";
 import CompareAtRisk, { ComparisonPanel } from "../CompareAtRisk";
 import { NEW_COMPARE_STATE, type CompareState } from "../compare";
 
@@ -65,9 +64,9 @@ describe("the open panel", () => {
     unticked = new Set<string>(),
     percentText = "",
     showPercentError = false,
-  }: { list?: ForecastComponent[]; unticked?: ReadonlySet<string>; percentText?: string; showPercentError?: boolean } = {}) {
+  }: { list?: Component[]; unticked?: ReadonlySet<string>; percentText?: string; showPercentError?: boolean } = {}) {
     const percent = showPercentError ? 0 : Number(percentText || 0);
-    const comparison = compareReplaceNow(
+    const comparison = compareReplaceAtRiskNow(
       { startYear: 2026, unitCount: 12, components: list },
       { only: new Set(list.filter((c) => !unticked.has(c.id)).map((c) => c.id)), emergencyPercent: percent },
     );

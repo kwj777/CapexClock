@@ -1,15 +1,15 @@
-import { computeForecast, type ForecastComponent } from "@/lib/forecast";
+import { landlordForecast, type Component } from "@/verticals/landlord";
 import { exportFileName, forecastCsv } from "../csv";
 
-const components: ForecastComponent[] = [
+const components: Component[] = [
   { id: "wh", category: "Plumbing", name: "Water heaters", quantity: 12, installYear: 2010, usefulLifeYears: 10, replacementCostEach: 1400 },
-  { id: "roof", category: "Roofing", name: 'Roof, "main"', quantity: 1, installYear: 2008, installYearIsEstimate: true, usefulLifeYears: 22, replacementCostEach: 38000 },
+  { id: "roof", category: "Roofing", name: 'Roof, "main"', quantity: 1, installYear: 2008, estimated: { installYear: true }, usefulLifeYears: 22, replacementCostEach: 38000 },
   { id: "evil", category: "Other", name: "=HYPERLINK(\"x\")", quantity: 1, installYear: 2020, usefulLifeYears: 8, replacementCostEach: 10 },
 ];
-const forecast = computeForecast({ startYear: 2026, unitCount: 12, components });
+const forecast = landlordForecast(components, 12, 2026);
 
-function csvLines(list: ForecastComponent[], details?: Parameters<typeof forecastCsv>[2]): string[] {
-  return forecastCsv(computeForecast({ startYear: 2026, unitCount: 1, components: list }), list, details)
+function csvLines(list: Component[], details?: Parameters<typeof forecastCsv>[2]): string[] {
+  return forecastCsv(landlordForecast(list, 1, 2026), list, details)
     .trimEnd()
     .split("\r\n");
 }
@@ -86,8 +86,8 @@ describe("forecast CSV", () => {
   });
 
   it("adds each component's condition and notes, and names guessed install years", () => {
-    const list: ForecastComponent[] = [
-      { id: "wh", category: "Plumbing", name: "Water heaters", quantity: 12, installYear: 2018, installYearIsEstimate: true, usefulLifeYears: 10, replacementCostEach: 1400 },
+    const list: Component[] = [
+      { id: "wh", category: "Plumbing", name: "Water heaters", quantity: 12, installYear: 2018, estimated: { installYear: true }, usefulLifeYears: 10, replacementCostEach: 1400 },
       { id: "roof", category: "Roofing", name: "Roof", quantity: 1, installYear: 2010, usefulLifeYears: 20, replacementCostEach: 38000 },
     ];
     const out = csvLines(list, {

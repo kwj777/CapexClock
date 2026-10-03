@@ -3,14 +3,13 @@
 // is made from these. Everything comes from what the owner supplied; nothing
 // is filled in for them.
 
-import { componentLife, type LifeStatus } from "@/engine";
-import type { ForecastComponent } from "@/lib/forecast";
+import { componentLife, type Component, type LifeStatus } from "@/engine";
 import type { ComponentCondition } from "./draft/model";
 import { LANDLORD_RULES } from "./rules";
 import type { UnitLabel } from "./units";
 
 export interface ReportInput {
-  component: ForecastComponent;
+  component: Component;
   unitLabel: UnitLabel;
   /** Null when the owner didn't rate it. */
   condition: ComponentCondition | null;
@@ -51,7 +50,7 @@ export function reportRows(inputs: readonly ReportInput[], year: number): Report
         quantity: c.quantity,
         unitLabel,
         installYear: c.installYear,
-        installYearIsEstimate: c.installYearIsEstimate ?? false,
+        installYearIsEstimate: c.estimated?.installYear ?? false,
         age: life.age,
         usefulLife: c.usefulLifeYears,
         endOfLifeYear: life.endOfLifeYear,

@@ -1,6 +1,13 @@
 import { SAVE_PROBLEM_TEXT, toSaveInput, type SaveInput } from "@/lib/properties/convert";
 import type { SaveFailure } from "@/lib/properties/save";
-import { EMPTY_DRAFT, withImportedRows, type Draft, type ImportedRow } from "@/verticals/landlord";
+import {
+  countNoun,
+  EMPTY_DRAFT,
+  LANDLORD_LABELS,
+  withImportedRows,
+  type Draft,
+  type ImportedRow,
+} from "@/verticals/landlord";
 import type { BuildingInfo, Preview, PreviewRow } from "./preview";
 import { listText, words } from "./text";
 
@@ -195,7 +202,7 @@ export function portfolioSummary(properties: readonly Pick<PlannedProperty, "row
   }
   const rows = properties.reduce((n, p) => n + p.rows.length, 0);
   const waiting = properties.reduce((n, p) => n + p.waiting.length, 0);
-  const made = `${count(properties.length, "property", "properties")} to create from ${count(rows, "row")}.`;
+  const made = `${count(properties.length, LANDLORD_LABELS.assetGroup.one, LANDLORD_LABELS.assetGroup.many)} to create from ${count(rows, "row")}.`;
   return waiting > 0 ? `${made} ${count(waiting, "row needs", "rows need")} you.` : made;
 }
 
@@ -265,12 +272,12 @@ export function createSummary(results: readonly CreateResult[]): string {
   const created = results.filter((r) => r.status === "created").length;
   const failed = results.length - created;
   const parts: string[] = [];
-  if (created > 0) parts.push(`Created ${created} ${created === 1 ? "property" : "properties"}.`);
+  if (created > 0) parts.push(`Created ${created} ${countNoun(LANDLORD_LABELS.assetGroup, created)}.`);
   if (failed > 0) parts.push(`${failed} didn't save.`);
   return parts.join(" ");
 }
 
 /** The button that creates them: "Create 3 properties". */
 export function createLabel(count: number): string {
-  return `Create ${count} ${count === 1 ? "property" : "properties"}`;
+  return `Create ${count} ${countNoun(LANDLORD_LABELS.assetGroup, count)}`;
 }

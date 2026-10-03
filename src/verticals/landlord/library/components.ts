@@ -61,3 +61,12 @@ export function chartCategory(category: string): ChartCategory {
     ? (category as ChartCategory)
     : "Other";
 }
+
+/** Library items by category, in library order, for the calculator's picker. */
+export function groupByCategory(library: readonly LibraryComponent[]): Record<string, LibraryComponent[]> {
+  return library.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
+    (acc[c.category] ??= []).push(c);
+    return acc;
+    // No prototype, so a category named "constructor" can't collide with Object's own keys.
+  }, Object.create(null) as Record<string, LibraryComponent[]>);
+}

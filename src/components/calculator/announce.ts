@@ -1,4 +1,4 @@
-import type { Forecast } from "@/lib/forecast";
+import { LANDLORD_LABELS, type LandlordForecast } from "@/verticals/landlord";
 import { formatMoney, formatReserve } from "./format";
 
 /**
@@ -6,11 +6,13 @@ import { formatMoney, formatReserve } from "./format";
  * the monthly reserve, what's needed now and how many rows are left out.
  * Empty when there's nothing to say yet.
  */
-export function forecastSummary(forecast: Forecast | null, incomplete: number): string {
+export function forecastSummary(forecast: LandlordForecast | null, incomplete: number): string {
   const parts: string[] = [];
   if (forecast) {
     const perUnit =
-      forecast.monthlyReservePerUnit === null ? "" : `, ${formatReserve(forecast.monthlyReservePerUnit)} per unit`;
+      forecast.monthlyReservePerUnit === null
+        ? ""
+        : `, ${formatReserve(forecast.monthlyReservePerUnit)} per ${LANDLORD_LABELS.divisor.one}`;
     parts.push(`Monthly reserve ${formatReserve(forecast.monthlyReserve)}${perUnit}.`);
     parts.push(`Needed in ${forecast.startYear}: ${formatMoney(forecast.neededNow)}.`);
   }

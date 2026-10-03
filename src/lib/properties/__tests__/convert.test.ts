@@ -1,6 +1,6 @@
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import { editRow, exampleDraft, withUnitCount } from "@/verticals/landlord";
-import { draftFromRows, forecastForProperty, saveProblemFields, toSaveInput } from "../convert";
+import { draftFromRows, saveProblemFields, toSaveInput } from "../convert";
 
 const property: PropertyRow = {
   id: "8f5a2b9e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
@@ -215,27 +215,5 @@ describe("loading a saved property", () => {
     const before0004 = component({});
     expect(before0004).not.toHaveProperty("install_year_is_estimate");
     expect(draftFromRows(property, [before0004])).toMatchObject({ rows: [{ installYearIsGuess: false }] });
-    expect(forecastForProperty(property, [before0004], 2026).forecast.atRisk[0].installYearIsEstimate).toBe(false);
-  });
-
-  it("marks a guessed install year as an estimate in the forecast", () => {
-    const rows = [
-      component({ install_year: 2015, install_year_is_estimate: true }),
-      component({ id: "b1d7c1e2-0000-4000-8000-000000000007", install_year: 2015 }),
-    ];
-    const { forecast } = forecastForProperty(property, rows, 2026);
-    expect(forecast.atRisk.map((r) => r.installYearIsEstimate)).toEqual([true, false]);
-  });
-
-  it("forecasts saved rows, using year built for blank install years and skipping blank costs", () => {
-    const rows = [
-      component({}),
-      component({ id: "b1d7c1e2-0000-4000-8000-000000000002", install_year: null }), // 1998 -> overdue
-      component({ id: "b1d7c1e2-0000-4000-8000-000000000003", replacement_cost_each: null }),
-    ];
-    const { forecast, excluded } = forecastForProperty(property, rows, 2026);
-    expect(excluded).toBe(1);
-    expect(forecast.neededNow).toBe(2 * 12 * 1400);
-    expect(forecast.atRisk.find((r) => r.status === "overdue")?.installYearIsEstimate).toBe(true);
   });
 });

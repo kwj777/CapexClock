@@ -1,47 +1,16 @@
 // Static illustration of the forecast output. The spending is made up; the
 // reserve figure is worked out from it the same way the calculator does.
 
-import { levelMonthlyReserve, type ForecastYear } from "@/lib/forecast";
+import { MOCKUP_SPEND, MOCKUP_UNITS, mockupBadgeReserve, type MockupKey } from "@/verticals/landlord";
 
 const SERIES = [
   { key: "roof", label: "Roof", color: "#f59e0b" },
   { key: "hvac", label: "HVAC", color: "#0ea5e9" },
   { key: "water", label: "Water heaters", color: "#10b981" },
   { key: "other", label: "Other", color: "#94a3b8" },
-] as const;
+] as const satisfies readonly { key: MockupKey; label: string; color: string }[];
 
-type Key = (typeof SERIES)[number]["key"];
-
-// Annual spend in $k per component, starting this year.
-export const MOCKUP_SPEND: Record<Key, number>[] = [
-  { roof: 0, hvac: 0, water: 4, other: 2 },
-  { roof: 0, hvac: 12, water: 0, other: 3 },
-  { roof: 0, hvac: 0, water: 5, other: 2 },
-  { roof: 38, hvac: 0, water: 0, other: 4 },
-  { roof: 0, hvac: 8, water: 3, other: 2 },
-  { roof: 0, hvac: 0, water: 0, other: 6 },
-  { roof: 0, hvac: 18, water: 5, other: 3 },
-  { roof: 0, hvac: 0, water: 0, other: 2 },
-  { roof: 0, hvac: 0, water: 6, other: 9 },
-  { roof: 14, hvac: 6, water: 0, other: 3 },
-];
-export const MOCKUP_UNITS = 12;
 const ROOF_YEAR = 3;
-
-/**
- * The calculator's reserve for this chart, per unit: the smallest level monthly
- * deposit that pays every bill after this year on time. The $38k roof in year
- * four sets it, which a plain 10-year average would miss.
- */
-export function mockupReservePerUnit(): number {
-  const years: ForecastYear[] = MOCKUP_SPEND.map((values, i) => ({
-    year: i,
-    total: SERIES.reduce((sum, s) => sum + values[s.key], 0) * 1000,
-    byCategory: {},
-    replacements: [],
-  }));
-  return levelMonthlyReserve(years) / MOCKUP_UNITS;
-}
 
 const W = 560;
 const H = 260;
@@ -52,7 +21,7 @@ const TICKS = [0, 10, 20, 30, 40, 50];
 export default function ForecastMockup() {
   const startYear = new Date().getFullYear();
   // Rounded up, like the calculator's figure, so saving it never runs short.
-  const reserve = Math.ceil(mockupReservePerUnit());
+  const reserve = mockupBadgeReserve();
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
   const band = plotW / MOCKUP_SPEND.length;

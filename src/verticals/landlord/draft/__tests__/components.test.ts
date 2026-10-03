@@ -1,6 +1,6 @@
-import { computeForecast } from "@/lib/forecast";
 import { COMPONENT_LIBRARY } from "../../library/components";
 import { badYearBuilt, PROBLEM_TEXT, problemFields, problemText, toComponents } from "../components";
+import { landlordForecast } from "../../forecast";
 import { exampleDraft } from "../example";
 import type { Draft, DraftRow } from "../model";
 import { customRow, rowFromLibrary } from "../rows";
@@ -16,7 +16,7 @@ describe("calculator rows to forecast components", () => {
     expect(components[0]).toMatchObject({
       quantity: 24,
       installYear: 2014,
-      installYearIsEstimate: true,
+      estimated: { installYear: true },
       usefulLifeYears: 10,
       replacementCostEach: 1400,
     });
@@ -25,7 +25,7 @@ describe("calculator rows to forecast components", () => {
   it("uses one row for bulk items: 24 water heaters from 2014 at $1,400", () => {
     const row = { ...rowFromLibrary(waterHeater, "24"), installYear: "2014", costEach: "1400" };
     const { components } = toComponents({ unitCount: "24", yearBuilt: "", rows: [row] }, 2026);
-    const f = computeForecast({ startYear: 2026, unitCount: 24, components });
+    const f = landlordForecast(components, 24, 2026);
     expect(f.years[0].total).toBe(33600);
   });
 
@@ -70,7 +70,7 @@ describe("calculator rows to forecast components", () => {
     const blank = { ...rowFromLibrary(waterHeater, "4"), costEach: "900" };
     const { components, problems } = toComponents({ unitCount: "4", yearBuilt: "1890", rows: [blank] }, 2026);
     expect(problems).toEqual({});
-    expect(components[0]).toMatchObject({ installYear: 1890, installYearIsEstimate: true });
+    expect(components[0]).toMatchObject({ installYear: 1890, estimated: { installYear: true } });
   });
 
   it("still keeps typed install years to 1900 or later", () => {

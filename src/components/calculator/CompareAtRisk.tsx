@@ -4,13 +4,13 @@ import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type SetSta
 import { track } from "@/lib/analytics";
 import { guessedYear } from "@/lib/export/rows";
 import {
-  compareReplaceNow,
-  replacementCost,
-  type AtRiskItem,
-  type ForecastComponent,
+  compareReplaceAtRiskNow,
+  type CompareItem,
+  type Component,
+  type Draft,
+  type DraftRow,
   type ReplaceNowComparison,
-} from "@/lib/forecast";
-import type { Draft, DraftRow } from "@/verticals/landlord";
+} from "@/verticals/landlord";
 import {
   applyChosen,
   applyLabel,
@@ -67,7 +67,7 @@ export default function CompareAtRisk({
   startYear: number;
   unitCount: number;
   /** The forecast's components, as the calculator worked them out from the draft. */
-  components: ForecastComponent[];
+  components: readonly Component[];
   /** Form rows by id, for whether an install year was typed and ticked as a guess. */
   rows: ReadonlyMap<string, DraftRow>;
   draft: Draft;
@@ -92,7 +92,7 @@ export default function CompareAtRisk({
   const { percent, error: percentError } = parseEmergencyPercent(percentText);
   const comparison = useMemo(
     () =>
-      compareReplaceNow(
+      compareReplaceAtRiskNow(
         { startYear, unitCount, components },
         { only: new Set(components.filter((c) => !unticked.has(c.id)).map((c) => c.id)), emergencyPercent: percent },
       ),
@@ -254,7 +254,7 @@ export function ComparisonPanel({
   applyId: string;
   startYear: number;
   comparison: ReplaceNowComparison;
-  byId: ReadonlyMap<string, ForecastComponent>;
+  byId: ReadonlyMap<string, Component>;
   rows: ReadonlyMap<string, DraftRow>;
   unticked: ReadonlySet<string>;
   onTick: (id: string, ticked: boolean) => void;
@@ -277,15 +277,15 @@ export function ComparisonPanel({
   const monthly = formatReserve(replaceNow.monthlyReserve);
   const perUnit = perUnitText(asPlanned, replaceNow);
   const eitherWay = eitherWayVariants(items, startYear, percent);
-  const sure = items.filter((i) => !i.installYearIsEstimate);
-  const toCheck = items.filter((i) => i.installYearIsEstimate);
+  const sure = items.filter((i) => !i.estimated.installYear);
+  const toCheck = items.filter((i) => i.estimated.installYear);
   const shownHint = showPercentError ? errorId : percent > 0 ? noteId : hintId;
 
   if (items.length === 0) {
     return <p className="text-sm text-slate-600 dark:text-slate-300">Everything at risk is set to Replace this year.</p>;
   }
 
-  const choice = (item: AtRiskItem) => {
+  const choice = (item: CompareItem) => {
     const component = byId.get(item.componentId);
     if (!component) return null;
     const row = rows.get(item.componentId);
@@ -305,7 +305,7 @@ export function ComparisonPanel({
             </span>
           </span>
           <span className="shrink-0 tabular-nums text-slate-900 dark:text-white">
-            {formatMoney(replacementCost(component))}
+            {formatMoney(item.cost)}
           </span>
         </label>
       </li>

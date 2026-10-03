@@ -1,5 +1,4 @@
-import type { ForecastComponent } from "@/lib/forecast";
-import { validateComponent } from "@/lib/forecast";
+import { validateComponent, type Component } from "@/engine";
 import { parseNumber } from "../parse";
 import type { Draft, DraftRow } from "./model";
 
@@ -30,15 +29,15 @@ export type RowProblem =
   | "invalid";
 
 export interface ConvertedRows {
-  components: ForecastComponent[];
+  components: Component[];
   problems: Record<string, RowProblem>;
 }
 
-/** Turns form rows into forecast components; rows that aren't complete are reported, not guessed. */
+/** Turns form rows into engine components; rows that aren't complete are reported, not guessed. */
 export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
   const yearBuilt = parseNumber(draft.yearBuilt);
   const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, currentYear);
-  const components: ForecastComponent[] = [];
+  const components: Component[] = [];
   const problems: Record<string, RowProblem> = {};
 
   for (const row of draft.rows) {
@@ -66,17 +65,17 @@ export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
       problems[row.id] = "missing_cost";
       continue;
     }
-    const component: ForecastComponent = {
+    const component: Component = {
       id: row.id,
       category: row.category,
       name: row.name.trim(),
       quantity: parseNumber(row.quantity) ?? NaN,
       installYear,
-      // Year built standing in for a blank year, or a year the owner says is a guess.
-      installYearIsEstimate: explicitYear === null || row.installYearIsGuess === true,
       usefulLifeYears: parseNumber(row.usefulLife) ?? NaN,
       replacementCostEach: cost,
       scenario: row.scenario,
+      // Year built standing in for a blank year, or a year the owner says is a guess.
+      estimated: { installYear: explicitYear === null || row.installYearIsGuess === true },
     };
     if (validateComponent(component).length > 0) {
       problems[row.id] = "invalid";

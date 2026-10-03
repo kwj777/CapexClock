@@ -3,18 +3,25 @@ import type { ReactElement } from "react";
 import { formatReserve } from "@/components/calculator/format";
 import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
+  atRiskShortText,
+  barPercent,
   ESTIMATED_NOTE,
   exportRows,
   GUESS_NOTE,
   installYearNote,
   leftOutSummary,
-  sumTotals,
+  pdfYearFigures,
   type ConditionNote,
   type ExportDetails,
   type ExportRow,
 } from "@/lib/export/rows";
-import type { Forecast, ForecastComponent } from "@/lib/forecast";
-import { CONDITION_TEXT } from "@/verticals/landlord";
+import {
+  CONDITION_TEXT,
+  countNoun,
+  LANDLORD_LABELS,
+  type Component,
+  type LandlordForecast,
+} from "@/verticals/landlord";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons), so the
 // fonts are only fetched then too.
@@ -173,8 +180,8 @@ const MAX_NOTE_LINES_KEPT_TOGETHER = 30;
 export interface ForecastPdfProps {
   name: string;
   unitCount: number;
-  forecast: Forecast;
-  components: ForecastComponent[];
+  forecast: LandlordForecast;
+  components: readonly Component[];
   details?: ExportDetails;
   generatedOn: string;
   /** Makes names safe to print; see printableText. */
@@ -198,8 +205,7 @@ export default function ForecastPdf({
 }: ForecastPdfProps) {
   const { rows, money } = tableData({ forecast, components, details });
   // Totals add up the rounded rows, so they match the table to the cent.
-  const years = forecast.years.map((y) => ({ year: y.year, total: sumTotals(rows.filter((r) => r.year === y.year)) }));
-  const maxYear = Math.max(1, ...years.map((y) => y.total));
+  const { years, maxYear, neededNow, horizonTotal } = pdfYearFigures(forecast, rows);
   const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
   // The saving-for list is its own column: cents on every line once one has them.
   const aheadMoney = moneyColumn(forecast.savingAhead.map((r) => r.cost));
@@ -210,7 +216,7 @@ export default function ForecastPdf({
         <Text style={s.brand}>CAPEXCLOCK · CAPEX FORECAST</Text>
         <Text style={s.title}>{printable(name)}</Text>
         <Text style={s.subtitle}>
-          {unitCount > 0 ? `${unitCount.toLocaleString("en-US")} ${unitCount === 1 ? "unit" : "units"} · ` : ""}
+          {unitCount > 0 ? `${unitCount.toLocaleString("en-US")} ${countNoun(LANDLORD_LABELS.divisor, unitCount)} · ` : ""}
           {forecast.startYear}–{forecast.endYear} · prepared {generatedOn}
         </Text>
 
@@ -220,13 +226,13 @@ export default function ForecastPdf({
             label="Per unit, per month"
             value={forecast.monthlyReservePerUnit === null ? "–" : formatReserve(forecast.monthlyReservePerUnit)}
           />
-          <Stat label={`Needed in ${forecast.startYear}`} value={money(years[0].total)} />
-          <Stat label="10-year total" value={money(sumTotals(rows))} />
+          <Stat label={`Needed in ${forecast.startYear}`} value={money(neededNow)} />
+          <Stat label="10-year total" value={money(horizonTotal)} />
         </View>
         {leftOut.length > 0 && <Text style={s.leftOut}>{leftOutSummary(leftOut)}</Text>}
         <Text style={s.note}>
           The monthly reserve is the smallest steady amount that has the cash ready for every replacement
-          from {forecast.startYear + 1} on, looking 30 years ahead. {forecast.startYear} costs (overdue or due
+          from {forecast.reserveFromYear} on, looking 30 years ahead. {forecast.startYear} costs (overdue or due
           this year) are listed separately. All figures are in today&apos;s dollars, without inflation.
         </Text>
 
@@ -235,7 +241,7 @@ export default function ForecastPdf({
           <View key={y.year} style={s.barRow}>
             <Text style={s.barYear}>{y.year}</Text>
             <View style={s.barTrack}>
-              {y.total > 0 && <View style={[s.bar, { width: `${(y.total / maxYear) * 100}%` }]} />}
+              {y.total > 0 && <View style={[s.bar, { width: `${barPercent(y.total, maxYear)}%` }]} />}
             </View>
             <Text style={s.barValue}>{money(y.total)}</Text>
           </View>
@@ -246,15 +252,11 @@ export default function ForecastPdf({
             <Text style={s.h2}>At risk</Text>
             {forecast.atRisk.map((a) => {
               const d = details.rowDetails?.get(a.componentId);
-              const yearNote = installYearNote(a.installYearIsEstimate, d);
+              const yearNote = installYearNote(a.estimated.installYear, d);
               return (
                 <Text key={a.componentId} style={{ marginBottom: 2 }}>
                   {printable(a.name)}:{" "}
-                  {a.status === "overdue"
-                    ? `${-a.yearsRemaining} yr${a.yearsRemaining === -1 ? "" : "s"} past end of life`
-                    : a.yearsRemaining === 0
-                      ? "due this year"
-                      : `due in ${a.yearsRemaining} yr${a.yearsRemaining === 1 ? "" : "s"}`}
+                  {atRiskShortText(a)}
                   {d?.condition ? `, ${CONDITION_TEXT[d.condition].toLowerCase()} condition` : ""}
                   {yearNote ? ` (${yearNote.toLowerCase()})` : ""}
                 </Text>

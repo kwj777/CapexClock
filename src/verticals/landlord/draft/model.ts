@@ -1,4 +1,4 @@
-import type { Scenario } from "@/lib/forecast";
+import type { Scenario } from "@/engine";
 import type { UnitLabel } from "../units";
 import { toComponents } from "./components";
 

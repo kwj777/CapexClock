@@ -14,11 +14,12 @@ import ForecastMockup from "@/components/ForecastMockup";
 import ConditionReportPdf from "@/components/report/ConditionReportPdf";
 import QuickEstimate from "@/components/reserve/QuickEstimate";
 import { exportDetails } from "@/lib/export/rows";
-import { compareReplaceNow, computeForecast } from "@/lib/forecast";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
 import {
+  compareReplaceAtRiskNow,
   COMPONENT_LIBRARY,
   exampleDraft,
+  landlordForecast,
   parseUnitCount,
   SAMPLE_NOTE,
   sampleReport,
@@ -126,7 +127,7 @@ describe("the forecast PDF", () => {
       const draft = withSteadyIds(exampleDraft());
       const { components } = toComponents(draft, year);
       const unitCount = parseUnitCount(draft.unitCount);
-      const forecast = computeForecast({ startYear: year, unitCount, components });
+      const forecast = landlordForecast(components, unitCount, year);
       expect(
         text(
           <ForecastPdf
@@ -166,7 +167,7 @@ describe("the replace-now comparison", () => {
     it(`on the example building, ${percent}% emergency premium`, () => {
       const draft = withSteadyIds(exampleDraft());
       const { components } = toComponents(draft, 2026);
-      const comparison = compareReplaceNow(
+      const comparison = compareReplaceAtRiskNow(
         { startYear: 2026, unitCount: parseUnitCount(draft.unitCount), components },
         { emergencyPercent: percent },
       );

@@ -2,12 +2,13 @@
 // example building (Load an example), with made-up conditions and notes of
 // the kind an owner would send. scripts/sample-report.tsx renders it.
 
-import { computeForecast, type Forecast, type ForecastComponent } from "@/lib/forecast";
+import type { Component } from "@/engine";
 import { reportRows, type ReportRow } from "./condition-report";
 import { toComponents } from "./draft/components";
 import { exampleDraft } from "./draft/example";
 import type { ComponentCondition } from "./draft/model";
 import { parseUnitCount } from "./draft/rows";
+import { landlordForecast, type LandlordForecast } from "./forecast";
 
 /** The owner's ratings and notes for each example component, by library slug. */
 const SAMPLE_CONDITIONS: Record<string, { condition: ComponentCondition; notes: string }> = {
@@ -27,8 +28,8 @@ export interface SampleReport {
   unitCount: number;
   yearBuilt: number;
   rows: ReportRow[];
-  forecast: Forecast;
-  components: ForecastComponent[];
+  forecast: LandlordForecast;
+  components: Component[];
 }
 
 export function sampleReport(year: number): SampleReport {
@@ -47,7 +48,7 @@ export function sampleReport(year: number): SampleReport {
     unitCount,
     yearBuilt: Number(draft.yearBuilt),
     rows: reportRows(inputs, year),
-    forecast: computeForecast({ startYear: year, unitCount, components }),
+    forecast: landlordForecast(components, unitCount, year),
     components,
   };
 }

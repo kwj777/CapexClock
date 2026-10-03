@@ -1,5 +1,4 @@
 import { assertForecastOptions, computeForecast, type Component, type ForecastResult } from "@/engine";
-import type { ForecastComponent } from "@/lib/forecast";
 import { badYearBuilt, toComponents, type RowProblem } from "./draft/components";
 import type { Draft } from "./draft/model";
 import { parseUnitCount } from "./draft/rows";
@@ -50,30 +49,13 @@ export interface DraftForecast {
   readonly forecast: LandlordForecast;
 }
 
-// Until toComponents emits engine components itself: today's shape, with the
-// install-year estimate carried as an estimate flag.
-function engineComponent(c: ForecastComponent): Component {
-  return {
-    id: c.id,
-    category: c.category,
-    name: c.name,
-    quantity: c.quantity,
-    installYear: c.installYear,
-    usefulLifeYears: c.usefulLifeYears,
-    replacementCostEach: c.replacementCostEach,
-    ...(c.scenario ? { scenario: c.scenario } : {}),
-    estimated: { installYear: c.installYearIsEstimate ?? false },
-  };
-}
-
 /** The calculator's form to its forecast: rows to components, the unit count, then the forecast. */
 export function forecastDraft(draft: Draft, currentYear: number): DraftForecast {
-  const converted = toComponents(draft, currentYear);
-  const components = converted.components.map(engineComponent);
+  const { components, problems } = toComponents(draft, currentYear);
   const unitCount = parseUnitCount(draft.unitCount);
   return {
     components,
-    problems: converted.problems,
+    problems,
     unitCount,
     yearBuiltIsBad: badYearBuilt(draft.yearBuilt, currentYear),
     forecast: landlordForecast(components, unitCount, currentYear),

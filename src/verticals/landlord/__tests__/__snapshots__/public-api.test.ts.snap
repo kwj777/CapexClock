@@ -62,6 +62,7 @@ exports[`has a deliberate public API 1`] = `
   "exampleDraft",
   "forecastDraft",
   "forecastProperty",
+  "groupByCategory",
   "hasEntries",
   "importReplaces",
   "importUndoFor",

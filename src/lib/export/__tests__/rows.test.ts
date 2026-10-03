@@ -1,6 +1,8 @@
-import { computeForecast, type ForecastComponent } from "@/lib/forecast";
+import { landlordForecast, type Component } from "@/verticals/landlord";
 import { breakLongWords, formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
 import {
+  atRiskShortText,
+  barPercent,
   ESTIMATED_NOTE,
   exportDetails,
   exportRows,
@@ -8,18 +10,19 @@ import {
   guessedYear,
   installYearNote,
   leftOutSummary,
+  pdfYearFigures,
   sumTotals,
   toCents,
   type ExportFormRow,
 } from "../rows";
 
-const components: ForecastComponent[] = [
-  { id: "furnace", category: "HVAC", name: "Gas furnace", quantity: 12, installYear: 2012, installYearIsEstimate: true, usefulLifeYears: 18, replacementCostEach: 4200 },
+const components: Component[] = [
+  { id: "furnace", category: "HVAC", name: "Gas furnace", quantity: 12, installYear: 2012, estimated: { installYear: true }, usefulLifeYears: 18, replacementCostEach: 4200 },
   { id: "carpet", category: "Flooring", name: "Carpet", quantity: 9600, installYear: 2020, usefulLifeYears: 8, replacementCostEach: 4 },
   { id: "dw", category: "Appliances", name: "Dishwasher", quantity: 1, installYear: 2023, usefulLifeYears: 3, replacementCostEach: 650.5 },
-  { id: "wh", category: "Plumbing", name: "Water heater", quantity: 1, installYear: 2010, installYearIsEstimate: true, usefulLifeYears: 10, replacementCostEach: 1400 },
+  { id: "wh", category: "Plumbing", name: "Water heater", quantity: 1, installYear: 2010, estimated: { installYear: true }, usefulLifeYears: 10, replacementCostEach: 1400 },
 ];
-const forecast = computeForecast({ startYear: 2026, unitCount: 12, components });
+const forecast = landlordForecast(components, 12, 2026);
 const rows = exportRows(forecast, components, new Map([["carpet", "per_sq_ft"]]));
 
 describe("export rows", () => {
@@ -41,7 +44,7 @@ describe("export rows", () => {
 
   it("adds up to the forecast total", () => {
     const sum = rows.reduce((total, r) => total + r.total, 0);
-    expect(toCents(sum)).toBe(toCents(forecast.total));
+    expect(toCents(sum)).toBe(toCents(forecast.horizonTotal));
     expect(rows.filter((r) => r.name === "Dishwasher").map((r) => r.total)).toEqual([650.5, 650.5, 650.5, 650.5]);
   });
 });
@@ -49,9 +52,9 @@ describe("export rows", () => {
 describe("export totals", () => {
   it("add up the rounded rows, so totals match the table to the cent", () => {
     const striping = ["a", "b", "c"].map(
-      (id): ForecastComponent => ({ id, category: "Site", name: `Striping ${id}`, quantity: 3333, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 0.125 }),
+      (id): Component => ({ id, category: "Site", name: `Striping ${id}`, quantity: 3333, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 0.125 }),
     );
-    const f = computeForecast({ startYear: 2026, unitCount: 12, components: striping });
+    const f = landlordForecast(striping, 12, 2026);
     const due = exportRows(f, striping).filter((r) => r.year === 2026);
     expect(due.map((r) => r.total)).toEqual([416.63, 416.63, 416.63]);
     // The unrounded year total, 1249.875, would print as $1,249.88.
@@ -61,8 +64,53 @@ describe("export totals", () => {
 
   it("clear float noise from the sum", () => {
     expect(sumTotals([{ total: 0.1 }, { total: 0.2 }])).toBe(0.3);
-    expect(sumTotals(rows)).toBe(toCents(forecast.total));
+    expect(sumTotals(rows)).toBe(toCents(forecast.horizonTotal));
     expect(sumTotals([])).toBe(0);
+  });
+});
+
+describe("the PDF's year figures", () => {
+  const striping = ["a", "b", "c"].map(
+    (id): Component => ({ id, category: "Site", name: `Striping ${id}`, quantity: 3333, installYear: 2020, usefulLifeYears: 5, replacementCostEach: 0.125 }),
+  );
+
+  it("add up each year's rounded rows, so the bars and totals match the table to the cent", () => {
+    const f = landlordForecast(striping, 12, 2026);
+    const due = exportRows(f, striping);
+    const figures = pdfYearFigures(f, due);
+    expect(figures.years.map((y) => y.year)).toEqual(f.years.map((y) => y.year));
+    expect(figures.years.filter((y) => y.total > 0)).toEqual([
+      { year: 2026, total: 1249.89 },
+      { year: 2031, total: 1249.89 },
+    ]);
+    expect(figures.neededNow).toBe(1249.89);
+    expect(figures.horizonTotal).toBe(2499.78);
+    expect(figures.maxYear).toBe(1249.89);
+  });
+
+  it("keep the bar scale at 1 or more, so an empty forecast draws no bars", () => {
+    const figures = pdfYearFigures(landlordForecast([], 12, 2026), []);
+    expect(figures.maxYear).toBe(1);
+    expect(figures.neededNow).toBe(0);
+    expect(figures.horizonTotal).toBe(0);
+  });
+
+  it("size each bar against the biggest year", () => {
+    expect(barPercent(1249.89, 1249.89)).toBe(100);
+    expect(barPercent(250, 1000)).toBe(25);
+    expect(barPercent(0, 1)).toBe(0);
+  });
+});
+
+describe("the PDF's at-risk line", () => {
+  it.each([
+    [{ status: "overdue", yearsRemaining: -1 }, "1 yr past end of life"],
+    [{ status: "overdue", yearsRemaining: -3 }, "3 yrs past end of life"],
+    [{ status: "due_soon", yearsRemaining: 0 }, "due this year"],
+    [{ status: "due_soon", yearsRemaining: 1 }, "due in 1 yr"],
+    [{ status: "due_soon", yearsRemaining: 2 }, "due in 2 yrs"],
+  ] as const)("reads %o as %s", (item, text) => {
+    expect(atRiskShortText(item)).toBe(text);
   });
 });
 

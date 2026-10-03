@@ -1,5 +1,5 @@
 import { formatMoney } from "@/components/calculator/format";
-import { roundEstimate, type QuickEstimate, type QuickInputs } from "@/verticals/landlord";
+import { estimateFigures, type QuickEstimate, type QuickInputs } from "@/verticals/landlord";
 
 export const ENTER_PROMPT = "Enter your units and year built to see an estimate.";
 export const FIX_PROMPT = "Fix the highlighted fields to see an estimate.";
@@ -34,11 +34,10 @@ function range(low: number, high: number, between: string): string {
  * figure from the rounded per-unit one, so the two always multiply out.
  */
 export function estimateText(estimate: QuickEstimate, units: number): EstimateText {
-  const low = roundEstimate(estimate.perUnit.low);
-  const high = roundEstimate(estimate.perUnit.high);
+  const { perUnit, building } = estimateFigures(estimate, units);
   return {
-    perUnit: range(low, high, "–"),
-    building: range(low * units, high * units, "–"),
-    spoken: `About ${range(low, high, " to ")} per unit each month, or ${range(low * units, high * units, " to ")} for the building, from typical costs.`,
+    perUnit: range(perUnit.low, perUnit.high, "–"),
+    building: range(building.low, building.high, "–"),
+    spoken: `About ${range(perUnit.low, perUnit.high, " to ")} per unit each month, or ${range(building.low, building.high, " to ")} for the building, from typical costs.`,
   };
 }

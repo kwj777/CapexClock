@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { summarizePortfolio } from "@/lib/properties/portfolio";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import { countNoun, LANDLORD_LABELS, summarizePortfolio } from "@/verticals/landlord";
 import { keptPropertyIds } from "./unsaved";
 
 const card = "rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900";
@@ -30,7 +30,7 @@ function keptSnapshot(userId: string | null): string {
 }
 
 /** Says which properties the per-unit figure leaves out. */
-function missingUnitsNote(properties: PropertyRow[]): string {
+function missingUnitsNote(properties: readonly PropertyRow[]): string {
   if (properties.length > 3) return `Leaves out ${properties.length} properties with no unit count.`;
   const names = properties.map((p) => p.name);
   if (names.length === 1) return `Leaves out ${names[0]}, which has no unit count.`;
@@ -86,7 +86,7 @@ export default function Portfolio({
               <p className="text-lg font-semibold text-slate-950 dark:text-white">{property.name}</p>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 {property.unit_count > 0
-                  ? `${property.unit_count} unit${property.unit_count === 1 ? "" : "s"}`
+                  ? `${property.unit_count} ${countNoun(LANDLORD_LABELS.divisor, property.unit_count)}`
                   : "No unit count"}{" "}
                 · {componentCount} component{componentCount === 1 ? "" : "s"}
                 {excluded > 0 && ` · ${excluded} left out of the forecast`}
