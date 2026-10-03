@@ -53,12 +53,12 @@ Other entry points: `compareScenarios` (two forecasts side by side), `forecastAs
 A vertical is one audience's view of the engine. The landlord vertical in `src/verticals/landlord` is the worked example.
 
 1. Make `src/verticals/<name>/`.
-2. Implement `Vertical` from `src/verticals/vertical.ts`: labels (the audience's words), a library of components with life ranges, `defaultLife`, `rules`, `derivedMetrics` and `rollupMetrics` (landlord: reserve per unit).
+2. Implement `Vertical` from `src/verticals/vertical.ts`: labels (the audience's words), a library of components with life ranges, `defaultLife`, `rules`, `derivedMetrics` and `rollupMetrics` (landlord: reserve per unit). Check it with `satisfies Vertical<…>`, as `src/verticals/landlord/index.ts` does.
 3. Write adapters from that audience's inputs to `Component` and `AssetGroup`.
-4. Call only `"@/engine"`, passing your rules on every call rather than relying on the defaults.
-5. Have your pages import only `@/verticals/<name>`, never the engine.
+4. Call only `"@/engine"`, passing your rules on every call rather than relying on the defaults (the landlord's are in `src/verticals/landlord/rules.ts`). Lint allows a vertical to import only `"@/engine"`, `"@/verticals/..."` and its own files.
+5. Have your pages import only `@/verticals/<name>`, never the engine; lint refuses anything else. Export functions that do the math rather than engine functions themselves (a test in `landlord/__tests__/public-api.test.ts` checks this for the landlord).
 
-What the engine assumes today, so the next vertical knows before it starts: savings earn no interest; the only funding goal is "never run short" (no threshold or percent-funded goal, no deposits that rise each year); the monthly amount saves from the second year, and first-year costs are shown as needed now; the at-risk window and the look-ahead are inputs. A vertical that needs otherwise adds an optional engine input whose default keeps every current number, with a test proving it. Metrics that need component ages (such as percent funded) can read them from the group's components.
+What the engine assumes today, so the next vertical knows before it starts: savings earn no interest; the only funding goal is "never run short" (no threshold or percent-funded goal, no deposits that rise each year); the monthly amount saves from the second year, and first-year costs are shown as needed now; the at-risk window and the look-ahead are inputs. A vertical that needs otherwise adds an optional engine input whose default keeps every current number, with a test proving it. Metrics that need component ages (such as percent funded) can read them from `VerticalGroup.group.components`.
 
 ## Commands
 

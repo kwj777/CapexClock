@@ -139,6 +139,17 @@ either form you can:
 On an older Netlify plan, going over 100 form entries a month (both forms together) turns on a
 paid add-on automatically. Check **Netlify → Billing** if sign-ups pick up.
 
+## How the numbers are worked out
+
+The forecast math lives in `src/engine`: plain TypeScript that knows nothing about rentals,
+pages or the database, and takes the current year as an input. `src/verticals/landlord` turns a
+rental property into engine inputs, passes the site's rules (10 years shown, 30-year look-ahead,
+no inflation) and adds the per-unit figures. Pages and downloads import only
+`@/verticals/landlord`; lint stops them reaching the engine directly. [ENGINE.md](src/engine/ENGINE.md)
+lists the engine's inputs and outputs and how another kind of building would plug in.
+`npm run test:engine` runs its tests (90% coverage or more) and `npm run typecheck:engine` checks it
+on its own.
+
 ## Replace-now comparison
 
 Under **At risk**, in the calculator and the property editor, "What if we replace everything at
