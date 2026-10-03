@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
+import SetupOffer from "@/components/import/SetupOffer";
 import type { LibraryComponent } from "@/lib/library/components";
 
 // The importer (and the readers it loads) only once the owner opens it.
@@ -52,7 +53,12 @@ export default function PortfolioHeader({
           </Link>
         </div>
       </div>
-      {open && <PortfolioImport id={panelId} library={library} existing={properties} onClose={close} />}
+      {open && (
+        <>
+          <SetupOffer where="my_properties" className="mt-6" />
+          <PortfolioImport id={panelId} library={library} existing={properties} onClose={close} />
+        </>
+      )}
     </>
   );
 }

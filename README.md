@@ -266,6 +266,17 @@ you, free." The address opens an email with the subject "Photo of a label", and 
 
 Count the photos you get each week in the Monday numbers.
 
+**The done-for-you import.** Next to the import on /capex-spreadsheet-template, and above the
+importer on My properties once "Import a spreadsheet" is open, a box says "Rather not do it
+yourself? Email your spreadsheet to support@capexclock.com and we'll set up your buildings for
+you, free for early users." The address opens an email with the subject "Set up my buildings",
+and a click sends `setup_offer_clicked` (`{where}` only: `template_page` or `my_properties`).
+When a sheet arrives, follow the checklist in the project files
+(`import-offer/handling-checklist.md`): Claude turns it into a CapexClock Excel file with a
+Building column, you check it and send it back, and the owner imports it. Delete the sheet within
+30 days of sending it back, as /privacy says. No price shows on the site until the first 10 sheets
+are done.
+
 The pay question after an export keeps its wording. A Yes or Maybe now asks "Which would you
 use first?" and sends `pay_question_first_pick` with `pick` (`reminders`, `report`, `photo` or
 `other`). Every pay-question event now has `version` = `2`; events from before this change have
@@ -498,6 +509,7 @@ the week the [analytics relay](#analytics-relay) goes live, so compare across th
 | Import | `import_started`, `import_completed` (Total count) | none | Since step 4 |
 | Import problems | `import_failed` (Total count) | `reason` | Since step 4 |
 | Template page | `template_downloaded` (Total count) | `file` | Since step 5 |
+| Done-for-you import | `setup_offer_clicked` (Total count) | `where` | From the day this went live |
 | Component list downloads | `component_list_exported` (Total count) | `where` | Since step 5 |
 | Comparison | `forecast_generated`, `compare_viewed`, `compare_applied` (Unique users), with the two compare events filtered to Path name = `/capex-calculator` | none | Since step 6 |
 | Quick estimate | A **Funnels** insight (not Trends): step 1 `quick_estimate_shown`, step 2 `$pageview` filtered to Path name = `/capex-calculator` (Unique users, conversion window 1 hour) | none | Since step 7 |
