@@ -18,7 +18,7 @@ import { CONTACT_EMAIL } from "@/lib/site";
 export const metadata: Metadata = pageMetadata({
   title: "Pricing | CapexClock",
   description:
-    "CapexClock is free today, with no limits during early access. A $12/month founding membership adds reminders, and a $29 condition report is made by hand.",
+    "CapexClock is free today, with no limits during early access. A $12/month founding membership adds automatic reminders, and a $29 condition report is made by hand.",
   path: "/pricing",
 });
 
@@ -56,7 +56,7 @@ const FAQ = [
   },
   {
     q: "Why only 20 of each?",
-    a: "We make every report and send every reminder by hand while we decide what to build, so we're taking up to 20 orders of each for now.",
+    a: "We make every report by hand and we're keeping the founding membership small while we decide what to build next, so we're taking up to 20 of each for now.",
   },
 ];
 
@@ -77,8 +77,8 @@ export default function PricingPage() {
         <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Pricing</h1>
           <p className="mt-4 max-w-2xl text-lg text-pretty text-slate-600 dark:text-slate-300">
-            CapexClock is free today, with no limits during early access. We&apos;re also testing two paid extras,
-            done by hand while we decide what to build next.
+            CapexClock is free today, with no limits during early access. We&apos;re also testing two paid extras
+            while we decide what to build next.
           </p>
 
           <div className="mt-10 grid gap-6 lg:grid-cols-3">

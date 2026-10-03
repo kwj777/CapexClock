@@ -100,7 +100,7 @@ export default function TermsPage() {
               <strong className="font-semibold text-slate-950 dark:text-white">Our founding promise:</strong>{" "}
               {FOUNDING_PROMISE_TEXT}
             </p>
-            <p className="mt-3">We&apos;re taking up to 20 founding members while we do this by hand.</p>
+            <p className="mt-3">We&apos;re taking up to 20 founding members for now.</p>
           </Section>
 
           <Section title="Condition report ($29)">

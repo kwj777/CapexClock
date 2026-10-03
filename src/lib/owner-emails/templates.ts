@@ -139,12 +139,18 @@ ${g.items
 /** The yearly budget summary, sent in November for the year ahead. */
 export function budgetSummaryEmail(summary: BudgetSummary, footer: EmailFooter): EmailContent {
   const { budgetYear: year, totals } = summary;
-  const subject = `Your ${year} replacement budget: ${formatMoney(totals.budgetYearTotal)}`;
+  const nothingDue = totals.budgetYearTotal === 0;
+  const subject = nothingDue
+    ? `Nothing to replace in ${year}`
+    : `Your ${year} replacement budget: ${formatMoney(totals.budgetYearTotal)}`;
+  const across = summary.properties.length === 1 ? "your property" : `your ${summary.properties.length} properties`;
   const intro =
-    `In ${year}, plan on ${formatMoney(totals.budgetYearTotal)} for replacements across ` +
-    `${summary.properties.length === 1 ? "your property" : `your ${summary.properties.length} properties`}, ` +
-    `and ${formatMoney(totals.tenYearTotal)} over the next 10 years. To never run short, set aside ` +
-    `${formatReserve(totals.monthlyReserve)} a month.`;
+    (nothingDue
+      ? `Nothing across ${across} is due for replacement in ${year}. Over the next 10 years, plan on ` +
+        `${formatMoney(totals.tenYearTotal)}`
+      : `In ${year}, plan on ${formatMoney(totals.budgetYearTotal)} for replacements across ${across}, ` +
+        `and ${formatMoney(totals.tenYearTotal)} over the next 10 years`) +
+    `. To never run short, set aside ${formatReserve(totals.monthlyReserve)} a month.`;
 
   const propertyHtml = summary.properties
     .map((p) => {
