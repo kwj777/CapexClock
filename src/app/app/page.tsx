@@ -1,7 +1,9 @@
+import EmailSettings from "@/components/account/EmailSettings";
 import ImportDraftPrompt from "@/components/account/ImportDraftPrompt";
 import Portfolio from "@/components/account/Portfolio";
 import PortfolioHeader from "@/components/account/PortfolioHeader";
 import { getLibrary } from "@/lib/library/source";
+import { loadEmailSettings } from "@/lib/owner-emails/load";
 import { fetchAllRows } from "@/lib/properties/load";
 import { createClient } from "@/lib/supabase/server";
 import { getAccount } from "./account";
@@ -19,6 +21,8 @@ export default async function PortfolioPage() {
     getAccount(),
     getLibrary(),
   ]);
+  // Read on its own, after the rest: it never fails the page, even before 0006 has run.
+  const emailSettings = await loadEmailSettings(supabase, account.id);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-8 sm:px-6">
@@ -42,6 +46,8 @@ export default async function PortfolioPage() {
           serverYear={new Date().getFullYear()}
         />
       )}
+
+      <EmailSettings view={emailSettings} />
     </div>
   );
 }
