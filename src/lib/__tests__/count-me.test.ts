@@ -1,0 +1,50 @@
+import { applyCountMe, COUNT_ME_KEY, countMeRequest, isNotCounted, withoutCountMe } from "../count-me";
+
+function memoryStore(initial: Record<string, string> = {}) {
+  const data = new Map(Object.entries(initial));
+  return {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+    removeItem: (k: string) => void data.delete(k),
+  };
+}
+
+function at(href: string) {
+  return { href, search: new URL(href).search };
+}
+
+describe("count-me switch", () => {
+  it("reads off and on, in any case, and ignores anything else", () => {
+    expect(countMeRequest("?count-me=off")).toBe("off");
+    expect(countMeRequest("?a=1&count-me=ON")).toBe("on");
+    expect(countMeRequest("?count-me=maybe")).toBeNull();
+    expect(countMeRequest("")).toBeNull();
+  });
+
+  it("drops only its own parameter from the address", () => {
+    expect(withoutCountMe("https://capexclock.com/pricing?a=1&count-me=off#x")).toBe("https://capexclock.com/pricing?a=1#x");
+    expect(withoutCountMe("https://capexclock.com/?count-me=on")).toBe("https://capexclock.com/");
+  });
+
+  it("marks the browser with off, unmarks it with on, and cleans the address", () => {
+    const store = memoryStore();
+    const replaced: string[] = [];
+    expect(applyCountMe(at("https://capexclock.com/?count-me=off"), () => store, (h) => replaced.push(h))).toBe(false);
+    expect(store.getItem(COUNT_ME_KEY)).toBe("off");
+    // Later visits stay uncounted without the parameter.
+    expect(applyCountMe(at("https://capexclock.com/lifespan"), () => store, (h) => replaced.push(h))).toBe(false);
+    expect(applyCountMe(at("https://capexclock.com/?count-me=on"), () => store, (h) => replaced.push(h))).toBe(true);
+    expect(store.getItem(COUNT_ME_KEY)).toBeNull();
+    expect(replaced).toEqual(["https://capexclock.com/", "https://capexclock.com/"]);
+  });
+
+  it("counts everyone else, including browsers that block storage", () => {
+    expect(applyCountMe(at("https://capexclock.com/"), () => memoryStore(), () => {})).toBe(true);
+    const blocked = () => {
+      throw new Error("blocked");
+    };
+    expect(applyCountMe(at("https://capexclock.com/?count-me=off"), blocked, () => {})).toBe(true);
+    expect(isNotCounted(blocked)).toBe(false);
+    expect(isNotCounted(() => memoryStore({ [COUNT_ME_KEY]: "off" }))).toBe(true);
+  });
+});
