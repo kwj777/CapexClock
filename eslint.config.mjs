@@ -189,10 +189,7 @@ const appBoundary = [
   {
     name: "app/only-via-verticals",
     files: [`src/**/*.${EXTS}`, `scripts/**/*.${EXTS}`],
-    // src/__parity__ is left out while the side-by-side test and the frozen copy of
-    // the old math live there: they must import @/engine and the old code. The
-    // pull request that deletes them removes this exception.
-    ignores: [`${ENGINE_DIR}/**`, `${VERTICALS_DIR}/**`, "src/__parity__/**"],
+    ignores: [`${ENGINE_DIR}/**`, `${VERTICALS_DIR}/**`],
     rules: {
       "no-restricted-imports": [
         "error",
