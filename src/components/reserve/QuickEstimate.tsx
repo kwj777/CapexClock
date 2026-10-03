@@ -4,25 +4,25 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatCostRange } from "@/components/calculator/format";
 import { track } from "@/lib/analytics";
-import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import {
   ASSUMPTION_SOURCES,
-  TYPICAL_COST_SOURCES,
-  typicalCostBasis,
-  type CostSource,
-} from "@/lib/library/typical-cost-sources";
-import {
   ESTIMATE_BUILDING_UNITS,
   FLOOR_SQ_FT_PER_APARTMENT,
   GIVE_OR_TAKE_YEARS,
+  LANDLORD_LABELS,
   PARKING_SQ_FT_PER_APARTMENT,
   quickEstimate,
   quickSystems,
   readQuickInputs,
   SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
+  TYPICAL_COST_SOURCES,
+  typicalCostBasis,
+  type CostSource,
+  type LibraryComponent,
   type QuickSystem,
-} from "@/lib/reserve/quick-estimate";
+  type TypicalCost,
+} from "@/verticals/landlord";
 import { estimateText, quickPrompt } from "./estimate-text";
 
 const input =
@@ -182,7 +182,9 @@ export default function QuickEstimate({
             <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-950 dark:text-white">{shown.text.perUnit}</p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               That&apos;s {shown.text.building} a month for{" "}
-              {shown.units === 1 ? "the 1 unit" : `all ${shown.units.toLocaleString("en-US")} units`}, from typical costs
+              {shown.units === 1
+                ? `the 1 ${LANDLORD_LABELS.divisor.one}`
+                : `all ${shown.units.toLocaleString("en-US")} ${LANDLORD_LABELS.divisor.many}`}, from typical costs
               for {shown.systems === 1 ? "1 system" : `${shown.systems} systems`}.
             </p>
             <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">

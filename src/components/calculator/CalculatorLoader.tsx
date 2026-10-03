@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
+import type { LibraryComponent, TypicalCost } from "@/verticals/landlord";
 import { placeholderHeight, placeholderScript } from "./placeholder";
 import { DRAFT_STORAGE_KEY } from "./storage-key";
 

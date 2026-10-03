@@ -1,5 +1,5 @@
-import type { Forecast, ForecastComponent, UnitLabel } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import type { AtRiskComponent, Component, LandlordForecast, UnitLabel } from "@/verticals/landlord";
 
 /** What the owner noted about a component, as the exports show it. */
 export interface RowDetails {
@@ -71,7 +71,7 @@ function rowName(row: Pick<ExportFormRow, "name">): string {
  */
 export function exportDetails(
   formRows: readonly ExportFormRow[],
-  components: readonly Pick<ForecastComponent, "id">[],
+  components: readonly Pick<Component, "id">[],
 ): ExportDetails {
   const included = new Set(components.map((c) => c.id));
   return {
@@ -134,8 +134,8 @@ export function sumTotals(rows: readonly Pick<ExportRow, "total">[]): number {
 
 /** Every replacement in the window, in year order. */
 export function exportRows(
-  forecast: Forecast,
-  components: ForecastComponent[],
+  forecast: Pick<LandlordForecast, "years">,
+  components: readonly Component[],
   unitLabels: ReadonlyMap<string, UnitLabel> = new Map(),
   details: ReadonlyMap<string, RowDetails> = new Map(),
 ): ExportRow[] {
@@ -152,12 +152,49 @@ export function exportRows(
         unit: unitLabels.get(r.componentId) === "per_sq_ft" ? "sq ft" : "each",
         costEach: c?.replacementCostEach ?? null,
         total: toCents(r.cost),
-        notes: [r.overdue ? "Overdue" : "", installYearNote(r.installYearIsEstimate, d)].filter(Boolean),
+        notes: [r.overdue ? "Overdue" : "", installYearNote(r.estimated.installYear, d)].filter(Boolean),
         condition: d?.condition ?? null,
         ownerNotes: d?.notes ?? "",
       };
     }),
   );
+}
+
+/** The PDF's year figures, from the rounded rows it prints, so they match its table to the cent. */
+export interface PdfYearFigures {
+  /** Each year in the window, adding up that year's rows. */
+  years: { year: number; total: number }[];
+  /** The biggest year's total, at least 1: a full-width bar. */
+  maxYear: number;
+  /** The first year's total, shown as "Needed in". */
+  neededNow: number;
+  /** Every row added up, shown as the 10-year total. */
+  horizonTotal: number;
+}
+
+export function pdfYearFigures(forecast: Pick<LandlordForecast, "years">, rows: readonly ExportRow[]): PdfYearFigures {
+  const years = forecast.years.map((y) => ({ year: y.year, total: sumTotals(rows.filter((r) => r.year === y.year)) }));
+  return {
+    years,
+    maxYear: Math.max(1, ...years.map((y) => y.total)),
+    neededNow: years[0].total,
+    horizonTotal: sumTotals(rows),
+  };
+}
+
+/** How wide a year's bar is, as a percent of the biggest year's. */
+export function barPercent(total: number, maxYear: number): number {
+  return (total / maxYear) * 100;
+}
+
+/** "3 yrs past end of life", "due this year" or "due in 1 yr", for the PDF's at-risk list. */
+export function atRiskShortText(item: Pick<AtRiskComponent, "status" | "yearsRemaining">): string {
+  if (item.status === "overdue") {
+    return `${-item.yearsRemaining} yr${item.yearsRemaining === -1 ? "" : "s"} past end of life`;
+  }
+  return item.yearsRemaining === 0
+    ? "due this year"
+    : `due in ${item.yearsRemaining} yr${item.yearsRemaining === 1 ? "" : "s"}`;
 }
 
 const MAX_NAMES = 5;

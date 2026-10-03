@@ -1,18 +1,21 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { formatQuantity, moneyColumn } from "@/lib/export/format";
-import { exportRows, sumTotals } from "@/lib/export/rows";
-import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import { barPercent, exportRows, pdfYearFigures } from "@/lib/export/rows";
 import { REPORT_LABEL } from "@/lib/paid-ideas";
+import { CONTACT_EMAIL } from "@/lib/site";
 import {
   ageText,
   CONDITION_TEXT,
   conditionCounts,
+  countNoun,
+  LANDLORD_LABELS,
   remainingLifeText,
   statusText,
+  type Component,
+  type LandlordForecast,
   type ReportRow,
-} from "@/lib/report/condition-report";
-import { CONTACT_EMAIL } from "@/lib/site";
+} from "@/verticals/landlord";
 
 // A condition report as a PDF. Only the sample is made with it for now
 // (scripts/sample-report.tsx, which registers the font first): paid reports
@@ -75,8 +78,8 @@ export interface ConditionReportProps {
   unitCount: number;
   yearBuilt: number;
   rows: ReportRow[];
-  forecast: Forecast;
-  components: ForecastComponent[];
+  forecast: LandlordForecast;
+  components: readonly Component[];
   /** "October 1, 2026" */
   preparedOn: string;
   /** "October 2026": when the owner's information is from. */
@@ -100,10 +103,9 @@ export default function ConditionReportPdf({
   const estimated = rows.filter((r) => r.installYearIsEstimate);
   const due = exportRows(forecast, components, new Map(rows.map((r) => [r.id, r.unitLabel])));
   const money = moneyColumn(due.map((r) => r.total));
-  const years = forecast.years.map((y) => ({ year: y.year, total: sumTotals(due.filter((r) => r.year === y.year)) }));
-  const maxYear = Math.max(1, ...years.map((y) => y.total));
+  const { years, maxYear, neededNow, horizonTotal } = pdfYearFigures(forecast, due);
   const ratings = conditionCounts(rows);
-  const units = `${unitCount.toLocaleString("en-US")} ${unitCount === 1 ? "unit" : "units"}`;
+  const units = `${unitCount.toLocaleString("en-US")} ${countNoun(LANDLORD_LABELS.divisor, unitCount)}`;
 
   const header = (
     <View style={s.topRow} fixed>
@@ -145,12 +147,12 @@ export default function ConditionReportPdf({
             label="Per unit, per month"
             value={forecast.monthlyReservePerUnit === null ? "–" : formatReserve(forecast.monthlyReservePerUnit)}
           />
-          <Stat label={`Needed in ${forecast.startYear}`} value={money(years[0].total)} />
-          <Stat label="10-year total" value={money(sumTotals(due))} />
+          <Stat label={`Needed in ${forecast.startYear}`} value={money(neededNow)} />
+          <Stat label="10-year total" value={money(horizonTotal)} />
         </View>
         <Text style={s.note}>
           The monthly reserve is the smallest steady amount that has the cash ready for every replacement from{" "}
-          {forecast.startYear + 1} on, looking 30 years ahead. {forecast.startYear} costs (past end of life or due this
+          {forecast.reserveFromYear} on, looking 30 years ahead. {forecast.startYear} costs (past end of life or due this
           year) are shown separately as needed now. All costs are in today&apos;s dollars, without inflation.
         </Text>
 
@@ -259,7 +261,7 @@ export default function ConditionReportPdf({
           <View key={y.year} style={s.barRow}>
             <Text style={s.barYear}>{y.year}</Text>
             <View style={s.barTrack}>
-              {y.total > 0 && <View style={[s.bar, { width: `${(y.total / maxYear) * 100}%` }]} />}
+              {y.total > 0 && <View style={[s.bar, { width: `${barPercent(y.total, maxYear)}%` }]} />}
             </View>
             <Text style={s.barValue}>{money(y.total)}</Text>
           </View>

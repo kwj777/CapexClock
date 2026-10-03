@@ -1,6 +1,5 @@
-import { exampleDraft, rowFromLibrary, type Draft } from "../draft";
+import { COMPONENT_LIBRARY, exampleDraft, rowFromLibrary, type Draft } from "@/verticals/landlord";
 import { placeholderHeight, placeholderScript } from "../placeholder";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
 
 const waterHeater = COMPONENT_LIBRARY.find((c) => c.slug === "tank-water-heater")!;
 const saved = (draft: Draft) => JSON.stringify(draft);

@@ -1,4 +1,4 @@
-import { COMPONENT_LIBRARY, type LibraryComponent } from "@/lib/library/components";
+import { COMPONENT_LIBRARY, type LibraryComponent } from "@/verticals/landlord";
 import { ALIASES, createMatcher, editDistance, nameKey, UNSURE_NAMES } from "../names";
 
 const match = createMatcher(COMPONENT_LIBRARY);

@@ -6,7 +6,7 @@ import ReserveTabs from "@/components/reserve/ReserveTabs";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
-import { SPREAD_REPLACEMENTS } from "@/lib/reserve/quick-estimate";
+import { SPREAD_REPLACEMENTS } from "@/verticals/landlord";
 
 export const metadata: Metadata = pageMetadata({
   title: "Reserve Calculator for Rental Properties | CapexClock",

@@ -1,5 +1,5 @@
-import type { DraftRow } from "@/components/calculator/draft";
-import type { ImportedRow, PreviewRow } from "../preview";
+import type { DraftRow, ImportedRow } from "@/verticals/landlord";
+import type { PreviewRow } from "../preview";
 import {
   applyLabel,
   askText,

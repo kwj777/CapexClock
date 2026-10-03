@@ -1,7 +1,10 @@
 import readExcelFile from "read-excel-file/universal";
 import Papa from "papaparse";
 import writeXlsxFile from "write-excel-file/universal";
+import { componentListCsv, componentListGrid, EXAMPLE_BUILDING, exampleCsv, exampleGrid } from "@/lib/export/component-list";
+import { listXlsx } from "@/lib/export/xlsx";
 import {
+  COMPONENT_LIBRARY,
   editRow,
   EMPTY_DRAFT,
   exampleDraft,
@@ -9,10 +12,7 @@ import {
   withUnitCount,
   type Draft,
   type DraftRow,
-} from "@/components/calculator/draft";
-import { componentListCsv, componentListGrid, EXAMPLE_BUILDING, exampleCsv, exampleGrid } from "@/lib/export/component-list";
-import { listXlsx } from "@/lib/export/xlsx";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+} from "@/verticals/landlord";
 import { CURRENT_YEAR, match, parse } from "../__fixtures__/sheets";
 import { xlsxFile, type FixtureCell } from "../__fixtures__/xlsx";
 import { openSheet, startingChoices } from "../open";

@@ -1,6 +1,5 @@
-import { CONDITION_TEXT } from "@/components/calculator/draft";
-import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import { CONDITION_TEXT, type Component, type LandlordForecast } from "@/verticals/landlord";
 import { guardFormulas } from "./formula-guard";
 import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
 
@@ -31,8 +30,8 @@ function condition(value: ComponentCondition | null | undefined): string {
  * carries its component's condition and the owner's notes.
  */
 export function forecastCsv(
-  forecast: Forecast,
-  components: ForecastComponent[],
+  forecast: Pick<LandlordForecast, "years">,
+  components: readonly Component[],
   details: ExportDetails = {},
 ): string {
   const lines = [

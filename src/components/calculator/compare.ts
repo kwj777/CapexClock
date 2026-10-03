@@ -1,5 +1,12 @@
-import type { AtRiskItem, ComparisonFigures, ReplaceNowComparison } from "@/lib/forecast";
-import { editRow, type Draft } from "./draft";
+import {
+  editRow,
+  type AtRiskComponent,
+  type CompareItem,
+  type ComparisonFigures,
+  type Draft,
+  type EstimateFlags,
+  type ReplaceNowComparison,
+} from "@/verticals/landlord";
 import { formatMoney, formatReserve } from "./format";
 
 /** The highest "Emergency replacements cost __% more" the comparison takes. */
@@ -39,7 +46,7 @@ function plural(count: number, word: string): string {
 }
 
 /** "Past due since 2011" or "Due 2027", as the at-risk list shows it. */
-export function riskText(item: Pick<AtRiskItem, "status" | "endOfLifeYear">): string {
+export function riskText(item: Pick<AtRiskComponent, "status" | "endOfLifeYear">): string {
   return item.status === "overdue" ? `Past due since ${item.endOfLifeYear}` : `Due ${item.endOfLifeYear}`;
 }
 
@@ -48,12 +55,12 @@ export function riskText(item: Pick<AtRiskItem, "status" | "endOfLifeYear">): st
  * install year that's an estimate, where that year came from.
  */
 export function itemDetail(
-  item: Pick<AtRiskItem, "status" | "endOfLifeYear" | "installYearIsEstimate">,
+  item: Pick<AtRiskComponent, "status" | "endOfLifeYear"> & { readonly estimated: Pick<EstimateFlags, "installYear"> },
   installYear: number,
   guessed: boolean,
 ): string {
   const due = `${riskText(item)}.`;
-  if (!item.installYearIsEstimate) return due;
+  if (!item.estimated.installYear) return due;
   return guessed
     ? `${due} Install year ${installYear} is a guess.`
     : `${due} No install year, so year built (${installYear}) is used.`;
@@ -123,15 +130,15 @@ export function perUnitText(asPlanned: ComparisonFigures, replaceNow: Comparison
  * second variant says so. Both are drawn in one spot (one shown), so typing a percent
  * never moves the list. Empty when nothing is paid this year either way.
  * Awaiting Kevin: if the extra stops applying to items paid this year either way (see
- * emergencyPercent in src/lib/forecast/compare.ts), "Only the emergency extra differs."
+ * emergencyPercent in src/verticals/landlord/compare.ts), "Only the emergency extra differs."
  * is no longer true and that variant goes.
  */
 export function eitherWayVariants(
-  items: Pick<AtRiskItem, "endOfLifeYear">[],
+  items: readonly Pick<CompareItem, "paidInFirstYearEitherWay">[],
   startYear: number,
   emergencyPercent: number,
 ): { text: string; shown: boolean }[] {
-  const inYearOne = items.filter((i) => i.endOfLifeYear <= startYear).length;
+  const inYearOne = items.filter((i) => i.paidInFirstYearEitherWay).length;
   if (inYearOne === 0) return [];
   const extra = emergencyPercent > 0;
   if (inYearOne === items.length) {

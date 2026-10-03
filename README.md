@@ -139,6 +139,17 @@ either form you can:
 On an older Netlify plan, going over 100 form entries a month (both forms together) turns on a
 paid add-on automatically. Check **Netlify → Billing** if sign-ups pick up.
 
+## How the numbers are worked out
+
+The forecast math lives in `src/engine`: plain TypeScript that knows nothing about rentals,
+pages or the database, and takes the current year as an input. `src/verticals/landlord` turns a
+rental property into engine inputs, passes the site's rules (10 years shown, 30-year look-ahead,
+no inflation) and adds the per-unit figures. Pages and downloads import only
+`@/verticals/landlord`; lint stops them reaching the engine directly. [ENGINE.md](src/engine/ENGINE.md)
+lists the engine's inputs and outputs and how another kind of building would plug in.
+`npm run test:engine` runs its tests (90% coverage or more) and `npm run typecheck:engine` checks it
+on its own.
+
 ## Replace-now comparison
 
 Under **At risk**, in the calculator and the property editor, "What if we replace everything at
@@ -213,19 +224,20 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   items the library counts per unit or per sq ft, never building-wide ones); they're
   never used in a forecast or saved to a property. It fills in costs only on the run that adds the
   columns, so running it again changes no costs and never puts back one edited or blanked in the
-  dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
+  dashboard. Until it runs the site uses the same numbers from
+  `src/verticals/landlord/library/typical-costs.ts`.
   Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
   says it isn't available and no hints show. Kevin approved the numbers, and spreading each
   replacement over its lifespan range for the year built, on October 2, 2026 (sources in
   `typical-costs.md`, phase 3 project files); `SPREAD_REPLACEMENTS` in
-  `src/lib/reserve/quick-estimate.ts` switches the method.
+  `src/verticals/landlord/quick-estimate.ts` switches the method.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
 own /lifespan page automatically (add sentence-friendly wording and notes in
-`src/lib/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be reached, the site
-falls back to the copy in `src/lib/library/components.ts`; a test keeps that file and
-`supabase/seed.sql` in sync.
+`src/verticals/landlord/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be
+reached, the site falls back to the copy in `src/verticals/landlord/library/components.ts`; a test
+keeps that file and `supabase/seed.sql` in sync.
 
 ## Paid-idea test buttons
 

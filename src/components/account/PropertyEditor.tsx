@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalculatorView, type RowNote } from "@/components/calculator/Calculator";
-import { EMPTY_DRAFT, loadDraft, saveDraft, type Draft } from "@/components/calculator/draft";
+import { loadDraft, saveDraft } from "@/components/calculator/draft-storage";
 import { track } from "@/lib/analytics";
-import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import {
   draftFromRows,
   SAVE_PROBLEM_TEXT,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
 import type { ComponentRow } from "@/lib/supabase/database.types";
+import { EMPTY_DRAFT, type Draft, type LibraryComponent, type TypicalCost } from "@/verticals/landlord";
 import { isSignedOut, readBack } from "./read-back";
 import {
   clearUnsaved,

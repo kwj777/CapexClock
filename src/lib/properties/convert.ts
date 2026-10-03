@@ -1,12 +1,17 @@
-import type { Draft, DraftRow, RowField } from "@/components/calculator/draft";
-import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT, MAX_NOTES_LENGTH } from "@/components/calculator/draft";
-import { computeForecast, validateComponent, type Forecast, type ForecastComponent } from "@/lib/forecast";
 import type {
   ComponentRow,
   PropertyRow,
   SaveComponentInput,
   SavePropertyInput,
 } from "@/lib/supabase/database.types";
+import {
+  EARLIEST_INSTALL_YEAR,
+  EARLIEST_YEAR_BUILT,
+  MAX_NOTES_LENGTH,
+  type Draft,
+  type DraftRow,
+  type RowField,
+} from "@/verticals/landlord";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -175,39 +180,5 @@ export function toSaveInput(
     },
     components,
     problems,
-  };
-}
-
-/**
- * Forecast for a saved property. Rows without a cost or any install year are left
- * out, and so is any row the forecast can't use (such as a quantity that isn't a
- * finite number), so one bad row can't break the page. An install year is an
- * estimate when it's blank (year built stands in) or the owner marked it a guess.
- */
-export function forecastForProperty(
-  property: PropertyRow,
-  components: ComponentRow[],
-  startYear: number,
-): { forecast: Forecast; excluded: number } {
-  const included: ForecastComponent[] = [];
-  for (const c of components) {
-    const installYear = c.install_year ?? property.year_built;
-    if (c.replacement_cost_each === null || installYear === null) continue;
-    const component: ForecastComponent = {
-      id: c.id,
-      category: c.category,
-      name: c.name,
-      quantity: Number(c.quantity),
-      installYear,
-      installYearIsEstimate: c.install_year === null || c.install_year_is_estimate === true,
-      usefulLifeYears: c.useful_life_years,
-      replacementCostEach: Number(c.replacement_cost_each),
-      scenario: c.scenario,
-    };
-    if (validateComponent(component).length === 0) included.push(component);
-  }
-  return {
-    forecast: computeForecast({ startYear, unitCount: property.unit_count, components: included }),
-    excluded: components.length - included.length,
   };
 }

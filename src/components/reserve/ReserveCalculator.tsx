@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { readReserveInputs, shownFields, type ExpenseField } from "@/lib/reserve/inputs";
-import { sinkingFund } from "@/lib/reserve/sinking-fund";
+import { shownFields } from "@/components/reserve/shown-fields";
+import { reserveCalculator, type ExpenseField } from "@/verticals/landlord";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -57,7 +57,7 @@ export default function ReserveCalculator() {
     setRows((rs) => rs.filter((x) => x.id !== id));
   }
 
-  const inputs = readReserveInputs(rows, balance, units);
+  const { inputs, result } = reserveCalculator(rows, balance, units);
   const problems = inputs.rowProblems;
   const flagged = new Map(
     rows.map((r) => [
@@ -65,9 +65,6 @@ export default function ReserveCalculator() {
       shownFields(problems.get(r.id), new Set((["cost", "years"] as const).filter((f) => touched.has(`${r.id}:${f}`)))),
     ]),
   );
-  const result = inputs.expenses.length && problems.size === 0 && !inputs.balanceProblem
-    ? sinkingFund({ expenses: inputs.expenses, currentBalance: inputs.balance, units: inputs.units })
-    : null;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">

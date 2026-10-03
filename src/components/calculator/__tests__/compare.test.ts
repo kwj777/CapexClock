@@ -1,5 +1,15 @@
-import { compareReplaceNow, computeForecast, type ReplaceNowComparison } from "@/lib/forecast";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import {
+  compareReplaceAtRiskNow,
+  COMPONENT_LIBRARY,
+  editRow,
+  EMPTY_DRAFT,
+  exampleDraft,
+  landlordForecast,
+  rowFromLibrary,
+  toComponents,
+  type Draft,
+  type ReplaceNowComparison,
+} from "@/verticals/landlord";
 import {
   applyChosen,
   applyLabel,
@@ -30,7 +40,6 @@ import {
   withReplaceNow,
   withTick,
 } from "../compare";
-import { EMPTY_DRAFT, editRow, exampleDraft, rowFromLibrary, toComponents, type Draft } from "../draft";
 
 const shown = (variants: { text: string; shown: boolean }[]) => variants.filter((v) => v.shown).map((v) => v.text);
 
@@ -92,20 +101,20 @@ describe("applying the comparison", () => {
   it("gives the forecast the comparison promised", () => {
     const start = 2026;
     const { components } = toComponents(draft, start);
-    const comparison = compareReplaceNow({ startYear: start, unitCount: 12, components });
+    const comparison = compareReplaceAtRiskNow({ startYear: start, unitCount: 12, components });
     const applied = withReplaceNow(draft, new Set(comparison.chosen));
-    const after = computeForecast({ startYear: start, unitCount: 12, components: toComponents(applied, start).components });
+    const after = landlordForecast(toComponents(applied, start).components, 12, start);
     expect(after.neededNow).toBe(comparison.replaceNow.neededNow);
-    expect(after.total).toBe(comparison.replaceNow.total);
+    expect(after.horizonTotal).toBe(comparison.replaceNow.total);
     expect(after.monthlyReserve).toBe(comparison.replaceNow.monthlyReserve);
     // Applied rows aren't offered again.
-    expect(compareReplaceNow({ startYear: start, unitCount: 12, components: toComponents(applied, start).components }).items).toEqual([]);
+    expect(compareReplaceAtRiskNow({ startYear: start, unitCount: 12, components: toComponents(applied, start).components }).items).toEqual([]);
   });
 
   it("lists the example's at-risk rows, with the blank install year to check", () => {
     const { components } = toComponents(draft, 2026);
-    const { items } = compareReplaceNow({ startYear: 2026, unitCount: 12, components });
-    expect(items.map((i) => [i.name, i.installYearIsEstimate])).toEqual([
+    const { items } = compareReplaceAtRiskNow({ startYear: 2026, unitCount: 12, components });
+    expect(items.map((i) => [i.name, i.estimated.installYear])).toEqual([
       ["Refrigerator", true],
       ["Tank water heater", false],
       ["Parking lot seal coat", false],
@@ -127,7 +136,7 @@ describe("applying the comparison", () => {
 describe("Apply and Undo in the panel", () => {
   const draft = exampleDraft();
   const { components } = toComponents(draft, 2026);
-  const { chosen } = compareReplaceNow({ startYear: 2026, unitCount: 12, components });
+  const { chosen } = compareReplaceAtRiskNow({ startYear: 2026, unitCount: 12, components });
 
   it("sends compare_viewed once, the first time the panel opens with items in it", () => {
     expect(viewedEvent(true, false, 4)).toEqual({ items: 4 });
@@ -245,13 +254,13 @@ describe("focus after Apply or Undo", () => {
 
 describe("the comparison's wording", () => {
   it("names when each item is due, and where an estimated install year came from", () => {
-    const overdue = { status: "overdue" as const, endOfLifeYear: 2011, installYearIsEstimate: false };
-    const soon = { status: "due_soon" as const, endOfLifeYear: 2028, installYearIsEstimate: false };
+    const overdue = { status: "overdue" as const, endOfLifeYear: 2011, estimated: { installYear: false } };
+    const soon = { status: "due_soon" as const, endOfLifeYear: 2028, estimated: { installYear: false } };
     expect(riskText(overdue)).toBe("Past due since 2011");
     expect(riskText(soon)).toBe("Due 2028");
     expect(itemDetail(soon, 2020, false)).toBe("Due 2028.");
-    expect(itemDetail({ ...soon, installYearIsEstimate: true }, 2020, true)).toBe("Due 2028. Install year 2020 is a guess.");
-    expect(itemDetail({ ...overdue, installYearIsEstimate: true }, 1998, false)).toBe(
+    expect(itemDetail({ ...soon, estimated: { installYear: true } }, 2020, true)).toBe("Due 2028. Install year 2020 is a guess.");
+    expect(itemDetail({ ...overdue, estimated: { installYear: true } }, 1998, false)).toBe(
       "Past due since 2011. No install year, so year built (1998) is used.",
     );
   });
@@ -295,10 +304,10 @@ describe("the comparison's wording", () => {
   });
 
   it("explains that items past end of life or due this year are paid this year either way", () => {
-    const mixed = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2028 }];
-    const allNow = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2026 }];
-    expect(eitherWayVariants([{ endOfLifeYear: 2027 }, { endOfLifeYear: 2028 }], 2026, 0)).toEqual([]);
-    expect(eitherWayVariants([{ endOfLifeYear: 2027 }], 2026, 20)).toEqual([]);
+    const mixed = [{ paidInFirstYearEitherWay: true }, { paidInFirstYearEitherWay: false }];
+    const allNow = [{ paidInFirstYearEitherWay: true }, { paidInFirstYearEitherWay: true }];
+    expect(eitherWayVariants([{ paidInFirstYearEitherWay: false }, { paidInFirstYearEitherWay: false }], 2026, 0)).toEqual([]);
+    expect(eitherWayVariants([{ paidInFirstYearEitherWay: false }], 2026, 20)).toEqual([]);
     expect(shown(eitherWayVariants(mixed, 2026, 0))).toEqual([
       "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years.",
     ]);
@@ -308,11 +317,11 @@ describe("the comparison's wording", () => {
   });
 
   it("adds the emergency extra to the explanation once there's a percent, in the same spot", () => {
-    const mixed = [{ endOfLifeYear: 2011 }, { endOfLifeYear: 2028 }];
+    const mixed = [{ paidInFirstYearEitherWay: true }, { paidInFirstYearEitherWay: false }];
     expect(shown(eitherWayVariants(mixed, 2026, 20))).toEqual([
       "Items past end of life or due in 2026 are paid in 2026 either way, so the difference comes from items due in the next 2 years and the emergency extra.",
     ]);
-    expect(shown(eitherWayVariants([{ endOfLifeYear: 2011 }], 2026, 20))).toEqual([
+    expect(shown(eitherWayVariants([{ paidInFirstYearEitherWay: true }], 2026, 20))).toEqual([
       "Everything here is past end of life or due in 2026, so it's paid in 2026 either way. Only the emergency extra differs.",
     ]);
     // Both drawn every time, so typing a percent never changes the height.
@@ -330,7 +339,7 @@ describe("the comparison for screen readers", () => {
     rows: [{ ...rowFromLibrary(heater, "10"), installYear: "2017", costEach: "1500" }],
   };
   const comparison = (only?: ReadonlySet<string>): ReplaceNowComparison =>
-    compareReplaceNow({ startYear: 2026, unitCount: 10, components: toComponents(draft, 2026).components }, { only });
+    compareReplaceAtRiskNow({ startYear: 2026, unitCount: 10, components: toComponents(draft, 2026).components }, { only });
 
   it("reads out this year's cash, the 10-year change and the monthly reserve", () => {
     // Waiting: $15,000 in 2027 needs $1,250 a month. Replacing now: next one in 2036 is 120 months away.

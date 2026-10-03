@@ -1,6 +1,6 @@
 import { inflateRawSync } from "node:zlib";
 import readExcelFile from "read-excel-file/universal";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { COMPONENT_LIBRARY } from "@/verticals/landlord";
 import {
   createInTurn,
   createSummary,

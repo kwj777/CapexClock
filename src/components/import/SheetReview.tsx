@@ -14,7 +14,7 @@ import type { NameMatcher } from "@/lib/import/names";
 import { columnsFor, parseSheetYear, type OpenedSheet } from "@/lib/import/open";
 import { KEEP_OWN, type FixField, type ImportChoices, type Preview, type PreviewRow } from "@/lib/import/preview";
 import { columnLetter, previewHints, quantityAnswers, quantityQuestionText } from "@/lib/import/wording";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent } from "@/verticals/landlord";
 import PreviewRows from "./PreviewRows";
 import { headingClass, inputClass } from "./SourcePicker";
 

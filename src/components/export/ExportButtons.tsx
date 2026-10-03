@@ -1,12 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
 import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
-import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
+import type { Component, Draft, LandlordForecast } from "@/verticals/landlord";
 import ComponentListButton from "./ComponentListButton";
 import { download } from "./download";
 import PayQuestion from "./PayQuestion";
@@ -28,8 +27,8 @@ export default function ExportButtons({
 }: {
   name: string;
   unitCount: number;
-  forecast: Forecast;
-  components: ForecastComponent[];
+  forecast: LandlordForecast;
+  components: readonly Component[];
   /** Every form row, so exports show units and name the rows left out. */
   rows: ExportFormRow[];
   /** The whole list, for the component list download, and the name for its Building column. */

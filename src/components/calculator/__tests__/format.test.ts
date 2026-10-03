@@ -1,4 +1,4 @@
-import { computeForecast, type ForecastComponent } from "@/lib/forecast";
+import { landlordForecast, type Component } from "@/verticals/landlord";
 import { formatCostRange, formatReserve } from "../format";
 
 function dollars(text: string): number {
@@ -19,19 +19,19 @@ describe("reserve amounts on screen", () => {
   });
 
   it("never leave the fund short when the shown amount is saved", () => {
-    const components: ForecastComponent[] = [
+    const components: Component[] = [
       { id: "roof", category: "Roofing", name: "Roof", quantity: 1, installYear: 2008, usefulLifeYears: 22, replacementCostEach: 36000 },
       { id: "wh", category: "Plumbing", name: "Water heaters", quantity: 24, installYear: 2014, usefulLifeYears: 10, replacementCostEach: 1400 },
       { id: "hvac", category: "HVAC", name: "Condensers", quantity: 12, installYear: 2019, usefulLifeYears: 14, replacementCostEach: 4500 },
     ];
-    const f = computeForecast({ startYear: 2026, years: 31, unitCount: 24, components });
+    const f = landlordForecast(components, 24, 2026);
     const monthly = dollars(formatReserve(f.monthlyReserve));
     const perUnit = dollars(formatReserve(f.monthlyReservePerUnit ?? 0));
     let balance = 0;
     let perUnitBalance = 0;
-    for (const y of f.years.slice(1)) {
-      balance += monthly * 12 - y.total;
-      perUnitBalance += perUnit * 24 * 12 - y.total;
+    for (const total of f.reserveYearTotals.slice(1)) {
+      balance += monthly * 12 - total;
+      perUnitBalance += perUnit * 24 * 12 - total;
       expect(balance).toBeGreaterThanOrEqual(0);
       expect(perUnitBalance).toBeGreaterThanOrEqual(0);
     }

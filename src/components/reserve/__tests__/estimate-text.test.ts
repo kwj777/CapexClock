@@ -1,4 +1,4 @@
-import { readQuickInputs } from "@/lib/reserve/quick-estimate";
+import { readQuickInputs } from "@/verticals/landlord";
 import { ENTER_PROMPT, estimateText, FIX_PROMPT, quickPrompt, TICK_PROMPT } from "../estimate-text";
 
 describe("the quick estimate as shown", () => {

@@ -19,60 +19,60 @@ import ComponentListButton from "@/components/export/ComponentListButton";
 import ExportButtons from "@/components/export/ExportButtons";
 import PaidIdeaButton, { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
 import PaidIdeasProvider from "@/components/paid/PaidIdeas";
-import { computeForecast, type Forecast } from "@/lib/forecast";
 import { track } from "@/lib/analytics";
 import { moneyColumn } from "@/lib/export/format";
 import { guessedYear, installYearNote } from "@/lib/export/rows";
 import type { PaidWhere } from "@/lib/paid-ideas";
 import {
-  COMPONENT_LIBRARY,
-  TYPICAL_COSTS,
-  UNIT_LABEL_TEXT,
-  type LibraryComponent,
-  type TypicalCost,
-} from "@/lib/library/components";
-import {
   badYearBuilt,
+  COMPONENT_LIBRARY,
   CONDITION_TEXT,
   CONDITIONS,
-  costHint,
   costLabel,
   customRow,
   detailsShown,
   detailsSummary,
   editRow,
-  exampleDraft,
   EMPTY_DRAFT,
-  clearImportUndo,
+  exampleDraft,
+  forecastDraft,
+  groupByCategory,
   hasEntries,
   importReplaces,
-  STORAGE_KEY as DRAFT_STORAGE_KEY,
-  loadDraft,
   MAX_NOTES_LENGTH,
   neighborRowId,
   notesLeftText,
   notesTooLong,
-  parseUnitCount,
-  peekImportUndo,
   problemFields,
   problemText,
   rowFromLibrary,
   rowTotal,
-  saveDraft,
-  toComponents,
+  TYPICAL_COSTS,
+  UNIT_LABEL_TEXT,
   withImport,
   withUnitCount,
   YEAR_BUILT_TEXT,
   type Draft,
   type DraftImport,
   type DraftRow,
+  type LandlordForecast,
+  type LibraryComponent,
   type RowField,
   type RowProblem,
-} from "./draft";
+  type TypicalCost,
+} from "@/verticals/landlord";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
 import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
+import { costHint } from "./cost-hint";
+import {
+  clearImportUndo,
+  loadDraft,
+  peekImportUndo,
+  saveDraft,
+  STORAGE_KEY as DRAFT_STORAGE_KEY,
+} from "./draft-storage";
 import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.
@@ -90,14 +90,6 @@ const ImportPanel = dynamic(() => import("@/components/import/ImportPanel"), {
 const CUSTOM = "__custom__";
 // Plans a replacement this year. Not "now", which reads like "I just replaced it".
 const REPLACE_LABEL = "Replace this year";
-
-function groupByCategory(library: LibraryComponent[]): Record<string, LibraryComponent[]> {
-  return library.reduce<Record<string, LibraryComponent[]>>((acc, c) => {
-    (acc[c.category] ??= []).push(c);
-    return acc;
-    // No prototype, so a category named "constructor" can't collide with Object's own keys.
-  }, Object.create(null) as Record<string, LibraryComponent[]>);
-}
 
 const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
@@ -299,15 +291,13 @@ function CalculatorBody({
 
   // The forecast and the notes under rows follow typing a moment later, so in a long
   // list each key press shows straight away and the forecast catches up after.
-  const forecastDraft = useDeferredValue(draft);
-  const { components, problems } = useMemo(() => toComponents(forecastDraft, startYear), [forecastDraft, startYear]);
-  // Condition and the guess flag for the lists under the forecast.
-  const rowsById = useMemo(() => new Map(forecastDraft.rows.map((r) => [r.id, r])), [forecastDraft.rows]);
-  const unitCount = parseUnitCount(forecastDraft.unitCount);
-  const forecast = useMemo(
-    () => computeForecast({ startYear, unitCount, components }),
-    [startYear, unitCount, components],
+  const deferredDraft = useDeferredValue(draft);
+  const { components, problems, unitCount, forecast } = useMemo(
+    () => forecastDraft(deferredDraft, startYear),
+    [deferredDraft, startYear],
   );
+  // Condition and the guess flag for the lists under the forecast.
+  const rowsById = useMemo(() => new Map(deferredDraft.rows.map((r) => [r.id, r])), [deferredDraft.rows]);
   const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, startYear);
   const showYearBuiltError = yearBuiltIsBad && !editingYearBuilt;
 
@@ -702,11 +692,11 @@ function CalculatorBody({
                     emphasis
                   />
                   <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
-                  <Stat label="10-year total" value={formatMoney(forecast.total)} />
+                  <Stat label="10-year total" value={formatMoney(forecast.horizonTotal)} />
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   The monthly reserve is the smallest steady amount that has the cash ready for every
-                  replacement from {forecast.startYear + 1} on, looking 30 years ahead.{" "}
+                  replacement from {forecast.reserveFromYear} on, looking 30 years ahead.{" "}
                   {forecast.startYear} costs (overdue or due this year) are shown separately because
                   there&apos;s no time to save for them.
                 </p>
@@ -728,7 +718,7 @@ function CalculatorBody({
             <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               In today&apos;s dollars, no inflation.
             </p>
-            {forecast.total > 0 ? (
+            {forecast.horizonTotal > 0 ? (
               <>
                 <ForecastChart forecast={forecast} />
                 <ForecastTable forecast={forecast} />
@@ -753,7 +743,7 @@ function CalculatorBody({
                 setDraft={setDraft}
                 state={compare}
                 setState={setCompare}
-                forecastPending={forecastDraft !== draft}
+                forecastPending={deferredDraft !== draft}
               />
             </AtRisk>
             <DueTable forecast={forecast} rows={rowsById} />
@@ -764,7 +754,7 @@ function CalculatorBody({
             unitCount={unitCount}
             forecast={forecast}
             components={components}
-            rows={forecastDraft.rows}
+            rows={deferredDraft.rows}
             list={{ draft, building: listName }}
             onPayQuestionChange={onPayQuestionChange}
           />
@@ -1112,7 +1102,7 @@ function Stat({
 }
 
 /** The chart's numbers as a table, for screen readers (the chart itself is hidden from them). */
-function ForecastTable({ forecast }: { forecast: Forecast }) {
+function ForecastTable({ forecast }: { forecast: LandlordForecast }) {
   const { rows, present } = toChartRows(forecast);
   return (
     <div className="sr-only">
@@ -1174,7 +1164,7 @@ function NameNotes({ row, isEstimate }: { row: DraftRow | undefined; isEstimate:
 }
 
 /** The at-risk card; children (the replace-now comparison) show under the list when it isn't empty. */
-function AtRisk({ forecast, rows, children }: { forecast: Forecast; rows: RowsById; children?: ReactNode }) {
+function AtRisk({ forecast, rows, children }: { forecast: LandlordForecast; rows: RowsById; children?: ReactNode }) {
   return (
     <div className={cardClass}>
       <h3 className="text-base font-semibold text-slate-950 dark:text-white">At risk</h3>
@@ -1189,7 +1179,7 @@ function AtRisk({ forecast, rows, children }: { forecast: Forecast; rows: RowsBy
 // The lists under the forecast can run to thousands of rows, so they're redrawn only
 // when the forecast changes, not on every key press in the list of components. The
 // comparison under this one isn't memoized, because Apply and Undo need the latest draft.
-const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Forecast; rows: RowsById }) {
+const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: LandlordForecast; rows: RowsById }) {
   return forecast.atRisk.length === 0 ? (
     <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Nothing is close to end of life.</p>
   ) : (
@@ -1198,7 +1188,7 @@ const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Fore
         <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
           <span className="text-slate-900 dark:text-white">
             {item.name}
-            <NameNotes row={rows.get(item.componentId)} isEstimate={item.installYearIsEstimate} />
+            <NameNotes row={rows.get(item.componentId)} isEstimate={item.estimated.installYear} />
           </span>
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -1215,8 +1205,8 @@ const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Fore
   );
 });
 
-const DueTable = memo(function DueTable({ forecast, rows: formRows }: { forecast: Forecast; rows: RowsById }) {
-  const rows = forecast.years.flatMap((y) => y.replacements);
+const DueTable = memo(function DueTable({ forecast, rows: formRows }: { forecast: LandlordForecast; rows: RowsById }) {
+  const rows = forecast.replacements;
   // Every row shows cents once any row has them, so the rows add up.
   const money = moneyColumn(rows.map((r) => r.cost));
   return (
@@ -1248,7 +1238,7 @@ const DueTable = memo(function DueTable({ forecast, rows: formRows }: { forecast
                         <span className="ml-0.5 text-xs text-red-700 dark:text-red-400">overdue</span>
                       </>
                     )}
-                    <NameNotes row={formRows.get(r.componentId)} isEstimate={r.installYearIsEstimate} />
+                    <NameNotes row={formRows.get(r.componentId)} isEstimate={r.estimated.installYear} />
                   </td>
                   <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
                     {money(r.cost)}

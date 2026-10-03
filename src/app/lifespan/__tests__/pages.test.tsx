@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent } from "@/verticals/landlord";
 import LifespanPage from "../[component]/page";
 import LifespanIndex from "../page";
 

@@ -9,16 +9,25 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Portfolio from "@/components/account/Portfolio";
 import { CalculatorView } from "@/components/calculator/Calculator";
 import { ComparisonPanel } from "@/components/calculator/CompareAtRisk";
-import { exampleDraft, parseUnitCount, toComponents, type Draft, type DraftRow } from "@/components/calculator/draft";
 import ForecastPdf from "@/components/export/ForecastPdf";
 import ForecastMockup from "@/components/ForecastMockup";
 import ConditionReportPdf from "@/components/report/ConditionReportPdf";
 import QuickEstimate from "@/components/reserve/QuickEstimate";
 import { exportDetails } from "@/lib/export/rows";
-import { compareReplaceNow, computeForecast } from "@/lib/forecast";
-import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "@/lib/library/components";
-import { sampleReport, SAMPLE_NOTE } from "@/lib/report/sample";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import {
+  compareReplaceAtRiskNow,
+  COMPONENT_LIBRARY,
+  exampleDraft,
+  landlordForecast,
+  parseUnitCount,
+  SAMPLE_NOTE,
+  sampleReport,
+  toComponents,
+  TYPICAL_COSTS,
+  type Draft,
+  type DraftRow,
+} from "@/verticals/landlord";
 import { corpusDraft, mulberry32 } from "./generate";
 
 // The PDF primitives become plain tags, and a bar's width is written out, so the
@@ -118,7 +127,7 @@ describe("the forecast PDF", () => {
       const draft = withSteadyIds(exampleDraft());
       const { components } = toComponents(draft, year);
       const unitCount = parseUnitCount(draft.unitCount);
-      const forecast = computeForecast({ startYear: year, unitCount, components });
+      const forecast = landlordForecast(components, unitCount, year);
       expect(
         text(
           <ForecastPdf
@@ -158,7 +167,7 @@ describe("the replace-now comparison", () => {
     it(`on the example building, ${percent}% emergency premium`, () => {
       const draft = withSteadyIds(exampleDraft());
       const { components } = toComponents(draft, 2026);
-      const comparison = compareReplaceNow(
+      const comparison = compareReplaceAtRiskNow(
         { startYear: 2026, unitCount: parseUnitCount(draft.unitCount), components },
         { emergencyPercent: percent },
       );

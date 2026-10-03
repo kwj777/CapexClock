@@ -1,7 +1,7 @@
-import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
+import { CONDITION_TEXT, countNoun, LANDLORD_LABELS, type DraftRow, type ImportedRow } from "@/verticals/landlord";
 import { COUNTED_PER_TEXT } from "./format";
-import type { BuildingInfo, ImportedRow, KnownRow, Preview, PreviewRow } from "./preview";
+import type { BuildingInfo, KnownRow, Preview, PreviewRow } from "./preview";
 import { listText, quote } from "./text";
 import { previewSummary, skippedText, statusText } from "./wording";
 
@@ -313,7 +313,8 @@ export function sheetDetails(
 export function fillText(fill: readonly DetailChange[]): string {
   if (fill.length === 0) return "";
   const what = listText(fill.map((f) => (f.field === "unitCount" ? "rental units" : "year built")));
-  const values = listText(fill.map((f) => (f.field === "unitCount" ? plural(Number(f.value), "unit") : `built ${f.value}`)));
+  const units = (n: number) => `${n.toLocaleString("en-US")} ${countNoun(LANDLORD_LABELS.divisor, n)}`;
+  const values = listText(fill.map((f) => (f.field === "unitCount" ? units(Number(f.value)) : `built ${f.value}`)));
   return `${what.charAt(0).toUpperCase()}${what.slice(1)} will come from the sheet: ${values}.`;
 }
 

@@ -3,18 +3,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import LifespanEstimator from "@/components/lifespan/LifespanEstimator";
-import { defaultLife, UNIT_LABEL_TEXT, type LibraryComponent } from "@/lib/library/components";
-import { notesFor } from "@/lib/library/content";
+import { getLibrary } from "@/lib/library/source";
+import { pageMetadata } from "@/lib/metadata";
 import {
   capitalize,
+  defaultLife,
   lifeDrivers,
   lifespanDescription,
   lifespanTitle,
+  notesFor,
   relatedHeading,
   subjectFor,
-} from "@/lib/library/phrasing";
-import { getLibrary } from "@/lib/library/source";
-import { pageMetadata } from "@/lib/metadata";
+  UNIT_LABEL_TEXT,
+  type LibraryComponent,
+} from "@/verticals/landlord";
 
 // Library edits in Supabase show up within an hour; new components get pages on first visit.
 export const revalidate = 3600;

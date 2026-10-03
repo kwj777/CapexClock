@@ -1,5 +1,5 @@
-import type { Draft } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import type { Draft } from "@/verticals/landlord";
 import type { SaveInput } from "./convert";
 
 /** Why a save didn't go through, so the editor can say what to do about it. */

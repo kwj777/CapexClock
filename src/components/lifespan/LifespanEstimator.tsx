@@ -2,24 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { loadDraft, saveDraft } from "@/components/calculator/draft-storage";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
-import { nextReplacementReserve, RESERVE_HORIZON_YEARS } from "@/lib/forecast";
-import { defaultLife, type LibraryComponent } from "@/lib/library/components";
-import { subjectFor } from "@/lib/library/phrasing";
+import {
+  EARLIEST_INSTALL_YEAR,
+  LANDLORD_RULES,
+  lifespanEstimate,
+  subjectFor,
+  withLibraryItem,
+  type LibraryComponent,
+} from "@/verticals/landlord";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
 const label = "text-xs font-medium text-slate-600 dark:text-slate-400";
-
-/** Null when blank; NaN when something was typed that isn't a number (e.g. "1.4k"). */
-function num(value: string): number | null {
-  const cleaned = value.replace(/[$,\s]/g, "");
-  if (cleaned === "") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : NaN;
-}
 
 /** "When will mine need replacing, and what should I set aside?" for one component. */
 export default function LifespanEstimator({ item }: { item: LibraryComponent }) {
@@ -41,53 +38,7 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
     if (alreadyAdded) alreadyPrompt.current?.focus();
   }, [alreadyAdded]);
 
-  const life = defaultLife(item);
-  const year = num(installYear);
-  const validYear = year !== null && Number.isInteger(year) && year >= 1900 && year <= startYear;
-  const qty = num(quantity);
-  const each = num(cost);
-  const sqFt = item.unitLabel === "per_sq_ft";
-
-  let result: {
-    due: number;
-    low: number;
-    high: number;
-    monthly: number | null;
-    neededNow: number | null;
-    /** The replacement the monthly amount saves for. */
-    savingFor: number | null;
-  } | null = null;
-  // Why no dollar figure shows yet, once a cost has been typed, and which field it's about.
-  let moneyHint: { text: string; field: "cost" | "quantity"; invalid: boolean } | null = null;
-  if (validYear) {
-    let monthly: number | null = null;
-    let neededNow: number | null = null;
-    let savingFor: number | null = null;
-    if (each !== null && (Number.isNaN(each) || each < 0)) {
-      moneyHint = { text: "Enter the cost as a plain number, like 1400.", field: "cost", invalid: true };
-    } else if (each !== null && qty === null) {
-      moneyHint = {
-        text: sqFt ? "Enter the square feet to see a monthly amount." : "Enter how many to see a monthly amount.",
-        field: "quantity",
-        invalid: false,
-      };
-    } else if (each !== null && qty !== null && (Number.isNaN(qty) || qty <= 0)) {
-      moneyHint = {
-        text: sqFt ? "Enter the square feet as a number, like 1200." : "Enter how many as a number, like 12.",
-        field: "quantity",
-        invalid: true,
-      };
-    } else if (each !== null && qty !== null) {
-      const r = nextReplacementReserve(
-        { id: item.slug, category: item.category, name: item.name, quantity: qty, installYear: year, usefulLifeYears: life, replacementCostEach: each },
-        startYear,
-      );
-      monthly = r.monthly;
-      neededNow = r.neededNow;
-      savingFor = r.savingFor;
-    }
-    result = { due: year + life, low: year + item.lifeLow, high: year + item.lifeHigh, monthly, neededNow, savingFor };
-  }
+  const { result, moneyHint, badYear } = lifespanEstimate({ item, installYear, quantity, costEach: cost, currentYear: startYear });
 
   function addToForecast(mode?: "add" | "update") {
     const draft = loadDraft();
@@ -100,13 +51,6 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
     router.push("/capex-calculator");
   }
 
-  const yearsLeft = result ? result.due - startYear : 0;
-  // The building forecast looks RESERVE_HORIZON_YEARS ahead, so it leaves out a later replacement for now.
-  const forecastCountsFrom =
-    result?.savingFor != null && result.savingFor > startYear + RESERVE_HORIZON_YEARS
-      ? result.savingFor - RESERVE_HORIZON_YEARS
-      : null;
-  const badYear = installYear.trim() !== "" && !validYear;
   // Points a field at the note below it, and marks it when what's typed can't be read.
   const noteFor = (field: "cost" | "quantity") =>
     moneyHint?.field === field
@@ -160,18 +104,18 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
             className={badYear ? "text-sm text-amber-800 dark:text-amber-300" : "text-sm text-slate-500 dark:text-slate-400"}
           >
             {badYear
-              ? `Enter a 4-digit year from 1900 to ${startYear}.`
+              ? `Enter a 4-digit year from ${EARLIEST_INSTALL_YEAR} to ${startYear}.`
               : "Enter the install year to see when replacement is due."}
           </p>
         ) : (
           <div className="space-y-2">
             <p className="text-lg">
               <span className="font-semibold text-slate-950 dark:text-white">
-                {yearsLeft < 0
+                {result.yearsLeft < 0
                   ? `Past expected life since ${result.due}`
-                  : yearsLeft === 0
+                  : result.yearsLeft === 0
                     ? `Due this year (${result.due})`
-                    : `Due around ${result.due}, in ${yearsLeft} year${yearsLeft === 1 ? "" : "s"}`}
+                    : `Due around ${result.due}, in ${result.yearsLeft} year${result.yearsLeft === 1 ? "" : "s"}`}
               </span>
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -195,11 +139,11 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
                     have the cash ready for the next replacement.
                   </>
                 )}
-                {result.monthly > 0 && forecastCountsFrom !== null && (
+                {result.monthly > 0 && result.forecastCountsFrom !== null && (
                   <>
                     {" "}
-                    The building forecast looks {RESERVE_HORIZON_YEARS} years ahead, so its monthly reserve won&apos;t
-                    count this replacement until {forecastCountsFrom}.
+                    The building forecast looks {LANDLORD_RULES.reserveHorizonYears} years ahead, so its monthly reserve won&apos;t
+                    count this replacement until {result.forecastCountsFrom}.
                   </>
                 )}
               </p>

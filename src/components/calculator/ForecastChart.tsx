@@ -13,9 +13,8 @@ import {
   type TooltipContentProps,
   type TooltipValueType,
 } from "recharts";
-import type { Forecast } from "@/lib/forecast";
-import { CHART_CATEGORIES, type ChartCategory } from "@/lib/library/components";
-import { toChartRows } from "./chartData";
+import { CHART_CATEGORIES, type ChartCategory, type LandlordForecast } from "@/verticals/landlord";
+import { toChartRows, tooltipTotal } from "./chartData";
 import { formatCompactMoney, formatMoney } from "./format";
 
 // Color follows the category, never its position in the current data.
@@ -28,7 +27,7 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
   const items = payload.flatMap((p) =>
     typeof p.value === "number" && p.value > 0 ? [{ ...p, value: p.value }] : [],
   );
-  const total = items.reduce((sum, p) => sum + p.value, 0);
+  const total = tooltipTotal(items.map((p) => p.value));
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
       <p className="font-semibold text-slate-900 dark:text-white">
@@ -49,7 +48,7 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
  * numbers as a table next to it (ForecastTable), so it takes no keyboard focus.
  */
 // Redrawn only when the forecast changes, not on every key press in the list above it.
-export default memo(function ForecastChart({ forecast }: { forecast: Forecast }) {
+export default memo(function ForecastChart({ forecast }: { forecast: LandlordForecast }) {
   const { rows, present } = toChartRows(forecast);
 
   return (

@@ -1,5 +1,6 @@
+import type { ImportedRow } from "@/verticals/landlord";
 import { preview } from "../__fixtures__/sheets";
-import type { ImportedRow, Preview, PreviewRow } from "../preview";
+import type { Preview, PreviewRow } from "../preview";
 import {
   addLabel,
   columnLetter,

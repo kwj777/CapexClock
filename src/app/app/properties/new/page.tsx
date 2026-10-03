@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PropertyEditorLoader from "@/components/account/PropertyEditorLoader";
 import { getLibrary, getTypicalCosts } from "@/lib/library/source";
-import { EMPTY_DRAFT } from "@/components/calculator/draft";
+import { EMPTY_DRAFT } from "@/verticals/landlord";
 import { getAccount } from "../../account";
 
 function heading(from: string | string[] | undefined): string {

@@ -1,8 +1,5 @@
-import { MAX_NOTES_LENGTH } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { UnitLabel } from "@/lib/forecast";
-import { defaultLife, type LibraryComponent } from "@/lib/library/components";
-import type { ComponentCondition } from "@/lib/supabase/database.types";
+import { defaultLife, MAX_NOTES_LENGTH, type ImportedRow, type LibraryComponent } from "@/verticals/landlord";
 import {
   buildingValues,
   columnValues,
@@ -36,29 +33,6 @@ import {
   saysPerSqFt,
   type Reading,
 } from "./values";
-
-/** A row ready for the draft. Strings, like the form's own fields. */
-export interface ImportedRow {
-  librarySlug: string | null;
-  category: string;
-  name: string;
-  quantity: string;
-  unitLabel: UnitLabel;
-  installYear: string;
-  installYearIsGuess: boolean;
-  usefulLife: string;
-  costEach: string;
-  condition: ComponentCondition | null;
-  notes: string;
-  /** "Replace now" said yes: plan its replacement this year. */
-  replaceNow: boolean;
-  /**
-   * Counted per unit with no quantity: one in each unit, so its quantity is the
-   * unit count of the list it goes into, and follows it. `quantity` is the sheet's
-   * unit count for the preview to show, or blank when the sheet doesn't give one.
-   */
-  followsUnitCount?: boolean;
-}
 
 /** Fields the owner can fix in the preview. */
 export type FixField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach";

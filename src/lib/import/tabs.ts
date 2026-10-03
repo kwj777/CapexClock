@@ -1,4 +1,4 @@
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent } from "@/verticals/landlord";
 import type { NameMatcher } from "./names";
 import { openSheet, startingChoices, type OpenedSheet } from "./open";
 import { buildPreview } from "./preview";

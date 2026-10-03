@@ -1,6 +1,21 @@
-import { costLabel, EMPTY_DRAFT, MAX_NOTES_LENGTH, withImport, withImportedRows, withUnitCount } from "@/components/calculator/draft";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
-import { buildPreview, isTotalLabel, KEEP_OWN, locationLine, mergedNotes, type Preview, type PreviewRow } from "../preview";
+import {
+  COMPONENT_LIBRARY,
+  costLabel,
+  EMPTY_DRAFT,
+  MAX_NOTES_LENGTH,
+  withImport,
+  withImportedRows,
+  withUnitCount,
+} from "@/verticals/landlord";
+import {
+  buildPreview,
+  isTotalLabel,
+  KEEP_OWN,
+  locationLine,
+  mergedNotes,
+  type Preview,
+  type PreviewRow,
+} from "../preview";
 import { planProperty, plannedSave, withEdits } from "../buildings";
 import { startingChoices } from "../open";
 import {

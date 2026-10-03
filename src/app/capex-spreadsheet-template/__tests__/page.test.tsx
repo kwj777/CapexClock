@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOM, exampleRows } from "@/lib/export/component-list";
 import readExcelFile from "read-excel-file/universal";
+import { BOM, exampleRows } from "@/lib/export/component-list";
 import { FORMAT_COLUMNS, FORMAT_HEADINGS, TEMPLATE_FORMATS, templateFile } from "@/lib/import/format";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { COMPONENT_LIBRARY } from "@/verticals/landlord";
 import { GET as getExample } from "../capexclock-example.csv/route";
 import { GET as getExampleXlsx } from "../capexclock-example.xlsx/route";
 import { GET as getTemplate } from "../capexclock-template.csv/route";

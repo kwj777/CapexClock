@@ -1,4 +1,4 @@
--- Component library. Mirrors src/lib/library/components.ts (a test keeps them in sync).
+-- Component library. Mirrors src/verticals/landlord/library/components.ts (a test keeps them in sync).
 -- Safe to re-run: existing slugs are left alone, so edits made in the dashboard stick.
 -- Runs after the migrations; the typical cost columns come from 0005_typical_costs.sql.
 insert into public.component_library
