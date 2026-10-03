@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import SetupOffer from "@/components/import/SetupOffer";
 import TemplateImport from "@/components/import/TemplateImport";
 import TemplateLink from "@/components/import/TemplateLink";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -167,6 +168,7 @@ export default async function SpreadsheetTemplatePage() {
               .
             </p>
             <TemplateImport library={library} accountsEnabled={supabaseEnv() !== null} />
+            <SetupOffer where="template_page" className="mt-6" />
           </section>
 
           <section className="mt-16 max-w-3xl" aria-labelledby="faq-heading">
