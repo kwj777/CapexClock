@@ -1,6 +1,7 @@
 [build]
-  # Lint and tests run first, so a failing check stops the deploy.
-  command = "npm run lint && npm test && npm run build"
+  # Lint and tests run first, so a failing check stops the deploy. --ci makes a
+  # missing saved result (src/__parity__/__snapshots__) fail instead of being written.
+  command = "npm run lint && npm test -- --ci && npm run build"
   publish = ".next"
 
 [build.environment]

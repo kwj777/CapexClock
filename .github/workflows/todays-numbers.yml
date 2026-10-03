@@ -1,0 +1,35 @@
+# "Today's numbers unchanged": fails a pull request that changes or deletes the
+# saved results of today's math (src/__parity__/__snapshots__) or edits the frozen
+# copy of today's math (src/__parity__/legacy). Adding a new saved file passes, and
+# so does deleting the frozen copy once it's no longer needed. A pull request that
+# is meant to change a number says so in its description; this check failing is
+# the prompt to confirm it.
+name: Today's numbers unchanged
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  todays-numbers:
+    name: Today's numbers unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check the saved numbers and the frozen copy
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base="origin/${BASE_REF}"
+          changed=$( { git diff --name-only --no-renames --diff-filter=MD "$base"...HEAD -- src/__parity__/__snapshots__;
+                       git diff --name-only --no-renames --diff-filter=M  "$base"...HEAD -- src/__parity__/legacy; } )
+          if [ -n "$changed" ]; then
+            echo "These hold today's numbers and must not change here:"
+            echo "$changed"
+            exit 1
+          fi
+          echo "Today's numbers are unchanged."
