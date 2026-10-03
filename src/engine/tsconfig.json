@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "types": [],
+    "paths": {},
+    "plugins": [],
+    "jsx": "preserve",
+    "allowJs": false,
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./**/__tests__/**", "./**/*.test.ts", "./**/*.test.tsx"]
+}

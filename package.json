@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "jest",
     "typecheck": "next typegen && tsc --noEmit",
+    "test:engine": "jest src/engine --coverage",
+    "typecheck:engine": "tsc -p src/engine/tsconfig.json",
     "sample-report": "ts-node --project scripts/tsconfig.json scripts/sample-report.tsx",
     "postinstall": "patch-package"
   },
