@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
 import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
+import type { Draft } from "@/verticals/landlord";
 import ComponentListButton from "./ComponentListButton";
 import { download } from "./download";
 import PayQuestion from "./PayQuestion";

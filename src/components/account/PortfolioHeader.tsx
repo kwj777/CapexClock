@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent } from "@/verticals/landlord";
 
 // The importer (and the readers it loads) only once the owner opens it.
 const PortfolioImport = dynamic(() => import("./PortfolioImport"), {

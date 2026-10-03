@@ -4,6 +4,7 @@ import { formatQuantity, moneyColumn } from "@/lib/export/format";
 import { exportRows, sumTotals } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import { REPORT_LABEL } from "@/lib/paid-ideas";
+import { CONTACT_EMAIL } from "@/lib/site";
 import {
   ageText,
   CONDITION_TEXT,
@@ -11,8 +12,7 @@ import {
   remainingLifeText,
   statusText,
   type ReportRow,
-} from "@/lib/report/condition-report";
-import { CONTACT_EMAIL } from "@/lib/site";
+} from "@/verticals/landlord";
 
 // A condition report as a PDF. Only the sample is made with it for now
 // (scripts/sample-report.tsx, which registers the font first): paid reports

@@ -1,5 +1,6 @@
-import type { Forecast, ForecastComponent, UnitLabel } from "@/lib/forecast";
+import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import type { UnitLabel } from "@/verticals/landlord";
 
 /** What the owner noted about a component, as the exports show it. */
 export interface RowDetails {

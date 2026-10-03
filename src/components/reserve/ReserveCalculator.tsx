@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { readReserveInputs, shownFields, type ExpenseField } from "@/lib/reserve/inputs";
+import { shownFields } from "@/components/reserve/shown-fields";
 import { sinkingFund } from "@/lib/reserve/sinking-fund";
+import { readReserveInputs, type ExpenseField } from "@/verticals/landlord";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";

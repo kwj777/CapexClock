@@ -1,5 +1,3 @@
-import type { Draft, DraftRow, RowField } from "@/components/calculator/draft";
-import { EARLIEST_INSTALL_YEAR, EARLIEST_YEAR_BUILT, MAX_NOTES_LENGTH } from "@/components/calculator/draft";
 import { computeForecast, validateComponent, type Forecast, type ForecastComponent } from "@/lib/forecast";
 import type {
   ComponentRow,
@@ -7,6 +5,14 @@ import type {
   SaveComponentInput,
   SavePropertyInput,
 } from "@/lib/supabase/database.types";
+import {
+  EARLIEST_INSTALL_YEAR,
+  EARLIEST_YEAR_BUILT,
+  MAX_NOTES_LENGTH,
+  type Draft,
+  type DraftRow,
+  type RowField,
+} from "@/verticals/landlord";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

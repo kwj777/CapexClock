@@ -16,9 +16,8 @@ import {
   type Forecast,
   type ForecastComponent,
 } from "@/lib/forecast";
-import { COMPONENT_LIBRARY, type TypicalCost } from "@/lib/library/components";
-import { quickEstimate, quickSystems } from "@/lib/reserve/quick-estimate";
 import { sinkingFund, type PlannedExpense } from "@/lib/reserve/sinking-fund";
+import { COMPONENT_LIBRARY, quickEstimate, quickSystems, type TypicalCost } from "@/verticals/landlord";
 import { corpusCase, mulberry32, type CorpusComponent } from "./generate";
 import * as legacy from "./legacy/forecast";
 import * as legacyCompare from "./legacy/compare";

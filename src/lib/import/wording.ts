@@ -1,6 +1,6 @@
-import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { FixField, ImportedRow, Preview, PreviewRow, QuantityQuestion, RowStatus, SkipReason, Skipped } from "./preview";
+import { CONDITION_TEXT, type DraftRow, type ImportedRow } from "@/verticals/landlord";
+import type { FixField, Preview, PreviewRow, QuantityQuestion, RowStatus, Skipped, SkipReason } from "./preview";
 import { columnLetter, listText, quote } from "./text";
 
 export { columnLetter };

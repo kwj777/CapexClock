@@ -1,6 +1,6 @@
 import { formatUnitPrice } from "@/components/calculator/format";
-import type { UnitLabel } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import type { UnitLabel } from "@/verticals/landlord";
 import { cellText, isDate, quote, type Cell } from "./text";
 
 /**

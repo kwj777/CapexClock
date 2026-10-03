@@ -1,7 +1,7 @@
-import { EMPTY_DRAFT, withImportedRows, type Draft } from "@/components/calculator/draft";
 import { SAVE_PROBLEM_TEXT, toSaveInput, type SaveInput } from "@/lib/properties/convert";
 import type { SaveFailure } from "@/lib/properties/save";
-import type { BuildingInfo, ImportedRow, Preview, PreviewRow } from "./preview";
+import { EMPTY_DRAFT, withImportedRows, type Draft, type ImportedRow } from "@/verticals/landlord";
+import type { BuildingInfo, Preview, PreviewRow } from "./preview";
 import { listText, words } from "./text";
 
 /** Most properties one import creates. */

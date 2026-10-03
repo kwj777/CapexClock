@@ -1,5 +1,5 @@
-import { exampleDraft } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import { exampleDraft } from "@/verticals/landlord";
 import { toSaveInput } from "../convert";
 import {
   compareSaved,

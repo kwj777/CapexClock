@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "@/lib/library/components";
-import { TICKED_BY_DEFAULT } from "@/lib/reserve/quick-estimate";
+import { COMPONENT_LIBRARY, TICKED_BY_DEFAULT, TYPICAL_COSTS } from "@/verticals/landlord";
 import QuickEstimate from "../QuickEstimate";
 import ReserveTabs from "../ReserveTabs";
 import { ENTER_PROMPT } from "../estimate-text";

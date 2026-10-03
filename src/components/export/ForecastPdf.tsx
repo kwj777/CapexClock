@@ -1,6 +1,5 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
-import { CONDITION_TEXT } from "@/components/calculator/draft";
 import { formatReserve } from "@/components/calculator/format";
 import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
@@ -15,6 +14,7 @@ import {
   type ExportRow,
 } from "@/lib/export/rows";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
+import { CONDITION_TEXT } from "@/verticals/landlord";
 
 // Loaded only when someone clicks "Download PDF" (see ExportButtons), so the
 // fonts are only fetched then too.

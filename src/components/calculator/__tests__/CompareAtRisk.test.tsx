@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareReplaceNow, type ForecastComponent } from "@/lib/forecast";
+import { exampleDraft, toComponents } from "@/verticals/landlord";
 import CompareAtRisk, { ComparisonPanel } from "../CompareAtRisk";
 import { NEW_COMPARE_STATE, type CompareState } from "../compare";
-import { exampleDraft, toComponents } from "../draft";
 
 // Clicks, focus and the live region are checked in the browser; what Apply and
 // Undo do is in compare.test.ts. These check what each state draws.

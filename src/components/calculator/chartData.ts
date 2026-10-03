@@ -1,5 +1,5 @@
 import type { Forecast } from "@/lib/forecast";
-import { CHART_CATEGORIES, chartCategory, type ChartCategory } from "@/lib/library/components";
+import { CHART_CATEGORIES, chartCategory, type ChartCategory } from "@/verticals/landlord";
 
 export type ChartRow = { year: number; total: number } & Partial<Record<ChartCategory, number>>;
 

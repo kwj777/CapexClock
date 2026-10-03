@@ -3,12 +3,12 @@ import Link from "next/link";
 import TemplateImport from "@/components/import/TemplateImport";
 import TemplateLink from "@/components/import/TemplateLink";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
-import { CONDITION_TEXT } from "@/components/calculator/draft";
 import { EXAMPLE_BUILDING, exampleRows } from "@/lib/export/component-list";
 import { COUNTED_PER_TEXT, FORMAT_COLUMNS } from "@/lib/import/format";
 import { getLibrary } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
 import { supabaseEnv } from "@/lib/supabase/env";
+import { CONDITION_TEXT } from "@/verticals/landlord";
 import { FAQ, faqJsonLd } from "./faq";
 
 export const metadata: Metadata = pageMetadata({

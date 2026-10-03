@@ -1,4 +1,4 @@
-import { TYPICAL_COSTS, type TypicalCost } from "./components";
+import { TYPICAL_COSTS, type TypicalCost } from "./typical-costs";
 
 /** A cost guide a typical cost was worked out from. */
 export interface CostSource {

@@ -1,4 +1,4 @@
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { COMPONENT_LIBRARY } from "@/verticals/landlord";
 import {
   MAX_PROPERTIES,
   planProperties,

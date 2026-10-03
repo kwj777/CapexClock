@@ -1,5 +1,5 @@
-import { editRow, exampleDraft, withUnitCount } from "@/components/calculator/draft";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import { editRow, exampleDraft, withUnitCount } from "@/verticals/landlord";
 import { draftFromRows, forecastForProperty, saveProblemFields, toSaveInput } from "../convert";
 
 const property: PropertyRow = {

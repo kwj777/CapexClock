@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { exampleDraft } from "@/components/calculator/draft";
 import type { ForecastComponent } from "@/lib/forecast";
 import {
   ageText,
@@ -11,7 +10,8 @@ import {
   statusText,
   type ReportInput,
 } from "../condition-report";
-import { sampleReport, SAMPLE_NOTE } from "../sample";
+import { exampleDraft } from "../draft/example";
+import { sampleReport, SAMPLE_NOTE } from "../sample-report";
 
 const component = (over: Partial<ForecastComponent>): ForecastComponent => ({
   id: "c",

@@ -1,5 +1,5 @@
 import { formatMoney } from "@/components/calculator/format";
-import { roundEstimate, type QuickEstimate, type QuickInputs } from "@/lib/reserve/quick-estimate";
+import { roundEstimate, type QuickEstimate, type QuickInputs } from "@/verticals/landlord";
 
 export const ENTER_PROMPT = "Enter your units and year built to see an estimate.";
 export const FIX_PROMPT = "Fix the highlighted fields to see an estimate.";

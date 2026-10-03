@@ -1,5 +1,3 @@
-export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
-
 /** "replace_now" pulls the next replacement into the first forecast year. */
 export type Scenario = "run_to_failure" | "replace_now";
 

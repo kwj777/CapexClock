@@ -7,22 +7,37 @@
 
 import { forecastSummary } from "@/components/calculator/announce";
 import { toChartRows } from "@/components/calculator/chartData";
-import { exampleDraft, parseUnitCount, toComponents, type Draft } from "@/components/calculator/draft";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { mockupReservePerUnit } from "@/components/ForecastMockup";
 import { estimateText } from "@/components/reserve/estimate-text";
 import { forecastCsv } from "@/lib/export/csv";
 import { exportDetails, exportRows, sumTotals } from "@/lib/export/rows";
 import { compareReplaceNow, computeForecast, type ForecastComponent } from "@/lib/forecast";
-import { COMPONENT_LIBRARY, defaultLife, TYPICAL_COSTS, UNIT_LABEL_TEXT } from "@/lib/library/components";
-import { lifeDrivers, lifespanDescription, lifespanTitle } from "@/lib/library/phrasing";
 import { forecastForProperty } from "@/lib/properties/convert";
 import { summarizePortfolio } from "@/lib/properties/portfolio";
-import { ageText, remainingLifeText, statusText } from "@/lib/report/condition-report";
-import { sampleReport } from "@/lib/report/sample";
-import type { ExpenseFields } from "@/lib/reserve/inputs";
-import { quickEstimate, quickSystems, roundEstimate, TICKED_BY_DEFAULT } from "@/lib/reserve/quick-estimate";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
+import {
+  ageText,
+  COMPONENT_LIBRARY,
+  defaultLife,
+  exampleDraft,
+  lifeDrivers,
+  lifespanDescription,
+  lifespanTitle,
+  parseUnitCount,
+  quickEstimate,
+  quickSystems,
+  remainingLifeText,
+  roundEstimate,
+  sampleReport,
+  statusText,
+  TICKED_BY_DEFAULT,
+  toComponents,
+  TYPICAL_COSTS,
+  UNIT_LABEL_TEXT,
+  type Draft,
+  type ExpenseFields,
+} from "@/verticals/landlord";
 import { corpus, CORPUS_SEED, type CorpusComponent } from "./generate";
 import { legacyLifespanEstimate } from "./legacy/lifespan-estimator";
 import { legacyReserveCalculator } from "./legacy/reserve-calculator";

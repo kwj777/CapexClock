@@ -1,6 +1,6 @@
-import { cleanDetails, type Draft } from "@/components/calculator/draft";
 import { toSaveInput } from "@/lib/properties/convert";
 import { sameSave } from "@/lib/properties/save";
+import { cleanDetails, type Draft } from "@/verticals/landlord";
 
 /**
  * Edits the property editor hasn't saved yet, kept in this browser so they survive

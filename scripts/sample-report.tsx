@@ -11,7 +11,7 @@
 import { Font, renderToFile } from "@react-pdf/renderer";
 import { join } from "node:path";
 import ConditionReportPdf, { REPORT_FONT } from "@/components/report/ConditionReportPdf";
-import { sampleReport, SAMPLE_NOTE } from "@/lib/report/sample";
+import { SAMPLE_NOTE, sampleReport } from "@/verticals/landlord";
 
 const root = join(__dirname, "..");
 const out = join(root, "public", "sample-condition-report.pdf");

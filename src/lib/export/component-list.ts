@@ -1,6 +1,6 @@
-import { CONDITION_TEXT, exampleDraft, type DraftRow } from "@/components/calculator/draft";
 import { COUNTED_PER_TEXT, FORMAT_COLUMNS, YES } from "@/lib/import/format";
 import type { FieldKind } from "@/lib/import/columns";
+import { CONDITION_TEXT, exampleDraft, type DraftRow } from "@/verticals/landlord";
 import { csvRow } from "./csv";
 
 /** The byte-order mark makes Excel read the file as UTF-8. */

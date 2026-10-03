@@ -3,18 +3,15 @@
 // is made from these. Everything comes from what the owner supplied; nothing
 // is filled in for them.
 
-import { AT_RISK_YEARS, endOfLifeYear, replacementCost, type ForecastComponent, type UnitLabel } from "@/lib/forecast";
-
-/** The owner's own rating, the same three as the database's component_condition. */
-export type Condition = "good" | "fair" | "poor";
-
-export const CONDITION_TEXT: Record<Condition, string> = { good: "Good", fair: "Fair", poor: "Poor" };
+import { AT_RISK_YEARS, endOfLifeYear, replacementCost, type ForecastComponent } from "@/lib/forecast";
+import type { ComponentCondition } from "./draft/model";
+import type { UnitLabel } from "./units";
 
 export interface ReportInput {
   component: ForecastComponent;
   unitLabel: UnitLabel;
   /** Null when the owner didn't rate it. */
-  condition: Condition | null;
+  condition: ComponentCondition | null;
   notes: string;
 }
 
@@ -36,7 +33,7 @@ export interface ReportRow {
   /** Years left until end of life; negative once it's past. */
   remainingLife: number;
   status: LifeStatus;
-  condition: Condition | null;
+  condition: ComponentCondition | null;
   notes: string;
   /** Quantity × cost each, in today's dollars. */
   replacementCost: number;
@@ -94,7 +91,7 @@ export function statusText(status: LifeStatus): string {
 }
 
 /** How many components were rated each way, in Good, Fair, Poor order, leaving out unrated ones. */
-export function conditionCounts(rows: readonly Pick<ReportRow, "condition">[]): { condition: Condition; count: number }[] {
+export function conditionCounts(rows: readonly Pick<ReportRow, "condition">[]): { condition: ComponentCondition; count: number }[] {
   return (["good", "fair", "poor"] as const)
     .map((condition) => ({ condition, count: rows.filter((r) => r.condition === condition).length }))
     .filter((c) => c.count > 0);

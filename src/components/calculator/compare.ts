@@ -1,5 +1,5 @@
 import type { AtRiskItem, ComparisonFigures, ReplaceNowComparison } from "@/lib/forecast";
-import { editRow, type Draft } from "./draft";
+import { editRow, type Draft } from "@/verticals/landlord";
 import { formatMoney, formatReserve } from "./format";
 
 /** The highest "Emergency replacements cost __% more" the comparison takes. */

@@ -1,6 +1,7 @@
-import { EARLIEST_YEAR_BUILT, YEAR_BUILT_TEXT } from "@/components/calculator/draft";
 import { computeForecast } from "@/lib/forecast";
-import { COMPONENT_LIBRARY, TYPICAL_COSTS, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
+import { EARLIEST_YEAR_BUILT, YEAR_BUILT_TEXT } from "../draft/components";
+import { COMPONENT_LIBRARY, type LibraryComponent } from "../library/components";
+import { TYPICAL_COSTS, type TypicalCost } from "../library/typical-costs";
 import {
   FLOOR_SQ_FT_PER_APARTMENT,
   GIVE_OR_TAKE_YEARS,

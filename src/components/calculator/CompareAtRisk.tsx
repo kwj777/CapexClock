@@ -10,6 +10,7 @@ import {
   type ForecastComponent,
   type ReplaceNowComparison,
 } from "@/lib/forecast";
+import type { Draft, DraftRow } from "@/verticals/landlord";
 import {
   applyChosen,
   applyLabel,
@@ -35,7 +36,6 @@ import {
   type CompareAction,
   type CompareState,
 } from "./compare";
-import type { Draft, DraftRow } from "./draft";
 import { formatMoney, formatReserve } from "./format";
 
 const inputClass =

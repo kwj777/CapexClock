@@ -14,7 +14,7 @@ import {
   type TooltipValueType,
 } from "recharts";
 import type { Forecast } from "@/lib/forecast";
-import { CHART_CATEGORIES, type ChartCategory } from "@/lib/library/components";
+import { CHART_CATEGORIES, type ChartCategory } from "@/verticals/landlord";
 import { toChartRows } from "./chartData";
 import { formatCompactMoney, formatMoney } from "./format";
 

@@ -2,12 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { loadDraft, saveDraft } from "@/components/calculator/draft-storage";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
-import { loadDraft, saveDraft, withLibraryItem } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { nextReplacementReserve, RESERVE_HORIZON_YEARS } from "@/lib/forecast";
-import { defaultLife, type LibraryComponent } from "@/lib/library/components";
-import { subjectFor } from "@/lib/library/phrasing";
+import { defaultLife, subjectFor, withLibraryItem, type LibraryComponent } from "@/verticals/landlord";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";

@@ -2,12 +2,15 @@
 // example building (Load an example), with made-up conditions and notes of
 // the kind an owner would send. scripts/sample-report.tsx renders it.
 
-import { exampleDraft, parseUnitCount, toComponents } from "@/components/calculator/draft";
 import { computeForecast, type Forecast, type ForecastComponent } from "@/lib/forecast";
-import { reportRows, type Condition, type ReportRow } from "./condition-report";
+import { reportRows, type ReportRow } from "./condition-report";
+import { toComponents } from "./draft/components";
+import { exampleDraft } from "./draft/example";
+import type { ComponentCondition } from "./draft/model";
+import { parseUnitCount } from "./draft/rows";
 
 /** The owner's ratings and notes for each example component, by library slug. */
-const SAMPLE_CONDITIONS: Record<string, { condition: Condition; notes: string }> = {
+const SAMPLE_CONDITIONS: Record<string, { condition: ComponentCondition; notes: string }> = {
   "asphalt-shingle-roof": { condition: "fair", notes: "Some granule loss on the south slope. No leaks reported." },
   "gas-furnace": { condition: "good", notes: "Serviced every fall. No repairs in the last two years." },
   "tank-water-heater": { condition: "fair", notes: "Rust at the fittings in units 3 and 7." },

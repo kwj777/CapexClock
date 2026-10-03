@@ -1,7 +1,7 @@
-import { CONDITION_TEXT, type DraftRow } from "@/components/calculator/draft";
 import { formatUnitPrice } from "@/components/calculator/format";
+import { CONDITION_TEXT, type DraftRow, type ImportedRow } from "@/verticals/landlord";
 import { COUNTED_PER_TEXT } from "./format";
-import type { BuildingInfo, ImportedRow, KnownRow, Preview, PreviewRow } from "./preview";
+import type { BuildingInfo, KnownRow, Preview, PreviewRow } from "./preview";
 import { listText, quote } from "./text";
 import { previewSummary, skippedText, statusText } from "./wording";
 

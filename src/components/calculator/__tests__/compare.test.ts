@@ -1,5 +1,13 @@
 import { compareReplaceNow, computeForecast, type ReplaceNowComparison } from "@/lib/forecast";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import {
+  COMPONENT_LIBRARY,
+  editRow,
+  EMPTY_DRAFT,
+  exampleDraft,
+  rowFromLibrary,
+  toComponents,
+  type Draft,
+} from "@/verticals/landlord";
 import {
   applyChosen,
   applyLabel,
@@ -30,7 +38,6 @@ import {
   withReplaceNow,
   withTick,
 } from "../compare";
-import { EMPTY_DRAFT, editRow, exampleDraft, rowFromLibrary, toComponents, type Draft } from "../draft";
 
 const shown = (variants: { text: string; shown: boolean }[]) => variants.filter((v) => v.shown).map((v) => v.text);
 

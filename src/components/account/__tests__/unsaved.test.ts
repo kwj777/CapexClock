@@ -1,4 +1,4 @@
-import { EMPTY_DRAFT, exampleDraft } from "@/components/calculator/draft";
+import { EMPTY_DRAFT, exampleDraft } from "@/verticals/landlord";
 import {
   clearAllUnsaved,
   KEEP_UNSAVED_MS,

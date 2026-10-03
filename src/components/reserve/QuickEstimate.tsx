@@ -4,14 +4,8 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatCostRange } from "@/components/calculator/format";
 import { track } from "@/lib/analytics";
-import type { LibraryComponent, TypicalCost } from "@/lib/library/components";
 import {
   ASSUMPTION_SOURCES,
-  TYPICAL_COST_SOURCES,
-  typicalCostBasis,
-  type CostSource,
-} from "@/lib/library/typical-cost-sources";
-import {
   ESTIMATE_BUILDING_UNITS,
   FLOOR_SQ_FT_PER_APARTMENT,
   GIVE_OR_TAKE_YEARS,
@@ -21,8 +15,13 @@ import {
   readQuickInputs,
   SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
+  TYPICAL_COST_SOURCES,
+  typicalCostBasis,
+  type CostSource,
+  type LibraryComponent,
   type QuickSystem,
-} from "@/lib/reserve/quick-estimate";
+  type TypicalCost,
+} from "@/verticals/landlord";
 import { estimateText, quickPrompt } from "./estimate-text";
 
 const input =

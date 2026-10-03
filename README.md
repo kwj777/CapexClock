@@ -213,19 +213,20 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   items the library counts per unit or per sq ft, never building-wide ones); they're
   never used in a forecast or saved to a property. It fills in costs only on the run that adds the
   columns, so running it again changes no costs and never puts back one edited or blanked in the
-  dashboard. Until it runs the site uses the same numbers from `src/lib/library/components.ts`.
+  dashboard. Until it runs the site uses the same numbers from
+  `src/verticals/landlord/library/typical-costs.ts`.
   Leave all three cells blank on a row to leave it out; with every row blank, the quick estimate
   says it isn't available and no hints show. Kevin approved the numbers, and spreading each
   replacement over its lifespan range for the year built, on October 2, 2026 (sources in
   `typical-costs.md`, phase 3 project files); `SPREAD_REPLACEMENTS` in
-  `src/lib/reserve/quick-estimate.ts` switches the method.
+  `src/verticals/landlord/quick-estimate.ts` switches the method.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its
 own /lifespan page automatically (add sentence-friendly wording and notes in
-`src/lib/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be reached, the site
-falls back to the copy in `src/lib/library/components.ts`; a test keeps that file and
-`supabase/seed.sql` in sync.
+`src/verticals/landlord/library/phrasing.ts` and `content.ts` if you like). If Supabase can't be
+reached, the site falls back to the copy in `src/verticals/landlord/library/components.ts`; a test
+keeps that file and `supabase/seed.sql` in sync.
 
 ## Paid-idea test buttons
 

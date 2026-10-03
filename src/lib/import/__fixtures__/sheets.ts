@@ -8,7 +8,7 @@
  * the names, addresses and numbers changed, and add a test for it.
  */
 import Papa from "papaparse";
-import { COMPONENT_LIBRARY } from "@/lib/library/components";
+import { COMPONENT_LIBRARY } from "@/verticals/landlord";
 import { createMatcher } from "../names";
 import { openSheet, startingChoices, type OpenedSheet } from "../open";
 import { buildPreview, type ImportChoices, type Preview } from "../preview";

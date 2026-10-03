@@ -1,6 +1,6 @@
-import { CONDITION_TEXT } from "@/components/calculator/draft";
 import type { Forecast, ForecastComponent } from "@/lib/forecast";
 import type { ComponentCondition } from "@/lib/supabase/database.types";
+import { CONDITION_TEXT } from "@/verticals/landlord";
 import { guardFormulas } from "./formula-guard";
 import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
 

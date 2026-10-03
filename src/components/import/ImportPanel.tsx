@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import type { Draft, DraftImport } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
@@ -25,7 +24,7 @@ import {
 } from "@/lib/import/reimport";
 import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { duplicates, duplicateText, longListText, NEEDS_YOU_TEXT } from "@/lib/import/wording";
-import type { LibraryComponent } from "@/lib/library/components";
+import type { Draft, DraftImport, LibraryComponent } from "@/verticals/landlord";
 import SheetReview, { type SheetState } from "./SheetReview";
 import SourcePicker, {
   headingClass,

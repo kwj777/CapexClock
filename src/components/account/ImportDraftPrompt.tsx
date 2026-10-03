@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { loadDraft } from "@/components/calculator/draft";
+import { loadDraft } from "@/components/calculator/draft-storage";
 
 // Follows the calculator in other tabs, so the prompt goes once that work is saved.
 function subscribe(onChange: () => void): () => void {

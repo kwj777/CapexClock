@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { COMPONENT_LIBRARY, TYPICAL_COSTS } from "../components";
+import { COMPONENT_LIBRARY } from "../components";
+import { TYPICAL_COSTS } from "../typical-costs";
 
-const supabase = (file: string) => readFileSync(join(__dirname, "../../../../supabase", file), "utf8");
+const supabase = (file: string) => readFileSync(join(__dirname, "../../../../../supabase", file), "utf8");
 
 describe("component library seed", () => {
   const rows = [

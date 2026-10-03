@@ -1,12 +1,5 @@
-import {
-  BALANCE_PROBLEM,
-  readReserveInputs,
-  ROW_PROBLEM,
-  shownFields,
-  UNITS_PROBLEM,
-  YEAR_TYPED_PROBLEM,
-} from "../inputs";
-import { sinkingFund } from "../sinking-fund";
+import { sinkingFund } from "@/lib/reserve/sinking-fund";
+import { BALANCE_PROBLEM, readReserveInputs, ROW_PROBLEM, UNITS_PROBLEM, YEAR_TYPED_PROBLEM } from "../reserve-calculator";
 
 const row = (cost: string, years: string, id = 1) => ({ id, cost, years });
 
@@ -72,22 +65,6 @@ describe("reading the reserve calculator's fields", () => {
     expect(r.rowProblems.get(2)?.fields).toEqual(["years"]);
     expect(r.rowProblems.get(3)?.fields).toEqual(["cost"]);
     expect(r.rowProblems.get(4)?.fields).toEqual(["cost", "years"]);
-  });
-});
-
-describe("when a row's problem shows", () => {
-  it("waits until the owner has left the field that needs fixing", () => {
-    const halfDone = readReserveInputs([row("60000", "")], "", "").rowProblems.get(1);
-    // Typing a cost, then moving on to the years field: nothing flagged yet.
-    expect(shownFields(halfDone, new Set(["cost"]))).toEqual([]);
-    // Leaving the years blank flags the years field only.
-    expect(shownFields(halfDone, new Set(["cost", "years"]))).toEqual(["years"]);
-  });
-
-  it("flags only the unreadable field", () => {
-    const badCost = readReserveInputs([row("1.4k", "5")], "", "").rowProblems.get(1);
-    expect(shownFields(badCost, new Set(["cost", "years"]))).toEqual(["cost"]);
-    expect(shownFields(undefined, new Set(["cost", "years"]))).toEqual([]);
   });
 });
 

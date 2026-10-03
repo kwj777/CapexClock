@@ -1,4 +1,4 @@
-import type { LibraryComponent } from "@/lib/library/components";
+import type { LibraryComponent } from "@/verticals/landlord";
 import { words } from "./text";
 
 /**

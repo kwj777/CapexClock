@@ -25,54 +25,54 @@ import { moneyColumn } from "@/lib/export/format";
 import { guessedYear, installYearNote } from "@/lib/export/rows";
 import type { PaidWhere } from "@/lib/paid-ideas";
 import {
-  COMPONENT_LIBRARY,
-  TYPICAL_COSTS,
-  UNIT_LABEL_TEXT,
-  type LibraryComponent,
-  type TypicalCost,
-} from "@/lib/library/components";
-import {
   badYearBuilt,
+  COMPONENT_LIBRARY,
   CONDITION_TEXT,
   CONDITIONS,
-  costHint,
   costLabel,
   customRow,
   detailsShown,
   detailsSummary,
   editRow,
-  exampleDraft,
   EMPTY_DRAFT,
-  clearImportUndo,
+  exampleDraft,
   hasEntries,
   importReplaces,
-  STORAGE_KEY as DRAFT_STORAGE_KEY,
-  loadDraft,
   MAX_NOTES_LENGTH,
   neighborRowId,
   notesLeftText,
   notesTooLong,
   parseUnitCount,
-  peekImportUndo,
   problemFields,
   problemText,
   rowFromLibrary,
   rowTotal,
-  saveDraft,
   toComponents,
+  TYPICAL_COSTS,
+  UNIT_LABEL_TEXT,
   withImport,
   withUnitCount,
   YEAR_BUILT_TEXT,
   type Draft,
   type DraftImport,
   type DraftRow,
+  type LibraryComponent,
   type RowField,
   type RowProblem,
-} from "./draft";
+  type TypicalCost,
+} from "@/verticals/landlord";
 import { forecastSummary } from "./announce";
 import { toChartRows } from "./chartData";
 import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
+import { costHint } from "./cost-hint";
+import {
+  clearImportUndo,
+  loadDraft,
+  peekImportUndo,
+  saveDraft,
+  STORAGE_KEY as DRAFT_STORAGE_KEY,
+} from "./draft-storage";
 import { formatMoney, formatReserve, formatUnitPrice } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.

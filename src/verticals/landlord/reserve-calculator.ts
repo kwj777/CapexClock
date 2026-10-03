@@ -1,4 +1,5 @@
-import { MAX_YEARS_UNTIL_DUE, type PlannedExpense } from "./sinking-fund";
+import { MAX_YEARS_UNTIL_DUE, type PlannedExpense } from "@/lib/reserve/sinking-fund";
+import { readNumber } from "./parse";
 
 export interface ExpenseFields {
   id: number;
@@ -8,7 +9,7 @@ export interface ExpenseFields {
 
 export type ExpenseField = "cost" | "years";
 
-export interface RowProblem {
+export interface ExpenseRowProblem {
   message: string;
   /** The fields that need fixing, so only those are marked. */
   fields: ExpenseField[];
@@ -17,21 +18,13 @@ export interface RowProblem {
 export interface ReserveInputs {
   expenses: PlannedExpense[];
   /** What's wrong with each row that can't be used, by row id. */
-  rowProblems: Map<number, RowProblem>;
+  rowProblems: Map<number, ExpenseRowProblem>;
   /** Blank counts as 0. */
   balance: number;
   balanceProblem: string | null;
   /** 0 when blank. */
   units: number;
   unitsProblem: string | null;
-}
-
-/** Null when blank; NaN when something was typed that isn't a number (e.g. "$30k"). */
-function num(value: string): number | null {
-  const cleaned = value.replace(/[$,\s]/g, "");
-  if (cleaned === "") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : NaN;
 }
 
 export const ROW_PROBLEM = `Enter a cost and a whole number of years from 0 to ${MAX_YEARS_UNTIL_DUE}.`;
@@ -51,10 +44,10 @@ function looksLikeYear(years: number): boolean {
  */
 export function readReserveInputs(rows: ExpenseFields[], balance: string, units: string): ReserveInputs {
   const expenses: PlannedExpense[] = [];
-  const rowProblems = new Map<number, RowProblem>();
+  const rowProblems = new Map<number, ExpenseRowProblem>();
   for (const r of rows) {
-    const cost = num(r.cost);
-    const years = num(r.years);
+    const cost = readNumber(r.cost);
+    const years = readNumber(r.years);
     if (cost === null && years === null) continue;
     if (years !== null && looksLikeYear(years)) {
       rowProblems.set(r.id, { message: YEAR_TYPED_PROBLEM, fields: ["years"] });
@@ -70,9 +63,9 @@ export function readReserveInputs(rows: ExpenseFields[], balance: string, units:
     expenses.push({ cost, yearsUntilDue: years });
   }
 
-  const balanceValue = num(balance);
+  const balanceValue = readNumber(balance);
   const balanceOk = balanceValue === null || (!Number.isNaN(balanceValue) && balanceValue >= 0);
-  const unitsValue = num(units);
+  const unitsValue = readNumber(units);
   const unitsOk = unitsValue === null || (Number.isInteger(unitsValue) && unitsValue > 0);
 
   return {
@@ -83,12 +76,4 @@ export function readReserveInputs(rows: ExpenseFields[], balance: string, units:
     units: unitsOk ? (unitsValue ?? 0) : 0,
     unitsProblem: unitsOk ? null : UNITS_PROBLEM,
   };
-}
-
-/**
- * The fields to mark as wrong right now. A field is only checked once the owner
- * has left it, so typing a cost doesn't flag the years they haven't reached yet.
- */
-export function shownFields(problem: RowProblem | undefined, touched: ReadonlySet<ExpenseField>): ExpenseField[] {
-  return problem ? problem.fields.filter((f) => touched.has(f)) : [];
 }

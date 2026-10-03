@@ -3,16 +3,8 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
-import {
-  importReplaces,
-  loadDraft,
-  saveDraft,
-  saveImportUndo,
-  withImport,
-  type Draft,
-  type DraftImport,
-} from "@/components/calculator/draft";
-import type { LibraryComponent } from "@/lib/library/components";
+import { loadDraft, saveDraft, saveImportUndo } from "@/components/calculator/draft-storage";
+import { importReplaces, withImport, type Draft, type DraftImport, type LibraryComponent } from "@/verticals/landlord";
 
 // The importer (and the readers it loads) only once the owner opens it.
 const ImportPanel = dynamic(() => import("./ImportPanel"), {

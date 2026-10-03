@@ -1,6 +1,6 @@
 import Papa from "papaparse";
-import { exampleDraft, type DraftRow } from "@/components/calculator/draft";
 import { FORMAT_HEADINGS } from "@/lib/import/format";
+import { exampleDraft, type DraftRow } from "@/verticals/landlord";
 import { componentListCsv, EXAMPLE_BUILDING, exampleCsv, exampleRows, templateCsv } from "../component-list";
 import { componentListFileName } from "../csv";
 

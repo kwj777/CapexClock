@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { Draft } from "@/components/calculator/draft";
 import { track } from "@/lib/analytics";
 import { componentListGrid, listCsv, type ListGrid } from "@/lib/export/component-list";
 import { componentListFileName } from "@/lib/export/csv";
 import { listXlsx } from "@/lib/export/xlsx";
+import type { Draft } from "@/verticals/landlord";
 import { download } from "./download";
 
 const LABEL = {

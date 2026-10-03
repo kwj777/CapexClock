@@ -40,10 +40,10 @@ import { buildPreview, type ImportChoices, type Preview } from "@/lib/import/pre
 import { failedReason, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
 import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { previewSummary } from "@/lib/import/wording";
-import type { LibraryComponent } from "@/lib/library/components";
 import type { SaveInput } from "@/lib/properties/convert";
 import { compareSaved, DETAILS_NOT_SAVED_TEXT, saveFailure, sendsDetails } from "@/lib/properties/save";
 import { createClient } from "@/lib/supabase/client";
+import type { LibraryComponent } from "@/verticals/landlord";
 import { isSignedOut, readBack } from "./read-back";
 
 const NO_DUPLICATES = new Set<string>();

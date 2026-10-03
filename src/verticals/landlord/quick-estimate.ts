@@ -1,6 +1,8 @@
-import { badYearBuilt, YEAR_BUILT_TEXT } from "@/components/calculator/draft";
 import { computeForecast, RESERVE_HORIZON_YEARS, validateComponent, type ForecastComponent } from "@/lib/forecast";
-import { defaultLife, type LibraryComponent, type TypicalCost } from "@/lib/library/components";
+import { badYearBuilt, YEAR_BUILT_TEXT } from "./draft/components";
+import { defaultLife, type LibraryComponent } from "./library/components";
+import type { TypicalCost } from "./library/typical-costs";
+import { readNumber } from "./parse";
 
 /**
  * The quick estimate: a per-unit monthly reserve range from a unit count, a year
@@ -239,24 +241,16 @@ export interface QuickInputs {
   yearBuiltProblem: string | null;
 }
 
-/** Null when blank; NaN when something was typed that isn't a number. */
-function num(value: string): number | null {
-  const cleaned = value.replace(/[$,\s]/g, "");
-  if (cleaned === "") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : NaN;
-}
-
 /** The most units the quick estimate takes: far more than any building it's for, and few enough to multiply out. */
 export const MAX_QUICK_UNITS = 100_000;
 export const QUICK_UNITS_PROBLEM = "Enter units as a whole number from 1 to 100,000, like 12.";
 
 /** Reads the unit count and year built. The year follows the calculators' rule and wording. */
 export function readQuickInputs(units: string, yearBuilt: string, currentYear: number): QuickInputs {
-  const unitsValue = num(units);
+  const unitsValue = readNumber(units);
   const unitsOk =
     unitsValue === null || (Number.isInteger(unitsValue) && unitsValue > 0 && unitsValue <= MAX_QUICK_UNITS);
-  const yearValue = num(yearBuilt);
+  const yearValue = readNumber(yearBuilt);
   const yearOk = !badYearBuilt(yearBuilt, currentYear);
   return {
     units: unitsOk ? unitsValue : null,
