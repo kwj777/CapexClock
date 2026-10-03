@@ -1,4 +1,4 @@
-import type { SavedComponent, SavedProperty } from "@/verticals/landlord";
+import type { SavedProperty, SavedReportComponent } from "@/verticals/landlord";
 import { readMode, runOwnerEmails, type EmailStore, type LogEntry, type Member, type OwnerData } from "../run";
 import type { OutgoingEmail } from "../send";
 
@@ -6,7 +6,7 @@ const TOKEN = "3f1c2b8e-9d4a-4c6b-8e2f-0a1b2c3d4e5f";
 const ALL_ON = { reminders: true, budget_summary: true, condition_report: true };
 
 const PROPERTY: SavedProperty = { id: "p1", name: "Elm St <A>", unit_count: 4, year_built: 2000 };
-const ROOF: SavedComponent = {
+const ROOF: SavedReportComponent = {
   id: "c-roof",
   property_id: "p1",
   category: "Roof",
@@ -16,8 +16,11 @@ const ROOF: SavedComponent = {
   useful_life_years: 20,
   replacement_cost_each: 12000,
   scenario: "run_to_failure",
+  unit_label: "per_building",
+  condition: "fair",
+  notes: null,
 };
-const HEATER: SavedComponent = { ...ROOF, id: "c-wh", category: "Plumbing", name: "Water heater", install_year: 2015, useful_life_years: 12, replacement_cost_each: 1500 };
+const HEATER: SavedReportComponent = { ...ROOF, id: "c-wh", category: "Plumbing", name: "Water heater", install_year: 2015, useful_life_years: 12, replacement_cost_each: 1500 };
 
 function member(userId: string, o: Partial<Member> = {}): Member {
   return { userId, email: `${userId}@example.com`, switches: { ...ALL_ON }, unsubscribeToken: TOKEN, ...o };

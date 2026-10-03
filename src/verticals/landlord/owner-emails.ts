@@ -1,8 +1,13 @@
 // What the automatic member emails say, worked out from saved properties. The
 // sender (src/lib/owner-emails) only formats and sends what these return.
 
+import type { Component } from "@/engine";
+import { reportRows, type ReportRow } from "./condition-report";
+import type { ComponentCondition } from "./draft/model";
+import { landlordForecast, type LandlordForecast } from "./forecast";
 import { summarizePortfolio, type PropertySummary } from "./portfolio";
-import type { SavedComponent, SavedProperty } from "./property";
+import { assetGroupFromSaved, type SavedComponent, type SavedProperty } from "./property";
+import type { UnitLabel } from "./units";
 
 /** One component in a replacement reminder. */
 export interface ReminderItem {
@@ -128,5 +133,55 @@ export function budgetSummary(
       monthlyReserve: totals.monthly,
       atRiskCount: totals.atRisk,
     },
+  };
+}
+
+/** A saved component with what the condition report also shows. The database's ComponentRow fits it. */
+export interface SavedReportComponent extends SavedComponent {
+  readonly unit_label: UnitLabel;
+  readonly condition: ComponentCondition | null;
+  readonly notes: string | null;
+}
+
+/** What ConditionReportPdf needs for one saved property. */
+export interface SavedConditionReport {
+  readonly propertyName: string;
+  readonly unitCount: number;
+  readonly yearBuilt: number | null;
+  readonly rows: ReportRow[];
+  readonly forecast: LandlordForecast;
+  readonly components: readonly Component[];
+  /** Components left out (no cost or no install year). */
+  readonly excluded: number;
+  /** Components in the report with no condition rating. */
+  readonly unrated: number;
+}
+
+/**
+ * A saved property's condition report as of `year`, or null when none of its
+ * components can be reported on (each needs a cost and an install year).
+ */
+export function savedConditionReport(
+  property: SavedProperty,
+  rows: readonly SavedReportComponent[],
+  year: number,
+): SavedConditionReport | null {
+  const { group, excluded } = assetGroupFromSaved(property, rows);
+  if (group.components.length === 0) return null;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const inputs = group.components.map((component) => {
+    const row = byId.get(component.id)!;
+    return { component, unitLabel: row.unit_label, condition: row.condition, notes: row.notes ?? "" };
+  });
+  const report = reportRows(inputs, year);
+  return {
+    propertyName: property.name,
+    unitCount: property.unit_count,
+    yearBuilt: property.year_built,
+    rows: report,
+    forecast: landlordForecast(group.components, property.unit_count, year),
+    components: group.components,
+    excluded,
+    unrated: report.filter((r) => r.condition === null).length,
   };
 }

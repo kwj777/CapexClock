@@ -10,6 +10,7 @@
 // To run it now: Netlify > Logs > Functions > owner-emails > Run now.
 
 import type { Config } from "@netlify/functions";
+import { conditionReportBuilder, siteFonts } from "../../src/lib/owner-emails/condition-report";
 import { secretClient, supabaseStore } from "../../src/lib/owner-emails/db";
 import { readMode, runOwnerEmails } from "../../src/lib/owner-emails/run";
 import { resendSender } from "../../src/lib/owner-emails/send";
@@ -40,6 +41,8 @@ export default async function ownerEmails(): Promise<Response> {
     site: SITE_URL,
     previewTo: CONTACT_EMAIL,
     budgetMs: TIME_BUDGET_MS,
+    // The report's font comes from the live site's public/fonts.
+    conditionReport: conditionReportBuilder(siteFonts(SITE_URL)),
     pauseMs: 600,
   });
   // Counts and account ids only: no email addresses or property names in the logs.

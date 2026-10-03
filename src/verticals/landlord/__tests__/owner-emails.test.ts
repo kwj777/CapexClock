@@ -1,4 +1,4 @@
-import { budgetSummary, reminderKey, remindersDue } from "../owner-emails";
+import { budgetSummary, reminderKey, remindersDue, savedConditionReport, type SavedReportComponent } from "../owner-emails";
 import type { SavedComponent, SavedProperty } from "../property";
 
 const P1: SavedProperty = { id: "p1", name: "Elm St", unit_count: 4, year_built: 2000 };
@@ -66,5 +66,36 @@ describe("budgetSummary", () => {
     expect(s.totals.budgetYearTotal).toBe(20500);
     expect(s.totals.tenYearTotal).toBeCloseTo(s.properties[0].tenYearTotal + s.properties[1].tenYearTotal);
     expect(s.totals.monthlyReserve).toBeCloseTo(s.properties[0].monthlyReserve + s.properties[1].monthlyReserve);
+  });
+});
+
+describe("savedConditionReport", () => {
+  const withReport = (r: SavedComponent, o: Partial<SavedReportComponent> = {}): SavedReportComponent => ({
+    ...r,
+    unit_label: "per_building",
+    condition: null,
+    notes: null,
+    ...o,
+  });
+
+  it("reports on components with a cost and install year", () => {
+    const rows = [
+      withReport(ROWS[0], { condition: "fair", notes: " Rust at the fittings " }),
+      withReport(ROWS[1]),
+      withReport(row("x", "p1", { replacement_cost_each: null })),
+    ];
+    const report = savedConditionReport(P1, rows, 2027)!;
+    expect(report).toMatchObject({ propertyName: "Elm St", unitCount: 4, yearBuilt: 2000, excluded: 1, unrated: 1 });
+    expect(report.rows.map((r) => [r.name, r.condition, r.notes, r.remainingLife])).toEqual([
+      ["Roof", null, "", -7],
+      ["Water heater", "fair", "Rust at the fittings", 0],
+    ]);
+    expect(report.forecast.neededNow).toBe(19500);
+    expect(report.components).toHaveLength(2);
+  });
+
+  it("is null when nothing can be reported on", () => {
+    expect(savedConditionReport(P1, [withReport(row("x", "p1", { replacement_cost_each: null }))], 2027)).toBeNull();
+    expect(savedConditionReport({ ...P1, year_built: null }, [], 2027)).toBeNull();
   });
 });

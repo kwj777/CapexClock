@@ -203,3 +203,62 @@ ${propertyHtml}
 
   return { subject, html, text };
 }
+
+/** One property's line in the condition report email. */
+export interface ReportSummaryLine {
+  readonly propertyId: string;
+  readonly name: string;
+  readonly atRisk: number;
+  readonly unrated: number;
+  readonly excluded: number;
+}
+
+/** The yearly condition report email; the PDFs go with it as attachments. */
+export function conditionReportEmail(lines: readonly ReportSummaryLine[], year: number, footer: EmailFooter): EmailContent {
+  const n = lines.length;
+  const subject = `Your ${year} condition report${n === 1 ? "" : "s"}`;
+  const intro =
+    n === 1
+      ? `Attached is the ${year} condition report for ${lines[0].name}: each component's age, remaining life and condition, what's at risk, a 10-year forecast and the monthly reserve.`
+      : `Attached are the ${year} condition reports for your ${n} properties: each component's age, remaining life and condition, what's at risk, a 10-year forecast and the monthly reserve.`;
+  const detail = (l: ReportSummaryLine) =>
+    [
+      `${l.atRisk} at risk`,
+      ...(l.unrated ? [`${l.unrated} without a condition rating`] : []),
+      ...(l.excluded ? [`${l.excluded} left out (no cost or install year)`] : []),
+    ].join(", ");
+  const nudge =
+    "The reports use the conditions and install years you saved. If something's changed, update it in My properties, and the next report (and your forecast) will reflect it.";
+  const label = "A planning document made from the information you supplied, not an inspection.";
+
+  const html = page(
+    subject,
+    `<p style="margin:0 0 12px;${TEXT}">${escapeHtml(intro)}</p>
+<table role="presentation" style="width:100%;border-collapse:collapse">
+${lines
+  .map(
+    (l) =>
+      `<tr><td style="${CELL}"><a style="${LINK}" href="${propertyUrl(l.propertyId)}">${escapeHtml(l.name)}</a><br><span style="${MUTED}">${escapeHtml(detail(l))}</span></td></tr>`,
+  )
+  .join("\n")}
+</table>
+<p style="margin:16px 0 0;${TEXT}">${escapeHtml(nudge).replace("My properties", `<a style="${LINK}" href="${APP_URL}">My properties</a>`)}</p>
+<p style="margin:8px 0 0;${MUTED}">${escapeHtml(label)}</p>`,
+    footer,
+  );
+
+  const text = [
+    subject,
+    "",
+    intro,
+    "",
+    ...lines.map((l) => `- ${l.name}: ${detail(l)} (${propertyUrl(l.propertyId)})`),
+    "",
+    `${nudge} ${APP_URL}`,
+    label,
+    "",
+    footerText(footer),
+  ].join("\n");
+
+  return { subject, html, text };
+}
