@@ -2,6 +2,7 @@ import Link from "next/link";
 import { presaleLinksFromEnv } from "@/lib/paid-ideas";
 import { supabaseEnv } from "@/lib/supabase/env";
 import { CONTACT_EMAIL } from "@/lib/site";
+import CountMeNote from "./CountMeNote";
 
 // Stripe's customer portal, where founding members cancel. Baked in at build time.
 const PORTAL = presaleLinksFromEnv().portal;
@@ -95,6 +96,7 @@ export function SiteFooter() {
             {CONTACT_EMAIL}
           </a>
         </div>
+        <CountMeNote />
       </div>
     </footer>
   );

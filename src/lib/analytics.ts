@@ -1,4 +1,5 @@
 import type { CaptureOptions, CaptureResult, PostHog } from "posthog-js";
+import { applyCountMe, COUNT_ME_EVENT } from "./count-me";
 
 /**
  * Where PostHog sends from the browser by default: this site, which passes it on to
@@ -30,6 +31,8 @@ let client: Promise<PostHog | null> | null = null;
 // Loads PostHog lazily so it never blocks first paint. No-op without a key.
 export function initAnalytics(): Promise<PostHog | null> {
   if (!KEY || typeof window === "undefined") return Promise.resolve(null);
+  // A browser marked with ?count-me=off never loads PostHog (see count-me.ts).
+  if (!client && !countsThisBrowser()) return Promise.resolve(null);
   client ??= import("posthog-js")
     .then(({ default: posthog }) => {
       posthog.init(KEY, {
@@ -49,6 +52,21 @@ export function initAnalytics(): Promise<PostHog | null> {
     })
     .catch(() => null);
   return client;
+}
+
+let counted: boolean | null = null;
+
+/** Applies ?count-me= once per page load, then remembers the answer. */
+function countsThisBrowser(): boolean {
+  if (counted === null) {
+    counted = applyCountMe(
+      window.location,
+      () => window.localStorage,
+      (href) => window.history.replaceState(window.history.state, "", href),
+    );
+    window.dispatchEvent(new Event(COUNT_ME_EVENT));
+  }
+  return counted;
 }
 
 /** Event properties: counts and labels only, never names, emails, addresses or anything typed. */

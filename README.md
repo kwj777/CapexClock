@@ -490,6 +490,15 @@ the week the [analytics relay](#analytics-relay) goes live, so compare across th
    number under **Billing → Subscriptions → Active**. Stripe is the real count of sales.
 6. **Once a month, Search Console:** see [Google Search Console](#google-search-console).
 
+### Leave your own visits out
+
+Open any page with `?count-me=off` on the end (for example `https://capexclock.com/?count-me=off`)
+once in each browser you use: Safari on your iPhone, and each browser on your Mac. That browser
+then never loads PostHog, so none of its pageviews, clicks or events are counted, and the footer
+says "Analytics off in this browser". `?count-me=on` turns it back on. It's remembered in that
+browser only, and clearing the site's data (or a private window) forgets it. It doesn't remove
+anything already recorded.
+
 ### Build the PostHog dashboard (once, about 20 minutes)
 
 1. In PostHog, open **Dashboards → New dashboard → Blank dashboard**, name it
