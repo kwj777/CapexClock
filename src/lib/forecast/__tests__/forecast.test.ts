@@ -290,3 +290,32 @@ describe("validation", () => {
     expect(() => replacementYears(component({ usefulLifeYears: 0 }), START, END)).toThrow(RangeError);
   });
 });
+
+describe("bad forecast settings", () => {
+  it("refuses a window that isn't a whole number of years, at least 1", () => {
+    for (const years of [0, -1, 2.5, Number.NaN]) {
+      expect(() => computeForecast({ startYear: START, years, unitCount: 12, components: [] })).toThrow(
+        new RangeError("Forecast window must be a whole number of years, at least 1."),
+      );
+    }
+  });
+
+  it("refuses a start year that isn't a whole year", () => {
+    expect(() => computeForecast({ startYear: 2026.5, unitCount: 12, components: [] })).toThrow(
+      new RangeError("Start year must be a whole year."),
+    );
+  });
+
+  it("refuses a negative or unreadable unit count", () => {
+    for (const unitCount of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => computeForecast({ startYear: START, unitCount, components: [] })).toThrow(
+        new RangeError("Unit count can't be negative."),
+      );
+    }
+  });
+
+  it("checks the window first, then the start year, then the unit count", () => {
+    expect(() => computeForecast({ startYear: 2026.5, years: 0, unitCount: -1, components: [] })).toThrow("Forecast window");
+    expect(() => computeForecast({ startYear: 2026.5, unitCount: -1, components: [] })).toThrow("Start year");
+  });
+});
