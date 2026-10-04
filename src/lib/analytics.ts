@@ -56,8 +56,12 @@ export function initAnalytics(): Promise<PostHog | null> {
 
 let counted: boolean | null = null;
 
-/** Applies ?count-me= once per page load, then remembers the answer. */
-function countsThisBrowser(): boolean {
+/**
+ * Applies ?count-me= once per page load, then remembers the answer. Called as the
+ * page starts, not when PostHog loads later, so the setting is saved (and the footer
+ * note shows) even if the visit is closed within a couple of seconds.
+ */
+export function countsThisBrowser(): boolean {
   if (counted === null) {
     counted = applyCountMe(
       window.location,
