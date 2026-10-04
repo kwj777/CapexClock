@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { initAnalytics } from "@/lib/analytics";
+import { countsThisBrowser, initAnalytics } from "@/lib/analytics";
 
 export default function Analytics() {
   useEffect(() => {
+    // ?count-me= is saved right away; only PostHog itself waits for a quiet moment.
+    countsThisBrowser();
     const start = () => void initAnalytics();
     if ("requestIdleCallback" in window) {
       const id = window.requestIdleCallback(start, { timeout: 4000 });
