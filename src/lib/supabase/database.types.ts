@@ -1,4 +1,4 @@
-// Hand-written to match supabase/migrations (0001_init.sql to 0006_owner_emails.sql), in the
+// Hand-written to match supabase/migrations (0001_init.sql to 0007_safety_buffer.sql), in the
 // shape `supabase gen types typescript` produces. Only the tables the app uses so far.
 
 export type UnitLabel = "per_unit" | "per_building" | "per_sq_ft";
@@ -14,6 +14,11 @@ export type PropertyRow = {
   state: string | null;
   unit_count: number;
   year_built: number | null;
+  /**
+   * 0007: safety buffer in percent (0, 10 or 20) on the monthly reserve. Missing from
+   * rows read from a database that hasn't had that update yet, which means none.
+   */
+  safety_buffer?: number;
   created_at: string;
   updated_at: string;
 };
@@ -120,6 +125,8 @@ export type SavePropertyInput = {
   state?: string | null;
   unit_count: number;
   year_built: number | null;
+  /** 0007: stored once that update has run; earlier databases drop it without an error. */
+  safety_buffer: number;
 };
 
 export type Database = {

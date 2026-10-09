@@ -3,7 +3,7 @@ import { badYearBuilt, toComponents, type RowProblem } from "./draft/components"
 import type { Draft } from "./draft/model";
 import { parseUnitCount } from "./draft/rows";
 import { assertUnitCount, landlordMetrics, type LandlordMetrics } from "./metrics";
-import { byUrgencyThenName, landlordOptions } from "./rules";
+import { byUrgencyThenName, landlordOptions, safetyBufferOf, type SafetyBuffer } from "./rules";
 
 /** The engine's forecast plus the landlord's derived metrics. */
 export interface LandlordForecast extends ForecastResult, LandlordMetrics {
@@ -13,15 +13,16 @@ export interface LandlordForecast extends ForecastResult, LandlordMetrics {
 /**
  * The forecast every landlord page shows: start year = the current year (passed
  * in) and LANDLORD_RULES (10 years shown, 30-year look-ahead, at risk within 2
- * years, no inflation, $0 saved). Checks in today's order: window, start year,
+ * years, no inflation, $0 saved), plus the owner's safety buffer (none by default). Checks in today's order: window, start year,
  * unit count, then components.
  */
 export function landlordForecast(
   components: readonly Component[],
   unitCount: number,
   currentYear: number,
+  safetyBuffer: SafetyBuffer = 0,
 ): LandlordForecast {
-  const options = landlordOptions(currentYear);
+  const options = landlordOptions(currentYear, safetyBuffer);
   assertForecastOptions(options);
   assertUnitCount(unitCount);
   return withLandlordMetrics(computeForecast({ ...options, components }), unitCount);
@@ -58,6 +59,6 @@ export function forecastDraft(draft: Draft, currentYear: number): DraftForecast 
     problems,
     unitCount,
     yearBuiltIsBad: badYearBuilt(draft.yearBuilt, currentYear),
-    forecast: landlordForecast(components, unitCount, currentYear),
+    forecast: landlordForecast(components, unitCount, currentYear, safetyBufferOf(draft.safetyBuffer)),
   };
 }

@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics";
 import { guessedYear } from "@/lib/export/rows";
 import {
   compareReplaceAtRiskNow,
+  safetyBufferOf,
   type CompareItem,
   type Component,
   type Draft,
@@ -93,10 +94,10 @@ export default function CompareAtRisk({
   const comparison = useMemo(
     () =>
       compareReplaceAtRiskNow(
-        { startYear, unitCount, components },
+        { startYear, unitCount, components, safetyBuffer: safetyBufferOf(draft.safetyBuffer) },
         { only: new Set(components.filter((c) => !unticked.has(c.id)).map((c) => c.id)), emergencyPercent: percent },
       ),
-    [startYear, unitCount, components, unticked, percent],
+    [startYear, unitCount, components, unticked, percent, draft.safetyBuffer],
   );
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components]);
   const summary = compareSummary(comparison, startYear);

@@ -43,6 +43,7 @@ describe("the rules every landlord forecast uses", () => {
       atRiskYears: 2,
       inflationRate: 0,
       currentReserveBalance: 0,
+      contingencyRate: 0,
     });
     expect(landlordOptions(START)).toEqual({ startYear: START, ...LANDLORD_RULES });
   });
@@ -218,5 +219,28 @@ describe("forecasting the calculator's form", () => {
     const d = forecastDraft(draft, START);
     expect(d.problems).toEqual({});
     expect(d.forecast.monthlyReserve).toBe(Infinity);
+  });
+});
+
+describe("the safety buffer", () => {
+  it("adds 10% or 20% to the monthly reserve and per-unit figure, and nothing else", () => {
+    const plain = landlordForecast(building, 24, START);
+    for (const buffer of [10, 20] as const) {
+      const padded = landlordForecast(building, 24, START, buffer);
+      expect(padded.contingencyRate).toBe(buffer / 100);
+      expect(padded.monthlyReserveBeforeContingency).toBe(plain.monthlyReserve);
+      expect(padded.monthlyReserve).toBeCloseTo(plain.monthlyReserve * (1 + buffer / 100), 9);
+      expect(padded.monthlyReservePerUnit).toBeCloseTo(padded.monthlyReserve / 24, 9);
+      expect(padded.neededNow).toBe(plain.neededNow);
+      expect(padded.years).toEqual(plain.years);
+    }
+    expect(landlordOptions(START, 20)).toEqual({ startYear: START, ...LANDLORD_RULES, contingencyRate: 0.2 });
+  });
+
+  it("comes from the calculator's draft, and a damaged one counts as none", () => {
+    const draft = exampleDraft();
+    const plain = forecastDraft(draft, START).forecast;
+    expect(forecastDraft({ ...draft, safetyBuffer: 20 }, START).forecast.monthlyReserve).toBeCloseTo(plain.monthlyReserve * 1.2, 9);
+    expect(forecastDraft({ ...draft, safetyBuffer: 15 as never }, START).forecast.monthlyReserve).toBe(plain.monthlyReserve);
   });
 });

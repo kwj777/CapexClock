@@ -3,6 +3,7 @@ import {
   DEFAULT_HORIZON_YEARS,
   DEFAULT_RESERVE_HORIZON_YEARS,
   MAX_HORIZON_YEARS,
+  MAX_CONTINGENCY_RATE,
   MAX_INFLATION_RATE,
 } from "./constants";
 import type { Component, ForecastOptions, YearAdjustment } from "./types";
@@ -52,6 +53,12 @@ export function assertInflationRate(rate: number): void {
   }
 }
 
+export function assertContingencyRate(rate: number): void {
+  if (!Number.isFinite(rate) || rate < 0 || rate > MAX_CONTINGENCY_RATE) {
+    throw new RangeError("Contingency rate must be a decimal from 0 to 1, like 0.1 for 10%.");
+  }
+}
+
 /** The at-risk window: a whole number of years from 0 to MAX_HORIZON_YEARS. */
 export function assertAtRiskYears(windowYears: number): void {
   if (!Number.isInteger(windowYears) || windowYears < 0 || windowYears > MAX_HORIZON_YEARS) {
@@ -73,6 +80,7 @@ export interface ResolvedOptions {
   readonly inflationRate: number;
   readonly currentReserveBalance: number;
   readonly adjustments: readonly YearAdjustment[];
+  readonly contingencyRate: number;
   /** max(horizonYears, reserveHorizonYears + 1): the years built, from startYear. */
   readonly projectionYears: number;
   readonly atRiskYears: number;
@@ -80,7 +88,7 @@ export interface ResolvedOptions {
 
 /**
  * Checks the options in a fixed order (horizon, reserve horizon, start year,
- * inflation, balance, adjustments, at-risk window) and throws a RangeError for the
+ * inflation, balance, adjustments, at-risk window, contingency) and throws a RangeError for the
  * first problem.
  */
 export function resolveOptions(options: ForecastOptions): ResolvedOptions {
@@ -104,6 +112,8 @@ export function resolveOptions(options: ForecastOptions): ResolvedOptions {
   for (const a of adjustments) assertAdjustment(a, options.startYear);
   const atRiskYears = options.atRiskYears ?? AT_RISK_YEARS;
   assertAtRiskYears(atRiskYears);
+  const contingencyRate = options.contingencyRate ?? 0;
+  assertContingencyRate(contingencyRate);
   return {
     startYear: options.startYear,
     horizonYears,
@@ -111,6 +121,7 @@ export function resolveOptions(options: ForecastOptions): ResolvedOptions {
     inflationRate,
     currentReserveBalance,
     adjustments,
+    contingencyRate,
     projectionYears: Math.max(horizonYears, reserveHorizonYears + 1),
     atRiskYears,
   };

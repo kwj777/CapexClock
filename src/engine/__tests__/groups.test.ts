@@ -22,6 +22,13 @@ describe("forecasting several groups", () => {
     expect(out[1].result.shortfallNow).toBe(600);
   });
 
+  it("uses a group's own contingency rate over the options' rate", () => {
+    const groups = [GROUPS[0], { ...GROUPS[0], id: "g4", contingencyRate: 0.2 }];
+    const out = forecastAssetGroups(groups, { startYear: START, contingencyRate: 0.1 });
+    expect(out.map((g) => g.result.contingencyRate)).toEqual([0.1, 0.2]);
+    expect(out[1].result.monthlyReserveBeforeContingency).toBe(out[0].result.monthlyReserveBeforeContingency);
+  });
+
   it("sums forecasts in the order given", () => {
     const results = forecastAssetGroups(GROUPS, { startYear: START }).map((g) => g.result);
     const totals = rollupForecasts(results);

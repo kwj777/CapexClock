@@ -1,5 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { formatMoney, formatReserve } from "@/components/calculator/format";
+import { formatMoney, formatReserve, safetyBufferSentence } from "@/components/calculator/format";
 import { formatQuantity, moneyColumn } from "@/lib/export/format";
 import { barPercent, exportRows, pdfYearFigures } from "@/lib/export/rows";
 import { REPORT_LABEL } from "@/lib/paid-ideas";
@@ -161,7 +161,9 @@ export default function ConditionReportPdf({
         </View>
         <Text style={s.note}>
           The monthly reserve is the smallest steady amount that has the cash ready for every replacement from{" "}
-          {forecast.reserveFromYear} on, looking 30 years ahead. {forecast.startYear} costs (past end of life or due this
+          {forecast.reserveFromYear} on, looking 30 years ahead.{" "}
+          {safetyBufferSentence(forecast) && `${safetyBufferSentence(forecast)} `}
+          {forecast.startYear} costs (past end of life or due this
           year) are shown separately as needed now. All costs are in today&apos;s dollars, without inflation.
         </Text>
 

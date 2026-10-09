@@ -5,6 +5,7 @@ import type { Component } from "@/engine";
 import { reportRows, type ReportRow } from "./condition-report";
 import type { ComponentCondition } from "./draft/model";
 import { landlordForecast, type LandlordForecast } from "./forecast";
+import { safetyBufferOf } from "./rules";
 import { summarizePortfolio, type PropertySummary } from "./portfolio";
 import { assetGroupFromSaved, type SavedComponent, type SavedProperty } from "./property";
 import type { UnitLabel } from "./units";
@@ -179,7 +180,7 @@ export function savedConditionReport(
     unitCount: property.unit_count,
     yearBuilt: property.year_built,
     rows: report,
-    forecast: landlordForecast(group.components, property.unit_count, year),
+    forecast: landlordForecast(group.components, property.unit_count, year, safetyBufferOf(property.safety_buffer)),
     components: group.components,
     excluded,
     unrated: report.filter((r) => r.condition === null).length,

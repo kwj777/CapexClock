@@ -234,6 +234,11 @@ When a new file appears in `supabase/migrations`, run it once on the live projec
   replacement over its lifespan range for the year built, on October 2, 2026 (sources in
   `typical-costs.md`, phase 3 project files); `SPREAD_REPLACEMENTS` in
   `src/verticals/landlord/quick-estimate.ts` switches the method.
+- `0007_safety_buffer.sql`: lets a saved property keep its safety buffer (none, +10% or +20%
+  on the monthly reserve). Run it before merging the pull request that adds the buffer. Until it
+  runs, everything else still saves and a saved property's buffer goes back to none. It needs
+  0002 and 0004 first. It's safe to run again. Don't run 0002 or 0004 again after it: that
+  brings back a save that ignores the buffer. If that happens, run 0007 again.
 
 The component library can be edited under **Table Editor → component_library**. The calculators and
 the /lifespan pages read it from Supabase and pick up edits within an hour. A new row gets its

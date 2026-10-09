@@ -73,6 +73,9 @@ describe("forecast options", () => {
     [{ atRiskYears: -1 }, "At-risk window must be a whole number of years from 0 to 100."],
     [{ atRiskYears: 101 }, "At-risk window must be a whole number of years from 0 to 100."],
     [{ atRiskYears: 0.5 }, "At-risk window must be a whole number of years from 0 to 100."],
+    [{ contingencyRate: -0.1 }, "Contingency rate must be a decimal from 0 to 1, like 0.1 for 10%."],
+    [{ contingencyRate: 10 }, "Contingency rate must be a decimal from 0 to 1, like 0.1 for 10%."],
+    [{ contingencyRate: Number.NaN }, "Contingency rate must be a decimal from 0 to 1, like 0.1 for 10%."],
   ])("refuses %o", (overrides, message) => {
     expect(errorOf(() => assertForecastOptions({ startYear: START, ...overrides }))).toBe(message);
     expect(errorOf(() => computeForecast({ startYear: START, components: [], ...overrides }))).toBe(message);
@@ -80,12 +83,12 @@ describe("forecast options", () => {
 
   it("accepts the limits", () => {
     expect(() =>
-      assertForecastOptions({ startYear: START, horizonYears: 100, reserveHorizonYears: 0, inflationRate: 1, currentReserveBalance: 0, atRiskYears: 100 }),
+      assertForecastOptions({ startYear: START, horizonYears: 100, reserveHorizonYears: 0, inflationRate: 1, currentReserveBalance: 0, atRiskYears: 100, contingencyRate: 1 }),
     ).not.toThrow();
     expect(() => assertForecastOptions({ startYear: START, adjustments: [{ year: START, amount: Number.POSITIVE_INFINITY }] })).not.toThrow();
   });
 
-  it("checks in order: horizon, reserve horizon, start year, inflation, balance, adjustments, at-risk window", () => {
+  it("checks in order: horizon, reserve horizon, start year, inflation, balance, adjustments, at-risk window, contingency", () => {
     const all = {
       startYear: 0.5,
       horizonYears: 0,
@@ -94,16 +97,17 @@ describe("forecast options", () => {
       currentReserveBalance: -1,
       adjustments: [{ year: -5, amount: -1 }],
       atRiskYears: -1,
+      contingencyRate: -1,
     };
-    const order = ["horizonYears", "reserveHorizonYears", "startYear", "inflationRate", "currentReserveBalance", "adjustments", "atRiskYears"] as const;
-    const fixed = { startYear: START, horizonYears: 10, reserveHorizonYears: 30, inflationRate: 0, currentReserveBalance: 0, adjustments: [], atRiskYears: 2 };
+    const order = ["horizonYears", "reserveHorizonYears", "startYear", "inflationRate", "currentReserveBalance", "adjustments", "atRiskYears", "contingencyRate"] as const;
+    const fixed = { startYear: START, horizonYears: 10, reserveHorizonYears: 30, inflationRate: 0, currentReserveBalance: 0, adjustments: [], atRiskYears: 2, contingencyRate: 0 };
     const seen: string[] = [];
     for (let i = 0; i < order.length; i++) {
       const options = { ...all };
       for (const key of order.slice(0, i)) Object.assign(options, { [key]: fixed[key] });
       seen.push(errorOf(() => assertForecastOptions(options)).split(" ")[0]);
     }
-    expect(seen).toEqual(["Forecast", "Reserve", "Start", "Inflation", "Current", "An", "At-risk"]);
+    expect(seen).toEqual(["Forecast", "Reserve", "Start", "Inflation", "Current", "An", "At-risk", "Contingency"]);
   });
 
   it("checks the options before any component", () => {

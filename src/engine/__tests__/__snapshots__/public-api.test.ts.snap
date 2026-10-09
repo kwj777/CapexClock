@@ -5,6 +5,7 @@ exports[`offers a deliberate set of functions and constants 1`] = `
   "AT_RISK_YEARS",
   "DEFAULT_HORIZON_YEARS",
   "DEFAULT_RESERVE_HORIZON_YEARS",
+  "MAX_CONTINGENCY_RATE",
   "MAX_HORIZON_YEARS",
   "MAX_INFLATION_RATE",
   "MAX_YEARS_UNTIL_DUE",

@@ -48,3 +48,16 @@ export function formatCostRange(low: number, high: number): string {
   const format = Number.isInteger(low) && Number.isInteger(high) ? money : moneyWithCents;
   return low === high ? format.format(low) : `${format.format(low)}–${format.format(high)}`;
 }
+
+/**
+ * The sentence after the monthly reserve's explanation when the owner picked a
+ * safety buffer, or "" when there's none.
+ */
+export function safetyBufferSentence(forecast: {
+  readonly contingencyRate: number;
+  readonly monthlyReserveBeforeContingency: number;
+}): string {
+  if (!(forecast.contingencyRate > 0)) return "";
+  const percent = Math.round(forecast.contingencyRate * 100);
+  return `It includes a ${percent}% safety buffer (${formatReserve(forecast.monthlyReserveBeforeContingency)} a month without it).`;
+}

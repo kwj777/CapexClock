@@ -186,3 +186,22 @@ describe("the portfolio is one forecast per property", () => {
     }
   });
 });
+
+describe("a property's safety buffer", () => {
+  it("raises that property's monthly reserve in the portfolio, its own page and the totals", () => {
+    const padded = { ...tenUnits, safety_buffer: 20 };
+    const rows = [roof("c1", tenUnits.id)];
+    const plain = summarizePortfolio([tenUnits], rows, 2026).summaries[0].forecast;
+    const { summaries, totals } = summarizePortfolio([padded], rows, 2026);
+    expect(summaries[0].forecast.monthlyReserve).toBeCloseTo(plain.monthlyReserve * 1.2, 9);
+    expect(summaries[0].forecast).toEqual(forecastProperty(padded, rows, 2026).forecast);
+    expect(totals.monthly).toBe(summaries[0].forecast.monthlyReserve);
+    expect(totals.perUnit).toBeCloseTo(summaries[0].forecast.monthlyReserve / 10, 9);
+  });
+
+  it("is none when missing (before update 0007) or not one of the choices", () => {
+    const rows = [roof("c1", tenUnits.id)];
+    const plain = forecastProperty(tenUnits, rows, 2026).forecast.monthlyReserve;
+    expect(forecastProperty({ ...tenUnits, safety_buffer: 50 }, rows, 2026).forecast.monthlyReserve).toBe(plain);
+  });
+});

@@ -201,3 +201,15 @@ describe("emergency replacements cost more", () => {
     expect(forecast(input([overdue, dueIn2]))).toEqual(before);
   });
 });
+
+describe("with a safety buffer", () => {
+  it("shows both monthly figures with the buffer, matching the forecast", () => {
+    const all = [overdue, dueNow, dueNextYear, dueIn2, later];
+    const plain = compareReplaceAtRiskNow(input(all));
+    const padded = compareReplaceAtRiskNow({ ...input(all), safetyBuffer: 10 });
+    expect(padded.asPlanned.monthlyReserve).toBeCloseTo(plain.asPlanned.monthlyReserve * 1.1, 9);
+    expect(padded.replaceNow.monthlyReserve).toBeCloseTo(plain.replaceNow.monthlyReserve * 1.1, 9);
+    expect(padded.asPlanned.monthlyReserve).toBe(landlordForecast(all, 12, START, 10).monthlyReserve);
+    expect(padded.asPlanned.neededNow).toBe(plain.asPlanned.neededNow);
+  });
+});
