@@ -15,11 +15,33 @@ export const LANDLORD_RULES = {
   inflationRate: 0,
   /** The calculator starts from $0 saved. */
   currentReserveBalance: 0,
+  /** No safety buffer unless the owner picks one (see SAFETY_BUFFERS). */
+  contingencyRate: 0,
 } as const;
 
-/** Engine options for a landlord forecast that starts in `currentYear`. */
-export function landlordOptions(currentYear: number): ForecastOptions {
-  return { startYear: currentYear, ...LANDLORD_RULES };
+/**
+ * The safety buffer choices, in percent: extra set aside each month on top of the
+ * "never run short" amount, because something always breaks early. 0 is none.
+ */
+export const SAFETY_BUFFERS = [0, 10, 20] as const;
+export type SafetyBuffer = (typeof SAFETY_BUFFERS)[number];
+
+/** True for one of the SAFETY_BUFFERS. */
+export function isSafetyBuffer(value: unknown): value is SafetyBuffer {
+  return SAFETY_BUFFERS.some((b) => b === value);
+}
+
+/** A stored buffer read back safely: anything that isn't one of the choices is none. */
+export function safetyBufferOf(value: unknown): SafetyBuffer {
+  return isSafetyBuffer(value) ? value : 0;
+}
+
+/**
+ * Engine options for a landlord forecast that starts in `currentYear`, with an
+ * optional safety buffer in percent (0, 10 or 20) on the monthly reserve.
+ */
+export function landlordOptions(currentYear: number, safetyBuffer: SafetyBuffer = 0): ForecastOptions {
+  return { startYear: currentYear, ...LANDLORD_RULES, contingencyRate: safetyBuffer / 100 };
 }
 
 /**

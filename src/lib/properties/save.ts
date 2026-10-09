@@ -61,11 +61,13 @@ export type SavedMatch = "same" | "without_details" | "different";
 
 export function compareSaved(
   sent: Pick<SaveInput, "property" | "components">,
-  property: Pick<PropertyRow, "name" | "unit_count" | "year_built">,
+  property: Pick<PropertyRow, "name" | "unit_count" | "year_built" | "safety_buffer">,
   components: ComponentRow[],
 ): SavedMatch {
   if (
     property.name !== sent.property.name ||
+    // Missing before update 0007, so there's nothing to compare.
+    (property.safety_buffer !== undefined && property.safety_buffer !== sent.property.safety_buffer) ||
     property.unit_count !== sent.property.unit_count ||
     property.year_built !== sent.property.year_built ||
     components.length !== sent.components.length

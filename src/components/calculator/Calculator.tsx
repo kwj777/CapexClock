@@ -47,6 +47,8 @@ import {
   problemText,
   rowFromLibrary,
   rowTotal,
+  SAFETY_BUFFERS,
+  safetyBufferOf,
   TYPICAL_COSTS,
   UNIT_LABEL_TEXT,
   withImport,
@@ -73,7 +75,7 @@ import {
   saveDraft,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
 } from "./draft-storage";
-import { formatMoney, formatReserve, formatUnitPrice } from "./format";
+import { formatMoney, formatReserve, formatUnitPrice, safetyBufferSentence } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.
 const ForecastChart = dynamic(() => import("./ForecastChart"), {
@@ -479,6 +481,20 @@ function CalculatorBody({
                 onChange={(e) => updateDraft({ yearBuilt: e.target.value })}
               />
             </label>
+            <label className="block w-36">
+              <span className={labelClass}>Safety buffer</span>
+              <select
+                className={`${inputClass} mt-1`}
+                value={safetyBufferOf(draft.safetyBuffer)}
+                onChange={(e) => updateDraft({ safetyBuffer: safetyBufferOf(Number(e.target.value)) })}
+              >
+                {SAFETY_BUFFERS.map((b) => (
+                  <option key={b} value={b}>
+                    {b === 0 ? "None" : `+${b}%`}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="flex gap-2">
             {showExample && (
@@ -530,7 +546,8 @@ function CalculatorBody({
           <p
             className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${showYearBuiltError ? "invisible" : ""}`}
           >
-            Year built fills in any install year you leave blank, marked as an estimate.
+            Year built fills in any install year you leave blank, marked as an estimate. A safety
+            buffer adds 10% or 20% to the monthly reserve, for repairs that come early.
           </p>
         </div>
       </section>
@@ -697,6 +714,7 @@ function CalculatorBody({
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   The monthly reserve is the smallest steady amount that has the cash ready for every
                   replacement from {forecast.reserveFromYear} on, looking 30 years ahead.{" "}
+                  {safetyBufferSentence(forecast) && `${safetyBufferSentence(forecast)} `}
                   {forecast.startYear} costs (overdue or due this year) are shown separately because
                   there&apos;s no time to save for them.
                 </p>

@@ -1,5 +1,6 @@
 import { validateComponent, type AssetGroup, type Component, type Scenario } from "@/engine";
 import { landlordForecast, type LandlordForecast } from "./forecast";
+import { safetyBufferOf } from "./rules";
 
 /** The saved-property fields the forecast reads. The database's PropertyRow is assignable to it. */
 export interface SavedProperty {
@@ -7,6 +8,8 @@ export interface SavedProperty {
   readonly name: string;
   readonly unit_count: number;
   readonly year_built: number | null;
+  /** Safety buffer in percent (0, 10 or 20). Missing until the database has update 0007, which means none. */
+  readonly safety_buffer?: number;
 }
 
 /** The saved-component fields the forecast reads. The database's ComponentRow is assignable to it. */
@@ -49,7 +52,16 @@ export function assetGroupFromSaved(
     };
     if (validateComponent(component).length === 0) components.push(component);
   }
-  return { group: { id: property.id, name: property.name, components }, excluded: rows.length - components.length };
+  const buffer = safetyBufferOf(property.safety_buffer);
+  return {
+    group: {
+      id: property.id,
+      name: property.name,
+      components,
+      ...(buffer > 0 ? { contingencyRate: buffer / 100 } : {}),
+    },
+    excluded: rows.length - components.length,
+  };
 }
 
 export function forecastProperty(
@@ -58,5 +70,8 @@ export function forecastProperty(
   currentYear: number,
 ): { forecast: LandlordForecast; excluded: number } {
   const { group, excluded } = assetGroupFromSaved(property, rows);
-  return { forecast: landlordForecast(group.components, property.unit_count, currentYear), excluded };
+  return {
+    forecast: landlordForecast(group.components, property.unit_count, currentYear, safetyBufferOf(property.safety_buffer)),
+    excluded,
+  };
 }

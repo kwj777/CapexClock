@@ -12,7 +12,7 @@ import {
   type YearAdjustment,
 } from "@/engine";
 import { assertUnitCount, landlordMetrics } from "./metrics";
-import { byUrgencyThenName, LANDLORD_RULES, landlordOptions } from "./rules";
+import { byUrgencyThenName, LANDLORD_RULES, landlordOptions, type SafetyBuffer } from "./rules";
 
 /** The headline figures for one side of the comparison. */
 export interface ComparisonFigures {
@@ -77,10 +77,17 @@ export interface CompareOptions {
  * next 2 years. Nothing in the input is changed.
  */
 export function compareReplaceAtRiskNow(
-  input: { readonly startYear: number; readonly unitCount: number; readonly components: readonly Component[] },
+  input: {
+    readonly startYear: number;
+    readonly unitCount: number;
+    readonly components: readonly Component[];
+    /** The owner's safety buffer, so both monthly figures match the forecast's. Missing means none. */
+    readonly safetyBuffer?: SafetyBuffer;
+  },
   options: CompareOptions = {},
 ): ReplaceNowComparison {
   const { startYear, unitCount, components } = input;
+  const buffer = input.safetyBuffer ?? 0;
   // Checked in a forecast's order: window, start year, unit count, then components.
   assertForecastOptions(landlordOptions(startYear));
   assertUnitCount(unitCount);
@@ -103,8 +110,8 @@ export function compareReplaceAtRiskNow(
   }
 
   const { base, modified, difference } = compareScenarios(
-    { ...landlordOptions(startYear), components, adjustments },
-    { ...landlordOptions(startYear), components: withScenario(components, new Set(chosen), "replace_now") },
+    { ...landlordOptions(startYear, buffer), components, adjustments },
+    { ...landlordOptions(startYear, buffer), components: withScenario(components, new Set(chosen), "replace_now") },
   );
   const figures = (s: ForecastSummary): ComparisonFigures => ({
     neededNow: s.neededNow,

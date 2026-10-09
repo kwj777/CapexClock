@@ -1,5 +1,5 @@
 import { landlordForecast, type Component } from "@/verticals/landlord";
-import { formatCostRange, formatReserve } from "../format";
+import { formatCostRange, formatReserve, safetyBufferSentence } from "../format";
 
 function dollars(text: string): number {
   return Number(text.replace(/[$,]/g, ""));
@@ -48,5 +48,17 @@ describe("typical cost ranges", () => {
 
   it("shows one figure when low and high are the same", () => {
     expect(formatCostRange(500, 500)).toBe("$500");
+  });
+});
+
+describe("the safety buffer sentence", () => {
+  it("names the buffer and the amount without it, rounded up like the reserve", () => {
+    expect(safetyBufferSentence({ contingencyRate: 0.1, monthlyReserveBeforeContingency: 2683.2 })).toBe(
+      "It includes a 10% safety buffer ($2,684 a month without it).",
+    );
+  });
+
+  it("is empty with no buffer", () => {
+    expect(safetyBufferSentence({ contingencyRate: 0, monthlyReserveBeforeContingency: 100 })).toBe("");
   });
 });

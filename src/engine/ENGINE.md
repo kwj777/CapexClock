@@ -26,6 +26,7 @@ That is enforced three ways: lint (the `engine/boundary` rules in `eslint.config
 | `inflationRate` | `inflation_rate` | Decimal from 0 to 1 (0.03 is 3%), compounded yearly from the start year | 0 |
 | `currentReserveBalance` | `current_reserve_balance` | Money already saved | 0 |
 | `adjustments` | | One-off amounts added to a year's total | none |
+| `contingencyRate` | | Safety margin on the monthly amount, decimal from 0 to 1 (0.1 is 10%). Only `monthlyReserve` grows | 0 |
 
 ## Outputs
 
@@ -36,7 +37,8 @@ A `ForecastResult`. Every amount is unrounded; rounding for display is the calle
 | `years` | One entry per horizon year: `total`, `byCategory`, `adjustment` and the `replacements` in it |
 | `horizonTotal` | Sum of the horizon's yearly totals |
 | `neededNow` | The first year's total, paid now rather than saved for |
-| `monthlyReserve` | The smallest level monthly deposit, from the second year on, that never lets the balance go below zero over the look-ahead |
+| `monthlyReserve` | The smallest level monthly deposit, from the second year on, that never lets the balance go below zero over the look-ahead, times (1 + `contingencyRate`) |
+| `monthlyReserveBeforeContingency` | That deposit before the safety margin; equals `monthlyReserve` when the rate is 0 |
 | `tightestYear` | The year that sets `monthlyReserve` (earliest on a tie), or null when nothing needs saving |
 | `shortfallNow`, `carriedForward` | What the balance can't cover in the first year, and what it carries toward later years |
 | `savingAhead` | Replacements after the horizon that set the monthly amount |

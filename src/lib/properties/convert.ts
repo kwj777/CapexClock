@@ -8,6 +8,7 @@ import {
   EARLIEST_INSTALL_YEAR,
   EARLIEST_YEAR_BUILT,
   MAX_NOTES_LENGTH,
+  safetyBufferOf,
   type Draft,
   type DraftRow,
   type RowField,
@@ -19,6 +20,8 @@ export function draftFromRows(property: PropertyRow, components: ComponentRow[])
   return {
     unitCount: String(property.unit_count),
     yearBuilt: property.year_built === null ? "" : String(property.year_built),
+    // Missing until the database has update 0007, which means none.
+    safetyBuffer: safetyBufferOf(property.safety_buffer),
     rows: [...components]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(
@@ -177,6 +180,7 @@ export function toSaveInput(
       name: name.trim() || "Untitled property",
       unit_count: problems.property === "unit_count" ? 0 : unitCount,
       year_built: yearBuilt,
+      safety_buffer: safetyBufferOf(draft.safetyBuffer),
     },
     components,
     problems,
