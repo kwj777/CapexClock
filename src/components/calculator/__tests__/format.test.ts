@@ -1,5 +1,5 @@
 import { landlordForecast, type Component } from "@/verticals/landlord";
-import { formatCostRange, formatReserve } from "../format";
+import { dueClusterSentence, formatCostRange, formatReserve } from "../format";
 
 function dollars(text: string): number {
   return Number(text.replace(/[$,]/g, ""));
@@ -48,5 +48,19 @@ describe("typical cost ranges", () => {
 
   it("shows one figure when low and high are the same", () => {
     expect(formatCostRange(500, 500)).toBe("$500");
+  });
+});
+
+describe("the big-year callout", () => {
+  it("lists two, three, or the first three and how many more", () => {
+    expect(dueClusterSentence({ year: 2030, names: ["Roof", "Gas furnace"], total: 88_400 })).toBe(
+      "Roof and Gas furnace both come due in 2030: $88,400.",
+    );
+    expect(dueClusterSentence({ year: 2031, names: ["Roof", "HVAC", "Water heater"], total: 27_400 })).toBe(
+      "Roof, HVAC and Water heater all come due in 2031: $27,400.",
+    );
+    expect(dueClusterSentence({ year: 2031, names: ["A", "B", "C", "D", "E"], total: 5 })).toBe(
+      "A, B, C and 2 more come due in 2031: $5.",
+    );
   });
 });

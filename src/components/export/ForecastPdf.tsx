@@ -1,6 +1,6 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
-import { formatReserve } from "@/components/calculator/format";
+import { dueClusterSentence, formatReserve } from "@/components/calculator/format";
 import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
   atRiskShortText,
@@ -16,6 +16,7 @@ import {
   type ExportRow,
 } from "@/lib/export/rows";
 import {
+  biggestDueCluster,
   CONDITION_TEXT,
   countNoun,
   LANDLORD_LABELS,
@@ -210,6 +211,7 @@ export default function ForecastPdf({
   const leftOut = (details.leftOut ?? []).map((l) => ({ ...l, name: printable(l.name) }));
   // The saving-for list is its own column: cents on every line once one has them.
   const aheadMoney = moneyColumn(forecast.savingAhead.map((r) => r.cost));
+  const cluster = biggestDueCluster(forecast);
 
   return (
     <Document title={`${name} CapEx forecast`} author="CapexClock">
@@ -236,6 +238,11 @@ export default function ForecastPdf({
           from {forecast.reserveFromYear} on, looking 30 years ahead. {forecast.startYear} costs (overdue or due
           this year) are listed separately. All figures are in today&apos;s dollars, without inflation.
         </Text>
+        {cluster && (
+          <Text style={s.note}>
+            Big year ahead: {printable(dueClusterSentence(cluster))} The monthly reserve saves for it ahead of time.
+          </Text>
+        )}
 
         <Text style={s.h2}>Replacement costs by year</Text>
         {years.map((y) => (
