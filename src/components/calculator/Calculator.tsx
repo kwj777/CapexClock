@@ -25,6 +25,7 @@ import { guessedYear, installYearNote } from "@/lib/export/rows";
 import type { PaidWhere } from "@/lib/paid-ideas";
 import {
   badYearBuilt,
+  biggestDueCluster,
   COMPONENT_LIBRARY,
   CONDITION_TEXT,
   CONDITIONS,
@@ -75,7 +76,7 @@ import {
   saveDraft,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
 } from "./draft-storage";
-import { formatMoney, formatReserve, formatUnitPrice, safetyBufferSentence } from "./format";
+import { dueClusterSentence, formatMoney, formatReserve, formatUnitPrice, safetyBufferSentence } from "./format";
 
 // Recharts is big; load it only once there's a forecast to draw.
 const ForecastChart = dynamic(() => import("./ForecastChart"), {
@@ -736,6 +737,7 @@ function CalculatorBody({
             <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               In today&apos;s dollars, no inflation.
             </p>
+            <DueClusterNote forecast={forecast} />
             {forecast.horizonTotal > 0 ? (
               <>
                 <ForecastChart forecast={forecast} />
@@ -1116,6 +1118,18 @@ function Stat({
       </p>
       {action && <div className="mt-3">{action}</div>}
     </div>
+  );
+}
+
+/** Names the costliest year when several things come due at once, so the monthly reserve makes sense. */
+function DueClusterNote({ forecast }: { forecast: LandlordForecast }) {
+  const cluster = biggestDueCluster(forecast);
+  if (!cluster) return null;
+  return (
+    <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+      <span className="font-semibold">Big year ahead: </span>
+      {dueClusterSentence(cluster)} The monthly reserve saves for it ahead of time.
+    </p>
   );
 }
 

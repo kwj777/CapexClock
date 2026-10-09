@@ -47,6 +47,7 @@ export * from "./forecast";
 export * from "./property";
 export * from "./portfolio";
 export * from "./compare";
+export * from "./cluster";
 export * from "./lifespan";
 export * from "./mockup";
 export * from "./library/components";
