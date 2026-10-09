@@ -10,3 +10,5 @@ export const MAX_HORIZON_YEARS = 100;
 export const MAX_YEARS_UNTIL_DUE = 100;
 /** Highest inflation rate accepted, as a decimal (1 = 100% a year); anything above is almost surely a percent typed as a whole number. */
 export const MAX_INFLATION_RATE = 1;
+/** Highest contingency rate accepted, as a decimal (1 = double the reserve); anything above is almost surely a percent typed as a whole number. */
+export const MAX_CONTINGENCY_RATE = 1;

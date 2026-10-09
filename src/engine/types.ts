@@ -45,6 +45,8 @@ export interface AssetGroup {
   readonly components: readonly Component[];
   /** Cash already saved for this group at the start. Missing means the options' balance (default 0). */
   readonly currentReserveBalance?: number;
+  /** This group's safety margin on the monthly reserve. Missing means the options' rate (default 0). */
+  readonly contingencyRate?: number;
 }
 
 /** A one-off amount that is not a replacement, added to one year's total (an emergency premium, say). */
@@ -75,6 +77,11 @@ export interface ForecastOptions {
   readonly currentReserveBalance?: number;
   /** Extra one-off amounts by year. Default none. */
   readonly adjustments?: readonly YearAdjustment[];
+  /**
+   * Safety margin added on top of the level monthly reserve, as a decimal from 0 to 1
+   * (0.1 is 10%). Default 0. Only the monthly figure grows; costs and years don't change.
+   */
+  readonly contingencyRate?: number;
 }
 
 export interface ForecastInput extends ForecastOptions {
@@ -134,8 +141,15 @@ export interface ForecastSummary {
   readonly horizonTotal: number;
   /** years[0].total: first-year costs, shown as needed now and not spread into the monthly reserve. */
   readonly neededNow: number;
-  /** Smallest level monthly deposit that pays every replacement after the first year on time. Unrounded. */
+  /**
+   * Smallest level monthly deposit that pays every replacement after the first year on
+   * time, plus the contingency margin. Unrounded.
+   */
   readonly monthlyReserve: number;
+  /** The level monthly deposit before the contingency margin. Equals monthlyReserve when the rate is 0. */
+  readonly monthlyReserveBeforeContingency: number;
+  /** The contingency rate the forecast used (default 0). */
+  readonly contingencyRate: number;
   /** First year the monthly reserve saves for: startYear + 1. */
   readonly reserveFromYear: number;
   /** Last year the monthly reserve looks at: startYear + max(horizonYears − 1, reserveHorizonYears). */

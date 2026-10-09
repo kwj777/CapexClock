@@ -1,6 +1,6 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
-import { dueClusterSentence, formatReserve } from "@/components/calculator/format";
+import { dueClusterSentence, formatReserve, safetyBufferSentence } from "@/components/calculator/format";
 import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
 import {
   atRiskShortText,
@@ -235,7 +235,9 @@ export default function ForecastPdf({
         {leftOut.length > 0 && <Text style={s.leftOut}>{leftOutSummary(leftOut)}</Text>}
         <Text style={s.note}>
           The monthly reserve is the smallest steady amount that has the cash ready for every replacement
-          from {forecast.reserveFromYear} on, looking 30 years ahead. {forecast.startYear} costs (overdue or due
+          from {forecast.reserveFromYear} on, looking 30 years ahead.{" "}
+          {safetyBufferSentence(forecast) && `${safetyBufferSentence(forecast)} `}
+          {forecast.startYear} costs (overdue or due
           this year) are listed separately. All figures are in today&apos;s dollars, without inflation.
         </Text>
         {cluster && (

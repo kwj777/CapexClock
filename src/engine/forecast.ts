@@ -69,7 +69,7 @@ export function compareScenarios(baseInput: ForecastInput, modifiedInput: Foreca
   };
 }
 
-/** One forecast per group, with shared options; a group's own balance wins over the options'. */
+/** One forecast per group, with shared options; a group's own balance and contingency rate win over the options'. */
 export function forecastAssetGroups(groups: readonly AssetGroup[], options: ForecastOptions): GroupForecast[] {
   return groups.map((group) => ({
     group,
@@ -77,6 +77,7 @@ export function forecastAssetGroups(groups: readonly AssetGroup[], options: Fore
       ...options,
       components: group.components,
       currentReserveBalance: group.currentReserveBalance ?? options.currentReserveBalance,
+      contingencyRate: group.contingencyRate ?? options.contingencyRate,
     }),
   }));
 }

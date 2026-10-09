@@ -42,7 +42,7 @@ describe("saving an editor draft", () => {
     draft.rows[0] = { ...draft.rows[0], id: "0e9a1a52-5c1b-4f4e-9d38-7a1f1f0d9c11" };
     const input = toSaveInput("  Maple Court ", draft, 2026, property.id);
     expect(input.problems).toEqual({});
-    expect(input.property).toEqual({ id: property.id, name: "Maple Court", unit_count: 12, year_built: 1998 });
+    expect(input.property).toEqual({ id: property.id, name: "Maple Court", unit_count: 12, year_built: 1998, safety_buffer: 0 });
     expect(input.components[0].id).toBe("0e9a1a52-5c1b-4f4e-9d38-7a1f1f0d9c11");
     expect(input.components[1]).not.toHaveProperty("id");
     expect(input.components.map((c) => c.sort_order)).toEqual([0, 1, 2, 3, 4, 5]);
@@ -215,5 +215,18 @@ describe("loading a saved property", () => {
     const before0004 = component({});
     expect(before0004).not.toHaveProperty("install_year_is_estimate");
     expect(draftFromRows(property, [before0004])).toMatchObject({ rows: [{ installYearIsGuess: false }] });
+  });
+});
+
+describe("the safety buffer", () => {
+  it("round-trips between a saved property and the editor", () => {
+    const draft = draftFromRows({ ...property, safety_buffer: 10 }, [component({})]);
+    expect(draft.safetyBuffer).toBe(10);
+    expect(toSaveInput(property.name, draft, 2026, property.id).property.safety_buffer).toBe(10);
+  });
+
+  it("is none for a property read before update 0007, or with a value the site doesn't offer", () => {
+    expect(draftFromRows(property, []).safetyBuffer).toBe(0);
+    expect(draftFromRows({ ...property, safety_buffer: 15 }, []).safetyBuffer).toBe(0);
   });
 });

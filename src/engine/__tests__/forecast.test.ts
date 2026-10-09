@@ -62,11 +62,13 @@ describe("a forecast end to end", () => {
     expect(Object.keys(f).sort()).toEqual([
       "atRisk",
       "carriedForward",
+      "contingencyRate",
       "currentReserveBalance",
       "endYear",
       "horizonTotal",
       "horizonYears",
       "monthlyReserve",
+      "monthlyReserveBeforeContingency",
       "neededNow",
       "nextReplacements",
       "replacements",

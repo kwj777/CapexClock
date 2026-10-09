@@ -1,5 +1,5 @@
 import { landlordForecast, type Component } from "@/verticals/landlord";
-import { dueClusterSentence, formatCostRange, formatReserve } from "../format";
+import { dueClusterSentence, formatCostRange, formatReserve, safetyBufferSentence } from "../format";
 
 function dollars(text: string): number {
   return Number(text.replace(/[$,]/g, ""));
@@ -62,5 +62,17 @@ describe("the big-year callout", () => {
     expect(dueClusterSentence({ year: 2031, names: ["A", "B", "C", "D", "E"], total: 5 })).toBe(
       "A, B, C and 2 more come due in 2031: $5.",
     );
+  });
+});
+
+describe("the safety buffer sentence", () => {
+  it("names the buffer and the amount without it, rounded up like the reserve", () => {
+    expect(safetyBufferSentence({ contingencyRate: 0.1, monthlyReserveBeforeContingency: 2683.2 })).toBe(
+      "It includes a 10% safety buffer ($2,684 a month without it).",
+    );
+  });
+
+  it("is empty with no buffer", () => {
+    expect(safetyBufferSentence({ contingencyRate: 0, monthlyReserveBeforeContingency: 100 })).toBe("");
   });
 });

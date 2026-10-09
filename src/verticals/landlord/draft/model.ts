@@ -1,4 +1,5 @@
 import type { Scenario } from "@/engine";
+import { isSafetyBuffer, type SafetyBuffer } from "../rules";
 import type { UnitLabel } from "../units";
 import { toComponents } from "./components";
 
@@ -44,6 +45,8 @@ export interface Draft {
   unitCount: string;
   yearBuilt: string;
   rows: DraftRow[];
+  /** Safety buffer in percent (0, 10 or 20) on the monthly reserve. Missing in older drafts, meaning none. */
+  safetyBuffer?: SafetyBuffer;
   /** forecast_generated was already sent for this draft (public calculator only). */
   forecastTracked?: boolean;
 }
@@ -68,8 +71,11 @@ export function isDraft(value: unknown): value is Draft {
  */
 export function upgradeDraft(draft: Draft, currentYear: number): Draft {
   const rows = draft.rows.map(cleanDetails);
+  const { safetyBuffer, ...rest } = draft;
   return {
-    ...draft,
+    ...rest,
+    // A damaged buffer in this browser is dropped (none) rather than break the forecast.
+    ...(isSafetyBuffer(safetyBuffer) ? { safetyBuffer } : {}),
     // An older draft that already shows a forecast has already been counted.
     forecastTracked: draft.forecastTracked ?? toComponents({ ...draft, rows }, currentYear).components.length > 0,
     rows: rows.map((r) =>
