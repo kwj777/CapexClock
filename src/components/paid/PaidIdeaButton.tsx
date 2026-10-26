@@ -178,7 +178,7 @@ function PaidIdeaPanel({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="-m-1 shrink-0 p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          className="-m-2.5 flex size-10 shrink-0 items-center justify-center rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
           <span aria-hidden="true">✕</span>
         </button>

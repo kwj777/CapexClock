@@ -16,7 +16,7 @@ import {
 import { CONTACT_EMAIL } from "@/lib/site";
 
 const fieldClass =
-  "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-[invalid=true]:border-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:aria-[invalid=true]:border-red-400";
+  "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-[invalid=true]:border-red-600 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:aria-[invalid=true]:border-red-400";
 const labelClass = "text-xs font-medium text-slate-700 dark:text-slate-300";
 const errorClass = "mt-1 text-xs text-red-700 dark:text-red-400";
 

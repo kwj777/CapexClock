@@ -25,7 +25,8 @@ export function SiteHeader() {
     ));
   return (
     <header className="mx-auto w-full max-w-6xl px-4 pb-3 pt-5 sm:px-6 md:pb-5">
-      <div className="flex items-center justify-between gap-4">
+      {/* Wraps instead of pushing "Sign in" off screen at large text sizes. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <ClockMark />
           CapexClock
@@ -63,7 +64,8 @@ export function SiteFooter() {
     <footer className="border-t border-slate-200 dark:border-slate-800">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:px-6">
         <p>© {new Date().getFullYear()} CapexClock</p>
-        <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Tools">
+        {/* Links are padded so each tap target is more than its 20px line of text. */}
+        <nav className="flex flex-wrap gap-x-5 gap-y-1 *:py-1" aria-label="Tools">
           <Link href="/capex-calculator" className="hover:text-slate-900 dark:hover:text-white">
             CapEx calculator
           </Link>
@@ -77,7 +79,7 @@ export function SiteFooter() {
             CapEx spreadsheet template
           </Link>
         </nav>
-        <div className="flex flex-wrap gap-x-5 gap-y-2">
+        <div className="flex flex-wrap gap-x-5 gap-y-1 *:py-1">
           <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
             Pricing
           </Link>

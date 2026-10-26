@@ -518,7 +518,7 @@ export default function PropertyEditor({
             setName(e.target.value);
             edited();
           }}
-          className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
+          className="mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
         />
       </label>
       {/* Wraps, so a long status (the 0004 message) moves the button below it on phones. */}
@@ -620,7 +620,7 @@ export default function PropertyEditor({
           <button
             type="button"
             onClick={onDelete}
-            className="text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-400"
+            className="-mx-2 rounded-md px-2 py-2 text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-400"
           >
             Delete this property
           </button>
