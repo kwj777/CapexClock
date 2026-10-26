@@ -16,7 +16,8 @@ const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 d
 export default function EmailSettings({ view }: { view: EmailSettingsView }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className={`${card} mt-10`}>
+    // The emails' "change your email settings" link points at this id.
+    <section id="email-settings" aria-labelledby={headingId} className={`${card} mt-10`}>
       <h2 id={headingId} className="text-lg font-semibold text-slate-950 dark:text-white">
         Email settings
       </h2>
