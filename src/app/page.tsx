@@ -34,7 +34,7 @@ const STEPS = [
   },
   {
     title: "Know what to reserve",
-    body: "Get one number: exactly how much to set aside per unit, per month.",
+    body: "Get one number: about how much to set aside per unit, per month.",
   },
 ];
 
@@ -65,12 +65,19 @@ const POPULAR_LIFESPANS = [
 ];
 
 const FAQ = [
-  { q: "Is it free?", a: "Yes, the core forecaster is free." },
-  { q: "Who is it for?", a: "Owners of roughly 5–100 rental units." },
+  { q: "Is it free?", a: "Yes. The calculator, saved properties and exports are free." },
+  {
+    q: "Who is it for?",
+    a: "Landlords with anything from a single rental to about 50 units. It works for bigger portfolios too.",
+  },
   { q: "Do I need to connect my accounting software?", a: "No." },
   {
     q: "Can I use it now?",
     a: "Yes. The calculator is open to everyone, and a free account saves your properties. We're deciding what to build next, like replacement reminders and a condition report for lenders and buyers. Join the early access list to hear first.",
+  },
+  {
+    q: "Where does my data go?",
+    a: "The free calculators work without an account. What you enter stays in your browser until you save it to an account. We don't sell your data or share it with advertisers.",
   },
 ];
 
@@ -119,7 +126,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <CtaButton />
-              <span className="text-sm text-slate-500 dark:text-slate-400">For owners of 5–100 units</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">For landlords with 1–50 units</span>
             </div>
           </div>
           <ForecastMockup />

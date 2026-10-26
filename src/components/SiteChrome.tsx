@@ -2,6 +2,7 @@ import Link from "next/link";
 import { presaleLinksFromEnv } from "@/lib/paid-ideas";
 import { supabaseEnv } from "@/lib/supabase/env";
 import { CONTACT_EMAIL } from "@/lib/site";
+import AccountLink from "./AccountLink";
 import CountMeNote from "./CountMeNote";
 
 // Stripe's customer portal, where founding members cancel. Baked in at build time.
@@ -34,20 +35,14 @@ export function SiteHeader() {
           {tools(false)}
         </nav>
         <div className="flex items-center gap-4 sm:gap-5">
-          {/* The smallest phones find it in the footer. */}
-          <Link href="/pricing" className={`${navLink} hidden sm:inline`}>
+          <Link href="/pricing" className={navLink}>
             Pricing
           </Link>
           {/* Below lg the landing page's own signup section covers this. */}
           <Link href="/#signup" className={`${navLink} hidden lg:inline`}>
             Early access
           </Link>
-          {/* No prefetch: /app runs the auth proxy, which public pages shouldn't trigger. */}
-          {supabaseEnv() && (
-            <Link href="/app" prefetch={false} className={navLink}>
-              Sign in
-            </Link>
-          )}
+          {supabaseEnv() && <AccountLink className={navLink} />}
         </div>
       </div>
       {/* Phones and tablets get the tools on their own row so nothing is squeezed. */}

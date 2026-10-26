@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   twitter: SHARED_TWITTER,
 };
 
+// Static pages are rebuilt once a day, so the home page chart's years and the
+// footer's © year move on with the calendar instead of waiting for a deploy.
+export const revalidate = 86400;
+
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
