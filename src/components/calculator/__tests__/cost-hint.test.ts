@@ -18,7 +18,7 @@ const carpet = COMPONENT_LIBRARY.find((c) => c.slug === "carpet")!;
 describe("typical cost hints under the cost field", () => {
   const libraryItem = (slug: string) => COMPONENT_LIBRARY.find((c) => c.slug === slug)!;
   const hint = (row: DraftRow) =>
-    costHint(row, libraryItem(row.librarySlug!), TYPICAL_COSTS.find((c) => c.slug === row.librarySlug));
+    costHint(row, libraryItem(row.librarySlug!), TYPICAL_COSTS.find((c) => c.slug === row.librarySlug))?.text ?? null;
   const windows = libraryItem("vinyl-windows");
 
   it("shows the typical range while the field says per apartment or per sq ft", () => {
@@ -35,10 +35,48 @@ describe("typical cost hints under the cost field", () => {
     expect(hint(ninety)).toBeNull();
   });
 
-  it("shows none for the building, or when the field and the typical cost count different things", () => {
+  it("keeps the range on a cost each for items there's one of in each apartment", () => {
+    // A furnace added from its lifespan page with How many = 12 and no units typed yet.
+    const furnace = editRow(rowFromLibrary(libraryItem("gas-furnace"), ""), { quantity: "12" }, "");
+    expect(costLabel(furnace)).toBe("Cost each");
+    expect(hint(furnace)).toBe("Typical $2,500–$5,000 each, use your quote");
+    expect(hint(editRow(rowFromLibrary(waterHeater, "12"), { quantity: "30" }, "12"))).toBe(
+      "Typical $800–$2,300 each, use your quote",
+    );
+  });
+
+  it("keeps a row typed at the unit count per apartment, as a reload does", () => {
+    const typed = editRow(rowFromLibrary(windows, "12"), { quantity: "12" }, "12");
+    expect(costLabel(typed)).toBe("Cost per apartment");
+    expect(hint(typed)).toBe("Typical $3,200–$7,200, use your quote");
+  });
+
+  it("questions a cost well above the typical range, most likely an extra zero", () => {
+    const row = rowFromLibrary(waterHeater, "12");
+    const check = (costEach: string) =>
+      costHint({ ...row, costEach }, waterHeater, TYPICAL_COSTS.find((c) => c.slug === waterHeater.slug));
+    expect(check("2300")).toEqual({ text: "Typical $800–$2,300, use your quote", warn: false });
+    expect(check("11500")).toEqual({ text: "Typical $800–$2,300, use your quote", warn: false });
+    expect(check("$50,000")).toEqual({ text: "Well above the typical $800–$2,300, check the zeros.", warn: true });
+  });
+
+  it("gives a building-wide item a price that doesn't depend on the building's size", () => {
     const roofRow = rowFromLibrary(roof, "12");
     expect(costLabel(roofRow)).toBe("Cost for the building");
-    expect(hint(roofRow)).toBeNull();
+    expect(hint(roofRow)).toBe("Typical $4.50–$8.00 per sq ft of roof, old shingles removed, use your quote");
+    expect(hint(rowFromLibrary(libraryItem("boiler"), "12"))).toBe(
+      "Typical $13,000–$35,000 for a 300,000–600,000 BTU boiler, use your quote",
+    );
+    for (const lib of COMPONENT_LIBRARY.filter((c) => c.unitLabel === "per_building")) {
+      expect(hint(rowFromLibrary(lib, "2"))).toMatch(/^Typical \$.+, use your quote$/);
+    }
+    // Not once the cost is edited in the dashboard: the working no longer matches.
+    expect(costHint(roofRow, roof, { slug: roof.slug, low: 3000, high: 5000, per: "apartment" })).toBeNull();
+    // Nor for two of them, which makes the field a cost each.
+    expect(hint(editRow(roofRow, { quantity: "2" }, "12"))).toBeNull();
+  });
+
+  it("shows none when the field and the typical cost count different things", () => {
     // Carpet counted per apartment: the per sq ft range would read as an apartment's cost.
     const carpetPerApartment = editRow(rowFromLibrary(carpet, "12"), { unitLabel: "per_unit" }, "12");
     expect(costLabel(carpetPerApartment)).toBe("Cost per apartment");
@@ -52,9 +90,9 @@ describe("typical cost hints under the cost field", () => {
       expect(costLabel(perApartment)).toBe("Cost per apartment");
       expect(hint(perApartment)).toBeNull();
     }
-    // Every building-wide item, whatever its count.
+    // Every building-wide item counted another way.
     for (const lib of COMPONENT_LIBRARY.filter((c) => c.unitLabel === "per_building")) {
-      for (const unitLabel of ["per_unit", "per_building", "per_sq_ft"] as const) {
+      for (const unitLabel of ["per_unit", "per_sq_ft"] as const) {
         expect(hint(editRow(rowFromLibrary(lib, "12"), { unitLabel }, "12"))).toBeNull();
       }
     }

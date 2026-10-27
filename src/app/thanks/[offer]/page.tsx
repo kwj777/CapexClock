@@ -95,12 +95,14 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
                     Within 2 business days, we switch on your membership and email you from {CONTACT_EMAIL} when
                     it&apos;s on.
                   </li>
+                  {/* Written for this page: OFFER_TEXT's wording is a list of what's included, for /pricing. */}
                   <li>
-                    {OFFER_TEXT.membership.includes} {OFFER_TEXT.membership.delivery} You can turn any of them off
-                    under Email settings in My properties.
+                    You&apos;ll get an email from us before each replacement comes due, plus a yearly budget summary
+                    and a yearly condition report. They go out automatically from the properties you save, and you
+                    can turn any of them off under Email settings in My properties.
                   </li>
                   <li>
-                    Rather we set it up for you? {sendDetails}
+                    Would you rather we set it up for you? {sendDetails}
                   </li>
                 </>
               ) : (

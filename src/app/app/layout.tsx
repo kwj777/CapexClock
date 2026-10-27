@@ -13,8 +13,9 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+// Padded to a comfortable tap size; nowrap so "My properties" never splits over two lines.
 const navLink =
-  "text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
+  "whitespace-nowrap py-2 text-sm font-medium text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
 
 export default async function AppLayout({ children }: LayoutProps<"/app">) {
   // Accounts aren't set up on this deployment.
@@ -24,12 +25,13 @@ export default async function AppLayout({ children }: LayoutProps<"/app">) {
   return (
     <>
       <header className="border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <nav className="flex items-center gap-5">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2.5 sm:px-6">
+          <nav className="flex flex-wrap items-center gap-x-5">
             <Link href="/app" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
               CapexClock
             </Link>
-            <Link href="/app" className={navLink}>
+            {/* Phones go there with the logo, which keeps the header to one row. */}
+            <Link href="/app" className={`${navLink} hidden sm:inline`}>
               My properties
             </Link>
             <Link href="/capex-calculator" className={navLink}>

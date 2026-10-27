@@ -45,7 +45,7 @@ describe("pay question memory", () => {
 
 describe("pay question events", () => {
   it("carry the question's version, so a changed question is counted apart", () => {
-    expect(versioned({ answer: "yes", trigger: "pdf" })).toEqual({ answer: "yes", trigger: "pdf", version: "2" });
+    expect(versioned({ answer: "yes", trigger: "pdf" })).toEqual({ answer: "yes", trigger: "pdf", version: "3" });
     expect(versioned({ pick: "report", answer: "maybe" }).version).toBe(PAY_QUESTION_VERSION);
   });
 });

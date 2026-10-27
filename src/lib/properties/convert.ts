@@ -124,6 +124,19 @@ function validYear(year: number | null, currentYear: number, earliest = EARLIEST
 }
 
 /**
+ * The name a property saved without one gets, from what the owner did enter, so
+ * several unnamed ones can be told apart: "12-unit building (built 1998)".
+ */
+export function fallbackName(unitCount: number, yearBuilt: number | null): string {
+  const units = Number.isInteger(unitCount) && unitCount > 0 && unitCount <= MAX_UNIT_COUNT ? unitCount : null;
+  const built = yearBuilt !== null && Number.isInteger(yearBuilt) ? yearBuilt : null;
+  if (units !== null && built !== null) return `${units}-unit building (built ${built})`;
+  if (units !== null) return `${units}-unit building`;
+  if (built !== null) return `Building built ${built}`;
+  return "Untitled property";
+}
+
+/**
  * Turns the editor's draft into save_property arguments. Blank costs and install
  * years are allowed (the row is kept but not forecast); anything the database
  * would reject is reported instead.
@@ -183,7 +196,7 @@ export function toSaveInput(
   return {
     property: {
       ...(propertyId ? { id: propertyId } : {}),
-      name: name.trim() || "Untitled property",
+      name: name.trim() || fallbackName(unitCount, problems.property === "year_built" ? null : yearBuilt),
       unit_count: problems.property === "unit_count" ? 0 : unitCount,
       year_built: yearBuilt,
       safety_buffer: safetyBufferOf(draft.safetyBuffer),

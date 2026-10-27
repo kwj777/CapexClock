@@ -7,8 +7,8 @@
 export const PAID_IDEAS = ["reminders", "report", "photo"] as const;
 export type PaidIdea = (typeof PAID_IDEAS)[number];
 
-/** The page a button sits on, sent with its events and with each sign-up. */
-export type PaidWhere = "calculator" | "property";
+/** The page a button or form sits on, sent with its events and with each sign-up. */
+export type PaidWhere = "calculator" | "property" | "pricing";
 
 export interface PaidIdeaText {
   /** The button's words. They start its accessible name, so "click Email me…" works by voice. */
@@ -33,14 +33,16 @@ export const PAID_IDEA_TEXT: Record<PaidIdea, PaidIdeaText> = {
   },
 };
 
+/** The heading of a panel that offers a "tell me first" list. */
 export const NOT_BUILT_TEXT = "Not built yet. We're deciding what to build next.";
 
 /**
- * A panel's name for screen readers: which idea it's for, then that it isn't built,
- * so the reminders, report and photo panels can be told apart.
+ * A panel's name for screen readers: which idea it's for, then its heading (that it
+ * isn't built, or the offer on sale), so the reminders, report and photo panels can be
+ * told apart.
  */
-export function panelName(idea: PaidIdea): string {
-  return `${PAID_IDEA_TEXT[idea].button}: not built yet`;
+export function panelName(idea: PaidIdea, onSale: Offer | null = null): string {
+  return `${PAID_IDEA_TEXT[idea].button}: ${onSale ? offerHeading(onSale) : "not built yet"}`;
 }
 
 /**
@@ -50,7 +52,7 @@ export function panelName(idea: PaidIdea): string {
  */
 export const PHOTO_OFFER = {
   before: "Want it now? Email a photo of the label to",
-  after: "and we'll fill in the row for you, free.",
+  after: "and we'll email back the install year, size and model to enter, free.",
   subject: "Photo of a label",
 } as const;
 
@@ -153,6 +155,12 @@ export function offerForIdea(idea: PaidIdea): Offer | null {
   return OFFER_FOR_IDEA[idea] ?? null;
 }
 
+/** The idea whose "tell me first" list an offer uses while it isn't on sale. */
+export const IDEA_FOR_OFFER: Readonly<Record<Offer, PaidIdea>> = {
+  membership: "reminders",
+  report: "report",
+};
+
 export function isOffer(value: string): value is Offer {
   return (OFFERS as readonly string[]).includes(value);
 }
@@ -167,7 +175,7 @@ export interface OfferText {
   includes: string;
   /** How and when it's delivered (on /pricing and /terms). */
   delivery: string;
-  /** The panel's line under "Not built yet". */
+  /** The panel's line under its heading. */
   pitch: string;
 }
 
@@ -200,12 +208,17 @@ export const OFFER_TEXT: Record<Offer, OfferText> = {
   },
 };
 
+/** A panel's heading while the offer is on sale: "Founding membership, $12/month". */
+export function offerHeading(offer: Offer): string {
+  return `${OFFER_TEXT[offer].name}, ${OFFER_TEXT[offer].price}`;
+}
+
 /** The founding price, said the one way it's allowed to be said. */
 export const FOUNDING_PRICE_TEXT = "$12/month founding price, kept for as long as you stay a member.";
 
 /** The founding promise, on /terms, /pricing and the membership panel. */
 export const FOUNDING_PROMISE_TEXT =
-  "If we don't build reminders, we cancel every founding membership and refund every payment in full.";
+  "If we stop sending reminders, we cancel every founding membership and refund every payment in full.";
 
 export const REFUND_TEXT = "Full refund within 30 days.";
 

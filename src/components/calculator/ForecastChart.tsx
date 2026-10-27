@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useSyncExternalStore } from "react";
 import {
   Bar,
   BarChart,
@@ -43,6 +43,19 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
   );
 }
 
+const NARROW = "(max-width: 639px)";
+
+function subscribeNarrow(onChange: () => void) {
+  const query = window.matchMedia(NARROW);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** True on phone-width screens, where every year is labelled short ('26) so none is skipped. */
+function useNarrow(): boolean {
+  return useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW).matches, () => false);
+}
+
 /**
  * The stacked bar chart. It's hidden from screen readers, which get the same
  * numbers as a table next to it (ForecastTable), so it takes no keyboard focus.
@@ -50,9 +63,12 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
 // Redrawn only when the forecast changes, not on every key press in the list above it.
 export default memo(function ForecastChart({ forecast }: { forecast: LandlordForecast }) {
   const { rows, present } = toChartRows(forecast);
+  const narrow = useNarrow();
 
   return (
-    <div className="viz-root h-72 w-full sm:h-80" aria-hidden="true">
+    // A tap focuses the chart's drawing, which browsers outline; the chart takes no
+    // keyboard focus (see above), so the outline is only a stray box.
+    <div className="viz-root h-72 w-full sm:h-80 [&_*]:outline-none" aria-hidden="true">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={rows}
@@ -62,8 +78,10 @@ export default memo(function ForecastChart({ forecast }: { forecast: LandlordFor
           <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
           <XAxis
             dataKey="year"
-            // Always show the first year, even when narrow screens skip labels.
-            interval="equidistantPreserveStart"
+            // Always show the first year, even when narrow screens skip labels. On phones every
+            // year is shown, written short.
+            interval={narrow ? 0 : "equidistantPreserveStart"}
+            tickFormatter={narrow ? (year: number) => `'${String(year).slice(-2)}` : undefined}
             tickLine={false}
             axisLine={{ stroke: "var(--viz-grid)" }}
             tick={{ fill: "var(--viz-axis)", fontSize: 12 }}

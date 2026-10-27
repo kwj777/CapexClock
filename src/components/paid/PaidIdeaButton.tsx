@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics";
 import {
   NOT_BUILT_TEXT,
   offerForIdea,
+  offerHeading,
   PAID_IDEA_TEXT,
   paidIdeaEvent,
   panelName,
@@ -14,6 +15,7 @@ import {
   type PaidWhere,
 } from "@/lib/paid-ideas";
 import { CONTACT_EMAIL } from "@/lib/site";
+import { useSeenOnScreen } from "@/components/useSeenOnScreen";
 import { usePaidIdeas } from "./PaidIdeas";
 import PresaleOffer from "./PresaleOffer";
 import TellMeFirstForm from "./TellMeFirstForm";
@@ -32,23 +34,6 @@ const badgeClass: Record<Tone, string> = {
     "shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-500/20 dark:text-amber-200",
   dark: "shrink-0 rounded-full bg-amber-400 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-950",
 };
-
-/** Calls onSeen once at least half the element has been on screen. */
-function useSeenOnScreen(element: HTMLElement | null, onSeen: (() => void) | null) {
-  useEffect(() => {
-    if (!element || !onSeen || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting)) return;
-        observer.disconnect();
-        onSeen();
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [element, onSeen]);
-}
 
 /**
  * A test button for a paid idea and the panel it opens, handed to `children`
@@ -145,7 +130,7 @@ export default function PaidIdeaButton({
 
 /**
  * What the first click shows: it isn't built, and a "tell me first" list, or
- * Buy now once the idea's Stripe link is set (never for the photo idea).
+ * the offer and Buy now once the idea's Stripe link is set (never for the photo idea).
  */
 function PaidIdeaPanel({
   id,
@@ -163,6 +148,7 @@ function PaidIdeaPanel({
   const { where, ownerEmail, signedUp, markSignedUp, offerLinks } = usePaidIdeas();
   const offer = offerForIdea(idea);
   const buyLink = offer && offerLinks[offer];
+  const onSale = buyLink ? offer : null;
   // Signed up from this panel just now (not from another button for the same idea).
   const [justSignedUp, setJustSignedUp] = useState(false);
   const thanks = useRef<HTMLParagraphElement>(null);
@@ -177,9 +163,9 @@ function PaidIdeaPanel({
     <section
       ref={panelRef}
       id={id}
-      // Named after its idea, not just "Not built yet", and where it sits when the idea
+      // Named after its idea, not just its heading, and where it sits when the idea
       // has two buttons, so the panels can be told apart.
-      aria-label={place ? `${panelName(idea)}, ${place}` : panelName(idea)}
+      aria-label={place ? `${panelName(idea, onSale)}, ${place}` : panelName(idea, onSale)}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
@@ -187,20 +173,19 @@ function PaidIdeaPanel({
       className="ph-no-capture rounded-xl bg-amber-50 p-4 text-left text-slate-900 ring-1 ring-amber-200 sm:p-5 dark:bg-slate-900 dark:text-white dark:ring-amber-500/40"
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold">
-          {NOT_BUILT_TEXT}
-        </p>
+        {/* "Not built yet" only goes with the "tell me first" list, never above a Buy now. */}
+        <p className="text-sm font-semibold">{onSale ? offerHeading(onSale) : NOT_BUILT_TEXT}</p>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="-m-1 shrink-0 p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          className="-m-2.5 flex size-10 shrink-0 items-center justify-center rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
           <span aria-hidden="true">✕</span>
         </button>
       </div>
-      {offer && buyLink ? (
-        <PresaleOffer offer={offer} link={buyLink} />
+      {onSale && buyLink ? (
+        <PresaleOffer offer={onSale} link={buyLink} />
       ) : (
         <>
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
@@ -237,10 +222,17 @@ function PaidIdeaPanel({
   );
 }
 
-/** The photo idea's free offer: rows filled in by hand from a photo emailed to us. */
-function PhotoOffer({ where }: { where: PaidWhere }) {
+/** The photo idea's free offer: we read a label emailed to us and reply with what to enter. */
+export function PhotoOffer({
+  where,
+  className = "mt-4 border-t border-amber-200 pt-3 dark:border-amber-500/30",
+}: {
+  where: PaidWhere;
+  /** Spacing and border; the panel's default sets it apart from the form above. */
+  className?: string;
+}) {
   return (
-    <p className="mt-4 border-t border-amber-200 pt-3 text-sm text-slate-700 dark:border-amber-500/30 dark:text-slate-300">
+    <p className={`${className} text-sm text-slate-700 dark:text-slate-300`}>
       {PHOTO_OFFER.before}{" "}
       <a
         href={photoOfferHref(CONTACT_EMAIL)}

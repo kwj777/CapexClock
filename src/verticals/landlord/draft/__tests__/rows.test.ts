@@ -51,6 +51,11 @@ describe("what Clear and Load an example would replace", () => {
     expect(hasEntries({ ...EMPTY_DRAFT, unitCount: "40" })).toBe(true);
     expect(hasEntries({ ...EMPTY_DRAFT, yearBuilt: "1962" })).toBe(true);
   });
+
+  it("counts a property name too, but not a blank one", () => {
+    expect(hasEntries({ ...EMPTY_DRAFT, name: "14 Maple Court" })).toBe(true);
+    expect(hasEntries({ ...EMPTY_DRAFT, name: "  " })).toBe(false);
+  });
 });
 
 describe("unit count", () => {
@@ -82,6 +87,17 @@ describe("unit count", () => {
     const two = editRow(rowFromLibrary(washer, ""), { quantity: "2" }, "");
     const next = typeUnitCount({ unitCount: "", yearBuilt: "", rows: [two] }, "2", "24");
     expect(next.rows[0].quantity).toBe("2");
+  });
+
+  it("keeps a row following the unit count when the owner types the unit count itself, as a reload does", () => {
+    const typed = editRow(rowFromLibrary(waterHeater, "12"), { quantity: "6" }, "12");
+    const back = editRow(typed, { quantity: "12" }, "12");
+    expect(back.followsUnitCount).toBe(true);
+    expect(costLabel(back)).toBe("Cost per apartment");
+    expect(withUnitCount({ unitCount: "12", yearBuilt: "", rows: [back] }, "14").rows[0].quantity).toBe("14");
+    // Not a per-building row, and not while there's no unit count.
+    expect(editRow(rowFromLibrary(roof, "12"), { quantity: "12" }, "12").followsUnitCount).toBe(false);
+    expect(editRow(rowFromLibrary(waterHeater, ""), { quantity: "" }, "").followsUnitCount).toBe(false);
   });
 
   it("fills in per-unit rows added before the unit count", () => {

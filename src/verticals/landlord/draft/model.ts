@@ -42,6 +42,8 @@ export const CONDITION_TEXT: Record<ComponentCondition, string> = { good: "Good"
 export const MAX_NOTES_LENGTH = 2000;
 
 export interface Draft {
+  /** The property's name, for downloads and saving to an account. Optional, missing in older drafts. */
+  name?: string;
   unitCount: string;
   yearBuilt: string;
   rows: DraftRow[];
@@ -71,9 +73,11 @@ export function isDraft(value: unknown): value is Draft {
  */
 export function upgradeDraft(draft: Draft, currentYear: number): Draft {
   const rows = draft.rows.map(cleanDetails);
-  const { safetyBuffer, ...rest } = draft;
+  const { safetyBuffer, name, ...rest } = draft;
   return {
     ...rest,
+    // A damaged name in this browser is dropped rather than break the page.
+    ...(typeof name === "string" ? { name } : {}),
     // A damaged buffer in this browser is dropped (none) rather than break the forecast.
     ...(isSafetyBuffer(safetyBuffer) ? { safetyBuffer } : {}),
     // An older draft that already shows a forecast has already been counted.

@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { PAY_QUESTION_VERSION } from "@/lib/export/pay-question";
 import PayQuestion, { PAY_QUESTION } from "../PayQuestion";
 
 // The first render only: effects (remembering that it was shown, moving focus)
@@ -35,6 +36,16 @@ describe("pay question", () => {
     const id = html.match(/<p id="([^"]+)"[^>]*>[^<]*Would you pay/)?.[1];
     expect(id).toBeDefined();
     expect(html).toContain(`<div role="group" aria-labelledby="${id}"`);
+  });
+
+  it("asks about the real $12/month membership, never $19 or lender-ready", () => {
+    expect(PAY_QUESTION).toContain("$12/month");
+    expect(PAY_QUESTION).toContain("for lenders and buyers");
+    expect(PAY_QUESTION).not.toMatch(/\$19|lender-ready/i);
+  });
+
+  it("counts answers to this wording apart from the old ones", () => {
+    expect(PAY_QUESTION_VERSION).toBe("3");
   });
 
   it("stays away once this browser has seen it, answered or not", () => {

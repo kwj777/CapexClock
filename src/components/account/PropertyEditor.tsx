@@ -78,6 +78,11 @@ function noteCreated(propertyId: string | null) {
   createdNow = propertyId;
 }
 
+/** No components, units or year built: nothing came over from the calculator. */
+function isEmptyDraft(draft: Draft): boolean {
+  return draft.rows.length === 0 && draft.unitCount.trim() === "" && draft.yearBuilt.trim() === "";
+}
+
 /** Row ids as saved, in the order the rows were sent. */
 function savedIds(components: ComponentRow[]): string[] {
   return [...components].sort((a, b) => a.sort_order - b.sort_order).map((c) => c.id);
@@ -114,20 +119,31 @@ export default function PropertyEditor({
   const backupKey = unsavedKey(userId, propertyId, importFromCalculator);
   const [currentYear] = useState(() => new Date().getFullYear());
   // Rendered client-only (see PropertyEditorLoader), so localStorage is safe here.
-  // An import starts from the calculator's work in this browser as it is now.
+  // An import starts from the calculator's work in this browser as it is now. With
+  // none (the link was opened in another browser), it starts from the same blank
+  // draft as the saved copy, so it isn't "Unsaved changes" before any edit.
   const [calculator] = useState(() => {
     if (!importFromCalculator) return null;
     const work = loadDraft();
-    return { draft: work, stored: JSON.stringify(work) };
+    // The calculator's optional property name becomes this property's name.
+    const { name: workName, ...workDraft } = work;
+    const empty = isEmptyDraft(workDraft);
+    return {
+      draft: empty ? initialDraft : workDraft,
+      name: (workName ?? "").trim(),
+      stored: JSON.stringify(work),
+      empty,
+    };
   });
   const startingDraft = calculator?.draft ?? initialDraft;
+  const startingName = calculator?.name || initialName;
   const [restored, setRestored] = useState(() => {
     const kept = loadUnsaved(backupKey);
     // Not over newer calculator work, and not when it matches what's already here.
     if (!kept || (calculator && kept.calculator !== calculator.stored)) return null;
-    return nothingToRestore(kept, initialName, startingDraft, currentYear) ? null : kept;
+    return nothingToRestore(kept, startingName, startingDraft, currentYear) ? null : kept;
   });
-  const [name, setName] = useState(() => restored?.name ?? initialName);
+  const [name, setName] = useState(() => restored?.name ?? startingName);
   const [draft, setDraft] = useState<Draft>(() => restored?.draft ?? startingDraft);
   // The copy in the database. Restored edits keep the version they started from, so
   // saving them over a newer copy is caught.
@@ -143,6 +159,7 @@ export default function PropertyEditor({
   const [arrivedCreated] = useState(() => propertyId !== undefined && createdNow === propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
   const leaving = useRef(false);
   const mounted = useRef(true);
@@ -534,8 +551,25 @@ export default function PropertyEditor({
   const actionClass =
     "mt-2 inline-block rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-red-800 ring-1 ring-red-300 hover:bg-red-100 dark:bg-transparent dark:text-red-200 dark:ring-red-400/40 dark:hover:bg-red-500/10";
 
+  // On phones Save is far above most rows, so a bar at the bottom carries it while there's something to save.
+  const showSaveBar = (dirty || save.kind === "saving") && save.kind !== "opening";
+  const notSaved = problemTexts.length > 0 || failure !== null;
+  const saveButton = (
+    <button
+      type="button"
+      onClick={() => onSave()}
+      // aria-disabled, not disabled, while saving: a disabled button drops keyboard focus to the page.
+      // onSave ignores clicks while a save is in flight.
+      aria-disabled={save.kind === "saving"}
+      disabled={save.kind === "opening"}
+      className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60 aria-disabled:opacity-60"
+    >
+      {propertyId ? "Save changes" : "Save property"}
+    </button>
+  );
+
   const header = (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5 dark:border-slate-800">
+    <div ref={headerRef} className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5 dark:border-slate-800">
       {/* The minimum width makes the Save controls wrap below on phones instead of squeezing the name. */}
       <label className="block min-w-48 flex-1 sm:max-w-md">
         <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Property name</span>
@@ -547,8 +581,13 @@ export default function PropertyEditor({
             setName(e.target.value);
             edited();
           }}
-          className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
+          className="mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-base font-medium text-slate-900 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
         />
+        {importFromCalculator && !name.trim() && (
+          <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+            Give it a name so you can find it later.
+          </span>
+        )}
       </label>
       {/* Wraps, so a long status (the 0004 message) moves the button below it on phones. */}
       <div className="flex flex-wrap items-center justify-end gap-3">
@@ -562,18 +601,14 @@ export default function PropertyEditor({
         >
           {status}
         </span>
-        <button
-          type="button"
-          onClick={() => onSave()}
-          // aria-disabled, not disabled, while saving: a disabled button drops keyboard focus to the page.
-          // onSave ignores clicks while a save is in flight.
-          aria-disabled={save.kind === "saving"}
-          disabled={save.kind === "opening"}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60 aria-disabled:opacity-60"
-        >
-          {propertyId ? "Save changes" : "Save property"}
-        </button>
+        {saveButton}
       </div>
+      {calculator?.empty && !restored && (
+        <p className="w-full text-sm text-slate-600 dark:text-slate-300">
+          No calculator work found in this browser. Add your property below, or open the calculator where you used it
+          and choose Save to my account.
+        </p>
+      )}
       {restored && !arrivedDetailsDropped && (
         <div className="w-full rounded-lg bg-amber-50 p-3 text-sm text-slate-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-slate-200 dark:ring-amber-500/30">
           <p>We brought back changes you hadn&apos;t saved. Save to keep them.</p>
@@ -650,10 +685,31 @@ export default function PropertyEditor({
           <button
             type="button"
             onClick={onDelete}
-            className="text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-400"
+            className="-mx-2 rounded-md px-2 py-2 text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-400"
           >
             Delete this property
           </button>
+        </div>
+      )}
+      {/* Sticky, not fixed: past the end of the editor it settles below "Delete this property"
+          instead of covering it or the footer. */}
+      {showSaveBar && (
+        <div className="sticky bottom-0 z-30 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95">
+          <div className="flex items-center justify-between gap-3">
+            {/* Not a live region: the status at the top already announces changes. */}
+            {notSaved && save.kind !== "saving" ? (
+              <button
+                type="button"
+                onClick={() => headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="text-left text-sm font-medium text-red-700 underline underline-offset-2 dark:text-red-400"
+              >
+                Not saved. See why
+              </button>
+            ) : (
+              <span className="text-sm text-slate-600 dark:text-slate-300">{status}</span>
+            )}
+            {saveButton}
+          </div>
         </div>
       )}
     </fieldset>

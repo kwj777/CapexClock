@@ -24,6 +24,7 @@ import { moneyColumn } from "@/lib/export/format";
 import { guessedYear, installYearNote } from "@/lib/export/rows";
 import type { PaidWhere } from "@/lib/paid-ideas";
 import {
+  badUnitCount,
   badYearBuilt,
   biggestDueCluster,
   COMPONENT_LIBRARY,
@@ -40,8 +41,8 @@ import {
   groupByCategory,
   hasEntries,
   importReplaces,
+  isMissingProblem,
   MAX_NOTES_LENGTH,
-  neighborRowId,
   notesLeftText,
   notesTooLong,
   problemFields,
@@ -51,6 +52,7 @@ import {
   SAFETY_BUFFERS,
   safetyBufferOf,
   TYPICAL_COSTS,
+  UNIT_COUNT_TEXT,
   UNIT_LABEL_TEXT,
   withImport,
   withUnitCount,
@@ -95,7 +97,7 @@ const CUSTOM = "__custom__";
 const REPLACE_LABEL = "Replace this year";
 
 const inputClass =
-  "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+  "block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 // A red border on a field marked invalid (the property's own fields).
 const invalidClass = "aria-invalid:border-red-500 dark:aria-invalid:border-red-400";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
@@ -109,7 +111,7 @@ const rowGridClass =
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 const textButton =
-  "text-left text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300";
+  "py-1 text-left text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300";
 
 /** The public calculator: work is kept in this browser until it's saved to an account. */
 export default function Calculator({
@@ -143,6 +145,8 @@ export default function Calculator({
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  const name = (draft.name ?? "").trim();
+  const saveId = useId();
   return (
     <CalculatorView
       draft={draft}
@@ -151,19 +155,32 @@ export default function Calculator({
       typicalCosts={typicalCosts}
       trackEvents
       showExample
+      nameField
+      exportName={name || "My property"}
+      listName={name}
       accountsEnabled={accountsEnabled}
       initialUndo={start.undo}
       lookUpOwnerEmail={accountsEnabled}
       onPayQuestionChange={setAskingPay}
-      footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount quiet={askingPay} /> : null}
+      footer={
+        accountsEnabled && draft.rows.length > 0 ? (
+          <>
+            <SaveToAccount id={saveId} quiet={askingPay} />
+            <PhoneSaveBar saveBoxId={saveId} hidden={askingPay} />
+          </>
+        ) : null
+      }
     />
   );
 }
 
+const SAVE_HREF = "/app/properties/new?from=calculator";
+
 /** Quiet while another question on the page waits for an answer: still there, but not competing with it. */
-function SaveToAccount({ quiet = false }: { quiet?: boolean }) {
+function SaveToAccount({ id, quiet = false }: { id?: string; quiet?: boolean }) {
   return (
     <div
+      id={id}
       className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5 ring-1 ${
         quiet
           ? "bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
@@ -175,7 +192,7 @@ function SaveToAccount({ quiet = false }: { quiet?: boolean }) {
         portfolio.
       </p>
       <Link
-        href="/app/properties/new?from=calculator"
+        href={SAVE_HREF}
         className={`rounded-lg px-4 py-2 text-sm font-semibold ${
           quiet
             ? "bg-white text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800"
@@ -188,6 +205,60 @@ function SaveToAccount({ quiet = false }: { quiet?: boolean }) {
   );
 }
 
+/** True while focus is in a field that brings up a phone's keyboard. */
+function useTyping(): boolean {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const isField = (el: EventTarget | null) =>
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement ||
+      (el instanceof HTMLInputElement && !["checkbox", "radio", "button", "submit"].includes(el.type));
+    const onFocusIn = (e: FocusEvent) => setTyping(isField(e.target));
+    const onFocusOut = (e: FocusEvent) => setTyping(isField(e.relatedTarget));
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+  return typing;
+}
+
+/**
+ * On phones, a slim bar stuck to the bottom with the same Save link, since the Save
+ * box is screens below the rows being edited. It steps aside while the keyboard is
+ * up, while the pay question waits, and once the Save box itself is on screen or
+ * scrolled past (so it never covers the footer).
+ */
+function PhoneSaveBar({ saveBoxId, hidden }: { saveBoxId: string; hidden: boolean }) {
+  const typing = useTyping();
+  const [boxReached, setBoxReached] = useState(false);
+  useEffect(() => {
+    const box = document.getElementById(saveBoxId);
+    if (!box || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setBoxReached(entry.isIntersecting || entry.boundingClientRect.top < 0);
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [saveBoxId]);
+  if (hidden || typing || boxReached) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-600 dark:text-slate-300">Kept in this browser only.</p>
+        <Link
+          href={SAVE_HREF}
+          className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+        >
+          Save to my account
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export interface CalculatorViewProps {
   draft: Draft;
   setDraft: Dispatch<SetStateAction<Draft>>;
@@ -196,6 +267,8 @@ export interface CalculatorViewProps {
   showExample?: boolean;
   /** Extra controls shown above the property fields, e.g. a property name. */
   header?: ReactNode;
+  /** Shows the draft's own optional Property name field (the public calculator). */
+  nameField?: boolean;
   footer?: ReactNode;
   /** Title for exported files. */
   exportName?: string;
@@ -235,10 +308,20 @@ interface Undo {
   action: "clear" | "example" | "import";
 }
 
+/** A row just removed, offered back in its place until anything else changes the list. */
+interface Removed {
+  row: DraftRow;
+  index: number;
+  before: DraftRow[];
+  after: DraftRow[];
+}
+
 /** A note shown under a row, and the row's fields it's about. */
 export interface RowNote {
   text: string;
   fields: RowField[];
+  /** Only something not filled in yet: shown as a next step, not an error, and the fields aren't marked invalid. */
+  missing?: boolean;
 }
 
 export function CalculatorView({
@@ -260,6 +343,7 @@ function CalculatorBody({
   trackEvents = false,
   showExample = false,
   header,
+  nameField = false,
   footer,
   exportName = "My property",
   listName = "",
@@ -280,16 +364,20 @@ function CalculatorBody({
   const baseId = useId();
   const yearBuiltErrorId = `${baseId}-year-built-error`;
   const unitsErrorId = `${baseId}-units-error`;
+  const unitsSaveErrorId = `${baseId}-units-save-error`;
   const unitsId = `${baseId}-units`;
+  const undoRemoveId = `${baseId}-undo-remove`;
   const addId = `${baseId}-add`;
   const undoId = `${baseId}-undo`;
   const importButtonId = `${baseId}-import`;
   const importPanelId = `${baseId}-import-panel`;
   const rowIdPrefix = (rowId: string) => `${baseId}-${rowId}`;
   const [editingYearBuilt, setEditingYearBuilt] = useState(false);
+  const [editingUnits, setEditingUnits] = useState(false);
   const [picked, setPicked] = useState("");
   // What Load an example, Clear or an import replaced, offered back until the next edit.
   const [undo, setUndo] = useState<Undo | null>(initialUndo);
+  const [removed, setRemoved] = useState<Removed | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
@@ -309,6 +397,8 @@ function CalculatorBody({
   const rowsById = useMemo(() => new Map(deferredDraft.rows.map((r) => [r.id, r])), [deferredDraft.rows]);
   const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, startYear);
   const showYearBuiltError = yearBuiltIsBad && !editingYearBuilt;
+  const showUnitsError = badUnitCount(draft.unitCount) && !editingUnits;
+  const showUnitsSaveProblem = Boolean(unitCountProblem) && !showUnitsError;
 
   // Once per draft, as soon as it shows a forecast (the reserve can come from items after year 10).
   const trackedDraft = useRef<Draft | null>(null);
@@ -346,17 +436,31 @@ function CalculatorBody({
     setAnnouncement((current) => (current === message ? `${message}\u00a0` : message));
   }, []);
 
+  // Removing leaves "Removed X. Undo" in the row's place, and focus on that Undo.
   const removeRow = useCallback(
     (id: string) => {
       const { rows } = latest.current.draft;
-      const removed = rows.find((r) => r.id === id);
-      const next = neighborRowId(rows, id);
-      focusNext.current = next ? `${baseId}-${next}-name` : addId;
-      latest.current.setDraft((d) => ({ ...d, rows: d.rows.filter((r) => r.id !== id) }));
-      announce(`Removed ${removed?.name.trim() || "the component"}.`);
+      const index = rows.findIndex((r) => r.id === id);
+      if (index < 0) return;
+      const after = rows.filter((r) => r.id !== id);
+      setRemoved({ row: rows[index], index, before: rows, after });
+      focusNext.current = undoRemoveId;
+      latest.current.setDraft((d) => ({ ...d, rows: d.rows === rows ? after : d.rows.filter((r) => r.id !== id) }));
+      announce(`Removed ${rows[index].name.trim() || "the component"}. Undo brings it back.`);
     },
-    [baseId, addId, announce],
+    [undoRemoveId, announce],
   );
+
+  // Offered until anything else changes the list.
+  const canUndoRemove = removed !== null && removed.after === draft.rows;
+
+  function undoRemove() {
+    if (!removed || !canUndoRemove) return;
+    setDraft((d) => ({ ...d, rows: removed.before }));
+    setRemoved(null);
+    focusNext.current = `${rowIdPrefix(removed.row.id)}-name`;
+    announce(`${removed.row.name.trim() || "The component"} is back.`);
+  }
 
   // Adding takes a pick and a press of Add, so arrowing through the list adds nothing.
   function addComponent() {
@@ -447,6 +551,39 @@ function CalculatorBody({
     return () => window.clearTimeout(timer);
   }, [summary]);
 
+  const rowItems = draft.rows.map((row) => (
+    <ListedRow
+      key={row.id}
+      row={row}
+      idPrefix={rowIdPrefix(row.id)}
+      yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
+      lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
+      typical={row.librarySlug ? typicalBySlug.get(row.librarySlug) : undefined}
+      note={rowNotes?.[row.id]}
+      problem={problems[row.id]}
+      onRowChange={updateRow}
+      onRowRemove={removeRow}
+    />
+  ));
+  // "Removed X. Undo" stands in the removed row's place, where the owner is looking.
+  if (canUndoRemove) {
+    rowItems.splice(
+      removed.index,
+      0,
+      <li key={`removed-${removed.row.id}`} className="flex flex-wrap items-center gap-x-2 py-4 text-sm text-slate-700 dark:text-slate-300">
+        Removed {removed.row.name.trim() || "a component"}.
+        <button
+          id={undoRemoveId}
+          type="button"
+          onClick={undoRemove}
+          className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+        >
+          Undo
+        </button>
+      </li>,
+    );
+  }
+
   return (
     <div className="space-y-8">
       <p className="sr-only" aria-live="polite" aria-atomic="true">
@@ -460,6 +597,20 @@ function CalculatorBody({
             <h2 id="property-heading" className="sr-only">
               Your property
             </h2>
+            {nameField && (
+              <label className="block w-full sm:w-64">
+                <span className={labelClass}>
+                  Property name <span className="font-normal text-slate-500 dark:text-slate-400">(optional)</span>
+                </span>
+                <input
+                  className={`${inputClass} mt-1`}
+                  maxLength={200}
+                  placeholder="e.g. 14 Maple Court"
+                  value={draft.name ?? ""}
+                  onChange={(e) => updateDraft({ name: e.target.value })}
+                />
+              </label>
+            )}
             <label className="block w-36">
               <span className={labelClass}>Rental units</span>
               <input
@@ -468,8 +619,12 @@ function CalculatorBody({
                 inputMode="numeric"
                 placeholder="e.g. 12"
                 value={draft.unitCount}
-                aria-invalid={unitCountProblem ? true : undefined}
-                aria-describedby={unitCountProblem ? unitsErrorId : undefined}
+                aria-invalid={showUnitsError || showUnitsSaveProblem || undefined}
+                aria-describedby={
+                  showUnitsError ? unitsErrorId : showUnitsSaveProblem ? unitsSaveErrorId : undefined
+                }
+                onFocus={() => setEditingUnits(true)}
+                onBlur={() => setEditingUnits(false)}
                 onChange={(e) => {
                   const value = e.target.value;
                   setDraft((d) => withUnitCount(d, value));
@@ -543,22 +698,31 @@ function CalculatorBody({
             </button>
           </p>
         )}
-        {unitCountProblem && (
-          <p id={unitsErrorId} className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+        {/* Why a saved property's unit count can't be saved (e.g. over 100,000), when the
+            field's own message below doesn't already cover it. */}
+        {showUnitsSaveProblem && (
+          <p id={unitsSaveErrorId} className="mt-3 text-sm text-amber-800 dark:text-amber-300">
             {unitCountProblem}
           </p>
         )}
-        {/* The error takes the hint's place in one grid cell, sized for the longer of the two, so
-            showing it when the field is left never moves the button the owner is clicking. */}
+        {/* The errors take the hint's place in one grid cell, sized for the longest, so
+            showing them when a field is left never moves the button the owner is clicking. */}
         <div className="mt-3 grid text-sm">
           <p
-            id={yearBuiltErrorId}
-            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${showYearBuiltError ? "" : "invisible"}`}
+            className={`col-start-1 row-start-1 text-amber-800 dark:text-amber-300 ${
+              showYearBuiltError || showUnitsError ? "" : "invisible"
+            }`}
           >
-            {YEAR_BUILT_TEXT}
+            <span id={unitsErrorId} className={showUnitsError ? "" : "hidden"}>
+              {UNIT_COUNT_TEXT}
+            </span>
+            {showUnitsError && showYearBuiltError && " "}
+            <span id={yearBuiltErrorId}>{showYearBuiltError || !showUnitsError ? YEAR_BUILT_TEXT : ""}</span>
           </p>
           <p
-            className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${showYearBuiltError ? "invisible" : ""}`}
+            className={`col-start-1 row-start-1 text-slate-500 dark:text-slate-400 ${
+              showYearBuiltError || showUnitsError ? "invisible" : ""
+            }`}
           >
             Year built fills in any install year you leave blank, marked as an estimate. A safety
             buffer adds 10% or 20% to the monthly reserve, for repairs that come early.
@@ -606,12 +770,29 @@ function CalculatorBody({
             </button>
           </div>
         </div>
+        {/* The forecast is below the whole list, screens down on a phone, so the answer is
+            pointed to from where components are added. */}
+        {components.length > 0 && (
+          <p className="mt-3 text-sm text-slate-700 sm:text-right dark:text-slate-300">
+            Monthly reserve{" "}
+            <span className="font-semibold tabular-nums text-slate-950 dark:text-white">
+              {formatReserve(forecast.monthlyReserve)}
+            </span>
+            {forecast.monthlyReservePerUnit !== null && (
+              <span className="tabular-nums"> ({formatReserve(forecast.monthlyReservePerUnit)}/unit)</span>
+            )}{" "}
+            ·{" "}
+            <a href="#forecast-heading" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
+              See your forecast <span aria-hidden="true">↓</span>
+            </a>
+          </p>
+        )}
         {/* Import and the component list on the left, the photo idea's test button on the right. */}
         <PaidIdeaDisclosure idea="photo">
           {(photoButton, photoPanel) => (
             <>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-x-5 gap-y-1">
+                <div className="flex flex-wrap gap-x-5 gap-y-3">
                   <button
                     id={importButtonId}
                     type="button"
@@ -653,7 +834,7 @@ function CalculatorBody({
           )}
         </PaidIdeaDisclosure>
 
-        {draft.rows.length === 0 ? (
+        {draft.rows.length === 0 && !canUndoRemove ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             Add your roofs, HVAC, water heaters and other big-ticket items
             {showExample ? ", or load an example to see how it works." : "."}
@@ -671,20 +852,7 @@ function CalculatorBody({
               ))}
             </div>
             <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-              {draft.rows.map((row) => (
-                <ListedRow
-                  key={row.id}
-                  row={row}
-                  idPrefix={rowIdPrefix(row.id)}
-                  yearBuilt={yearBuiltIsBad ? "" : draft.yearBuilt.trim()}
-                  lib={row.librarySlug ? libraryBySlug.get(row.librarySlug) : undefined}
-                  typical={row.librarySlug ? typicalBySlug.get(row.librarySlug) : undefined}
-                  note={rowNotes?.[row.id]}
-                  problem={problems[row.id]}
-                  onRowChange={updateRow}
-                  onRowRemove={removeRow}
-                />
-              ))}
+              {rowItems}
             </ul>
             <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
               Tick {REPLACE_LABEL} to plan a replacement in {startYear}, even if it isn&apos;t worn
@@ -715,12 +883,23 @@ function CalculatorBody({
                   />
                   <Stat
                     label="Per unit, per month"
-                    value={
-                      forecast.monthlyReservePerUnit === null
-                        ? "Add units"
-                        : formatReserve(forecast.monthlyReservePerUnit)
-                    }
+                    value={forecast.monthlyReservePerUnit === null ? "—" : formatReserve(forecast.monthlyReservePerUnit)}
                     emphasis
+                    action={
+                      forecast.monthlyReservePerUnit === null && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const units = document.getElementById(unitsId);
+                            units?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            units?.focus({ preventScroll: true });
+                          }}
+                          className="rounded-md px-2.5 py-1 text-sm font-medium text-white ring-1 ring-white/40 hover:bg-white/10"
+                        >
+                          Enter rental units <span aria-hidden="true">↑</span>
+                        </button>
+                      )
+                    }
                   />
                   <Stat label={`Needed in ${forecast.startYear}`} value={formatMoney(forecast.neededNow)} />
                   <Stat label="10-year total" value={formatMoney(forecast.horizonTotal)} />
@@ -825,7 +1004,12 @@ const ListedRow = memo(function ListedRow({
     <ComponentRow
       {...props}
       row={row}
-      problem={note ?? (problem ? { text: problemText(row, problem), fields: problemFields(row, problem) } : null)}
+      problem={
+        note ??
+        (problem
+          ? { text: problemText(row, problem), fields: problemFields(row, problem), missing: isMissingProblem(problem) }
+          : null)
+      }
       onChange={(patch) => onRowChange(row.id, patch)}
       onRemove={() => onRowRemove(row.id)}
     />
@@ -859,10 +1043,14 @@ function ComponentRow({
   const costMathId = `${idPrefix}-cost-math`;
   const hint = costHint(row, lib, typical);
   const detailsId = `${idPrefix}-details`;
+  const conditionHelpId = `${idPrefix}-condition-help`;
   const notesLeftId = `${idPrefix}-notes-left`;
-  // Marks the field the row's note is about and points it at the note.
+  // Marks the field the row's note is about and points it at the note. Something
+  // not filled in yet is only pointed at the note, not marked invalid.
   const flag = (field: RowField) =>
-    problem?.fields.includes(field) ? { "aria-invalid": true, "aria-describedby": problemId } : {};
+    problem?.fields.includes(field)
+      ? { "aria-invalid": problem.missing ? undefined : true, "aria-describedby": problemId }
+      : {};
   const costFlag = flag("costEach");
   const lifeFlag = flag("usefulLife");
   const summary = detailsSummary(row);
@@ -970,7 +1158,8 @@ function ComponentRow({
             </span>
           )}
         </label>
-        <label className="block">
+        {/* Full width on phones, so the 16px placeholder isn't cut off. */}
+        <label className="col-span-2 block sm:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>{costLabel(row)}</span>
           <div className="relative mt-1 lg:mt-0">
             <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500 dark:text-slate-400">
@@ -993,13 +1182,19 @@ function ComponentRow({
           </div>
           <CostNote row={row} id={costMathId} />
           {hint && (
-            <span id={hintId} className="mt-0.5 block text-xs text-pretty text-slate-500 dark:text-slate-400">
-              {hint}
+            <span
+              id={hintId}
+              className={`mt-0.5 block text-xs text-pretty ${
+                hint.warn ? "font-medium text-amber-800 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {hint.text}
             </span>
           )}
         </label>
-        {/* As tall as a field and pushed down past a label's line, so the box sits on the fields' line. */}
-        <label className="mt-7 flex min-h-[2.375rem] items-center gap-2 self-start text-sm text-slate-700 lg:mt-0 lg:justify-center dark:text-slate-300">
+        {/* As tall as a field and pushed down past a label's line, so the box sits on the fields' line.
+            Phones put it beside Remove and More instead. */}
+        <label className="flex min-h-[2.375rem] items-center gap-2 self-start text-sm text-slate-700 sm:mt-7 lg:mt-0 lg:justify-center dark:text-slate-300">
           <input
             type="checkbox"
             checked={row.scenario === "replace_now"}
@@ -1010,7 +1205,7 @@ function ComponentRow({
           <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
         {/* More comes last, so the fields it shows are next in the tab order. */}
-        <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:mt-7 sm:min-h-[2.375rem] sm:justify-end sm:self-start lg:mt-0">
+        <div className="flex items-center justify-between gap-2 sm:mt-7 sm:min-h-[2.375rem] sm:justify-end sm:self-start lg:mt-0">
           <button
             type="button"
             onClick={onRemove}
@@ -1041,11 +1236,13 @@ function ComponentRow({
         className={`${showDetails ? "grid" : "hidden"} mt-3 grid-cols-1 gap-3 sm:grid-cols-3 lg:grid ${rowGridClass}`}
       >
         {/* Labels sit above, so these fields start at the same edges as the fields above them. */}
+        <div>
         <label className="block">
           <span className={labelClass}>Condition</span>
           <select
             value={row.condition ?? ""}
             aria-label={`Condition, ${label}`}
+            aria-describedby={conditionHelpId}
             onChange={(e) => onChange({ condition: CONDITIONS.find((c) => c === e.target.value) ?? null })}
             className={`${inputClass} mt-1`}
           >
@@ -1057,6 +1254,10 @@ function ComponentRow({
             ))}
           </select>
         </label>
+          <p id={conditionHelpId} className="mt-1 text-xs text-pretty text-slate-500 dark:text-slate-400">
+            For your notes and the report. It doesn&apos;t change the dates. To plan it now, tick {REPLACE_LABEL}.
+          </p>
+        </div>
         <div className="sm:col-span-2 lg:col-span-6">
           <label className="block">
             <span className={labelClass}>Notes</span>
@@ -1087,7 +1288,10 @@ function ComponentRow({
         </div>
       </div>
       {problem && (
-        <p id={problemId} className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+        <p
+          id={problemId}
+          className={`mt-2 text-sm ${problem.missing ? "text-slate-500 dark:text-slate-400" : "text-amber-800 dark:text-amber-300"}`}
+        >
           {problem.text}
         </p>
       )}
@@ -1127,14 +1331,19 @@ function Stat({
 }) {
   return (
     <div
-      className={`rounded-2xl p-5 ${
+      className={`min-w-0 rounded-2xl p-5 ${
         emphasis
-          ? "bg-slate-950 text-white dark:bg-slate-800"
+          ? "bg-slate-950 text-white dark:bg-slate-800 dark:ring-1 dark:ring-slate-500"
           : "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
       }`}
     >
-      <p className={`text-sm ${emphasis ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>{label}</p>
-      <p className={`mt-1 text-3xl font-semibold tabular-nums ${emphasis ? "" : "text-slate-950 dark:text-white"}`}>
+      <p className={`text-sm ${emphasis ? "text-slate-300 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}`}>
+        {label}
+      </p>
+      {/* A huge (typo-sized) total wraps instead of running out of the card. */}
+      <p
+        className={`mt-1 text-3xl font-semibold tabular-nums wrap-anywhere ${emphasis ? "" : "text-slate-950 dark:text-white"}`}
+      >
         {value}
       </p>
       {action && <div className="mt-3">{action}</div>}
@@ -1237,23 +1446,30 @@ const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Land
     <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Nothing is close to end of life.</p>
   ) : (
     <ul className="mt-4 space-y-3">
-      {forecast.atRisk.map((item) => (
-        <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
-          <span className="text-slate-900 dark:text-white">
-            {item.name}
-            <NameNotes row={rows.get(item.componentId)} isEstimate={item.estimated.installYear} />
-          </span>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-              item.status === "overdue"
-                ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
-            }`}
-          >
-            {riskText(item)}
-          </span>
-        </li>
-      ))}
+      {forecast.atRisk.map((item) => {
+        const row = rows.get(item.componentId);
+        // Already set to Replace this year, so it's planned for, not a warning.
+        const replacing = row?.scenario === "replace_now";
+        return (
+          <li key={item.componentId} className="flex items-start justify-between gap-3 text-sm">
+            <span className="text-slate-900 dark:text-white">
+              {item.name}
+              <NameNotes row={row} isEstimate={item.estimated.installYear} />
+            </span>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                replacing
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  : item.status === "overdue"
+                    ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+                    : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
+              }`}
+            >
+              {replacing ? `Replacing ${forecast.startYear}` : riskText(item)}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 });

@@ -88,9 +88,7 @@ export default function TermsPage() {
                 </>
               ) : (
                 <>
-                  You can cancel any time online, through Stripe&apos;s customer portal. Its link, Manage or cancel
-                  membership, goes at the bottom of every page when memberships go on sale. You can also cancel by
-                  emailing <Email />.
+                  Once memberships go on sale, you&apos;ll be able to cancel any time online, or by emailing <Email />.
                 </>
               )}{" "}
               Once you cancel, it stops renewing and you aren&apos;t charged again. Your membership lasts until the end
@@ -138,7 +136,7 @@ export default function TermsPage() {
           <Section title="Refunds">
             <p>
               If you&apos;re not happy, email <Email /> within 30 days of a payment and we&apos;ll refund that payment
-              in full. The refund goes back to the card you paid with. And if we don&apos;t build reminders, we cancel
+              in full. The refund goes back to the card you paid with. And if we stop sending reminders, we cancel
               every founding membership and refund every payment, however long ago it was made.
             </p>
           </Section>

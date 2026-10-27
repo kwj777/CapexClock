@@ -26,7 +26,7 @@ import {
 import { estimateText, quickPrompt } from "./estimate-text";
 
 const input =
-  "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
+  "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
 const label = "text-xs font-medium text-slate-600 dark:text-slate-400";
 const link = "font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
 
@@ -218,63 +218,66 @@ export default function QuickEstimate({
           Typical installed costs in today&apos;s dollars, from the cost guides named under each one. A heat pump heats
           and cools, so untick central AC if heat pumps do the cooling.
         </p>
-        <table className="mt-3 w-full text-left text-sm">
-          <caption className="sr-only">Systems and their typical replacement costs</caption>
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th scope="col" className={`${label} py-2 pr-2`}>
-                System
-              </th>
-              <th scope="col" className={`${label} py-2 pr-2`}>
-                Typical cost
-              </th>
-              <th scope="col" className={`${label} py-2`}>
-                Lasts
-              </th>
-            </tr>
-          </thead>
-          {byCategory(systems).map(([category, items]) => (
-            <tbody key={category} className="border-b border-slate-100 dark:border-slate-800">
-              <tr>
-                <th
-                  scope="rowgroup"
-                  colSpan={3}
-                  className="pt-4 pb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                >
-                  {category}
+        {/* Scrolls sideways rather than pushing the page wide at large text sizes. */}
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">Systems and their typical replacement costs</caption>
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800">
+                <th scope="col" className={`${label} py-2 pr-2`}>
+                  System
+                </th>
+                <th scope="col" className={`${label} py-2 pr-2`}>
+                  Typical cost
+                </th>
+                <th scope="col" className={`${label} py-2`}>
+                  Lasts
                 </th>
               </tr>
-              {items.map((s) => (
-                <tr key={s.item.slug}>
-                  <th scope="row" className="py-2 pr-2 text-left align-top font-normal">
-                    <label className="flex items-start gap-2 text-slate-900 dark:text-white">
-                      <input
-                        type="checkbox"
-                        checked={ticked.has(s.item.slug)}
-                        onChange={(e) => toggle(s.item.slug, e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
-                      />
-                      <span>{s.item.name}</span>
-                    </label>
+            </thead>
+            {byCategory(systems).map(([category, items]) => (
+              <tbody key={category} className="border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <th
+                    scope="rowgroup"
+                    colSpan={3}
+                    className="pt-4 pb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                  >
+                    {category}
                   </th>
-                  <td className="py-2 pr-2 align-top">
-                    <span className="tabular-nums text-slate-900 dark:text-white">
-                      {formatCostRange(s.cost.low, s.cost.high)}
-                    </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      {s.cost.per === "apartment" ? "per apartment" : `per sq ft, ${s.perApartment} sq ft per apartment`}
-                    </span>
-                    <Basis text={typicalCostBasis(s.cost)} />
-                    <Sources sources={TYPICAL_COST_SOURCES.get(s.item.slug)} />
-                  </td>
-                  <td className="py-2 align-top tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300">
-                    {s.item.lifeLow}–{s.item.lifeHigh} yrs
-                  </td>
                 </tr>
-              ))}
-            </tbody>
-          ))}
-        </table>
+                {items.map((s) => (
+                  <tr key={s.item.slug}>
+                    <th scope="row" className="py-2 pr-2 text-left align-top font-normal">
+                      <label className="flex items-start gap-2 text-slate-900 dark:text-white">
+                        <input
+                          type="checkbox"
+                          checked={ticked.has(s.item.slug)}
+                          onChange={(e) => toggle(s.item.slug, e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+                        />
+                        <span>{s.item.name}</span>
+                      </label>
+                    </th>
+                    <td className="py-2 pr-2 align-top">
+                      <span className="tabular-nums text-slate-900 dark:text-white">
+                        {formatCostRange(s.cost.low, s.cost.high)}
+                      </span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">
+                        {s.cost.per === "apartment" ? "per apartment" : `per sq ft, ${s.perApartment} sq ft per apartment`}
+                      </span>
+                      <Basis text={typicalCostBasis(s.cost)} />
+                      <Sources sources={TYPICAL_COST_SOURCES.get(s.item.slug)} />
+                    </td>
+                    <td className="py-2 align-top tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300">
+                      {s.item.lifeLow}–{s.item.lifeHigh} yrs
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
       </fieldset>
 
       <section className="mt-8" aria-labelledby={`${baseId}-how`}>
