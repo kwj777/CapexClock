@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
-import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
+import { exportDetails, formFacts } from "@/lib/export/rows";
 import { PaidIdeaDisclosure } from "@/components/paid/PaidIdeaButton";
-import type { Component, Draft, LandlordForecast } from "@/verticals/landlord";
+import type { Component, Draft, DraftRow, LandlordForecast } from "@/verticals/landlord";
 import ComponentListButton from "./ComponentListButton";
 import { download } from "./download";
 import PayQuestion from "./PayQuestion";
@@ -22,6 +22,7 @@ export default function ExportButtons({
   forecast,
   components,
   rows,
+  yearBuilt,
   list,
   onPayQuestionChange,
 }: {
@@ -29,8 +30,10 @@ export default function ExportButtons({
   unitCount: number;
   forecast: LandlordForecast;
   components: readonly Component[];
-  /** Every form row, so exports show units and name the rows left out. */
-  rows: ExportFormRow[];
+  /** Every form row, so exports show units and name the rows left out, and why. */
+  rows: DraftRow[];
+  /** As typed, for the PDF's subtitle; a year that can't be right is left out. */
+  yearBuilt: string;
   /** The whole list, for the component list download, and the name for its Building column. */
   list?: { draft: Pick<Draft, "rows" | "unitCount" | "yearBuilt">; building: string };
   /** Told while the pay question waits for an answer. */
@@ -45,11 +48,11 @@ export default function ExportButtons({
     if (busy) return;
     setBusy(format);
     setFailed(false);
-    const details = exportDetails(rows, components);
+    const details = exportDetails(rows, components, formFacts({ yearBuilt, rows }, forecast.startYear));
     try {
       if (format === "csv") {
         // The byte-order mark makes Excel read the file as UTF-8.
-        const csv = "﻿" + forecastCsv(forecast, components, details);
+        const csv = "﻿" + forecastCsv(forecast, components, details, name);
         download(new Blob([csv], { type: "text/csv;charset=utf-8" }), exportFileName(name, "csv", forecast.startYear));
       } else {
         // The PDF library is large, so it's only loaded when asked for.

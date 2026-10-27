@@ -1,7 +1,7 @@
 import type { ComponentCondition } from "@/lib/supabase/database.types";
 import { CONDITION_TEXT, type Component, type LandlordForecast } from "@/verticals/landlord";
 import { guardFormulas } from "./formula-guard";
-import { exportRows, LEFT_OUT_NOTE, type ExportDetails } from "./rows";
+import { exportRows, leftOutNote, type ExportDetails } from "./rows";
 
 /** One cell of a CSV row, with formulas guarded and quotes where the value needs them. */
 function cell(value: string | number): string {
@@ -27,15 +27,18 @@ function condition(value: ComponentCondition | null | undefined): string {
 /**
  * One row per replacement in the forecast window, in year order, then one row
  * for each component left out because its details aren't complete. Each row
- * carries its component's condition and the owner's notes.
+ * carries the property's name, so a forwarded or merged file still says which
+ * building it's for, and its component's condition and the owner's notes.
  */
 export function forecastCsv(
   forecast: Pick<LandlordForecast, "years">,
   components: readonly Component[],
   details: ExportDetails = {},
+  property = "",
 ): string {
   const lines = [
     csvRow([
+      "Property",
       "Year",
       "Component",
       "Category",
@@ -51,6 +54,7 @@ export function forecastCsv(
   for (const r of exportRows(forecast, components, details.unitLabels, details.rowDetails)) {
     lines.push(
       csvRow([
+        property,
         r.year,
         r.name,
         r.category,
@@ -65,7 +69,9 @@ export function forecastCsv(
     );
   }
   for (const l of details.leftOut ?? []) {
-    lines.push(csvRow(["", l.name, l.category, "", "", "", "", LEFT_OUT_NOTE, condition(l.condition), l.notes ?? ""]));
+    lines.push(
+      csvRow([property, "", l.name, l.category, "", "", "", "", leftOutNote(l), condition(l.condition), l.notes ?? ""]),
+    );
   }
   // CRLF is what spreadsheet apps expect from CSV.
   return lines.join("\r\n") + "\r\n";
@@ -96,7 +102,14 @@ function fileSlug(name: string): string {
     .replace(/[łđðøæœßþı]/g, (letter) => LATIN_LETTERS[letter])
     // Letters and digits in any script stay; spaces, quotes, slashes and the like become dashes.
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-");
-  const slug = Array.from(text).slice(0, MAX_SLUG_LENGTH).join("").replace(/^-+|-+$/g, "");
+  const chars = Array.from(text.replace(/^-+/, ""));
+  let cut = chars.slice(0, MAX_SLUG_LENGTH).join("");
+  // A long name is cut at the last whole word, unless that leaves too little of it.
+  if (chars.length > MAX_SLUG_LENGTH && chars[MAX_SLUG_LENGTH] !== "-") {
+    const lastBreak = cut.lastIndexOf("-");
+    if (lastBreak >= MAX_SLUG_LENGTH / 2) cut = cut.slice(0, lastBreak);
+  }
+  const slug = cut.replace(/^-+|-+$/g, "");
   return slug || "capexclock";
 }
 
