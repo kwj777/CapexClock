@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { CONTACT_EMAIL, LEGAL_NAME, LEGAL_STATE } from "@/lib/site";
 import { turnstileSiteKey } from "@/lib/turnstile";
 
 export const metadata: Metadata = {
@@ -30,7 +30,8 @@ export default function PrivacyPage() {
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Privacy</h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-            What CapexClock collects, why, and who helps us run the site. Last updated {UPDATED}.
+            What CapexClock collects, why, and who helps us run the site. CapexClock is run by {LEGAL_NAME}, a{" "}
+            {LEGAL_STATE} limited liability company (&quot;we&quot;). Last updated {UPDATED}.
           </p>
 
           <Section title="The short version">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { presaleLinksFromEnv } from "@/lib/paid-ideas";
 import { supabaseEnv } from "@/lib/supabase/env";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { CONTACT_EMAIL, LEGAL_NAME } from "@/lib/site";
 import AccountLink from "./AccountLink";
 import CountMeNote from "./CountMeNote";
 
@@ -58,7 +58,9 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 dark:border-slate-800">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:px-6">
-        <p>© {new Date().getFullYear()} CapexClock</p>
+        <p>
+          © {new Date().getFullYear()} CapexClock, by {LEGAL_NAME}
+        </p>
         {/* Links are padded so each tap target is more than its 20px line of text. */}
         <nav className="flex flex-wrap gap-x-5 gap-y-1 *:py-1" aria-label="Tools">
           <Link href="/capex-calculator" className="hover:text-slate-900 dark:hover:text-white">
