@@ -20,7 +20,7 @@ const FAQ = [
   },
   {
     q: "How do I enter costs?",
-    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per unit are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 water heaters × $1,400 = $16,800. While a cost is per apartment or per sq ft, a gray hint shows the typical range to compare with. Building-wide items like the roof or a boiler don't get one, since their price depends on the building. The hint is never used in the math, so enter your own quote.",
+    a: "Enter what a replacement would cost today, from a quote or your best estimate. Items counted per apartment are priced per apartment, so for windows enter the cost of all the windows in one apartment. If you type your own count instead, such as 90 windows, the cost is for each one. Every row shows its math, like 12 water heaters × $1,400 = $16,800. A gray hint under the cost shows a typical range to compare with. For building-wide items like the roof or a boiler, it's a price that doesn't depend on the building's size, such as a price per sq ft of roof, since the whole job does. The hint is never used in the math, so enter your own quote.",
   },
   {
     q: "What if I don't know when something was installed?",

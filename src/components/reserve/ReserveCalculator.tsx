@@ -194,21 +194,22 @@ export default function ReserveCalculator() {
       <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800" aria-live="polite">
         {result ? (
           <>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {/* min-w-0 and wrapping keep a huge (typo-sized) amount inside its column. */}
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 [&>div]:min-w-0">
               <div>
                 <dt className={label}>Save each month</dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{formatReserve(result.monthly)}</dd>
+                <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-slate-950 dark:text-white">{formatReserve(result.monthly)}</dd>
               </div>
               <div>
                 <dt className={label}>Per unit</dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">
+                <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-slate-950 dark:text-white">
                   {result.perUnit === null ? "—" : formatReserve(result.perUnit)}
                 </dd>
               </div>
               {result.shortfallNow > 0 && (
                 <div>
                   <dt className={label}>Short right now</dt>
-                  <dd className="mt-1 text-2xl font-semibold tabular-nums text-red-700 dark:text-red-400">{formatMoney(result.shortfallNow)}</dd>
+                  <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-red-700 dark:text-red-400">{formatMoney(result.shortfallNow)}</dd>
                 </div>
               )}
             </dl>
