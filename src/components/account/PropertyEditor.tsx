@@ -12,6 +12,7 @@ import {
   saveProblemFields,
   toSaveInput,
   type SaveInput,
+  type SaveProblem,
 } from "@/lib/properties/convert";
 import {
   compareSaved,
@@ -69,6 +70,12 @@ function noteVersionCheckMissing() {
 let detailsNotSavedFor: string | null = null;
 function noteDetailsNotSaved(propertyId: string | null) {
   detailsNotSavedFor = propertyId;
+}
+
+// A new property that was just saved. Its own page opens next and says "Saved".
+let createdNow: string | null = null;
+function noteCreated(propertyId: string | null) {
+  createdNow = propertyId;
 }
 
 /** No components, units or year built: nothing came over from the calculator. */
@@ -149,6 +156,7 @@ export default function PropertyEditor({
   // A new property that just opened here after its condition and notes were dropped:
   // the kept edits hold them, and the message replaces "We brought back changes".
   const [arrivedDetailsDropped] = useState(() => propertyId !== undefined && detailsNotSavedFor === propertyId);
+  const [arrivedCreated] = useState(() => propertyId !== undefined && createdNow === propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
   // Counts blocked saves, so each one moves focus to the first row to fix.
@@ -166,11 +174,23 @@ export default function PropertyEditor({
     (save.kind === "failed" && save.failure === "signed_out") || (save.kind === "delete_failed" && save.signedOut);
 
   // After a blocked save, problems update as the owner fixes them, next to each row.
-  const problems = useMemo(
-    () => (showProblems ? toSaveInput(name, draft, currentYear, savedId).problems : {}),
+  const { problems, propertyProblems } = useMemo(
+    () =>
+      showProblems
+        ? toSaveInput(name, draft, currentYear, savedId)
+        : { problems: {} as Record<string, SaveProblem>, propertyProblems: [] as SaveProblem[] },
     [showProblems, name, draft, currentYear, savedId],
   );
-  const problemTexts = [...new Set(Object.values(problems).map((p) => SAVE_PROBLEM_TEXT[p]))];
+  // Both of the property's own problems, then the rows'.
+  const propertyTexts = [...new Set(propertyProblems.map((p) => SAVE_PROBLEM_TEXT[p]))];
+  const rowTexts = [
+    ...new Set(
+      Object.entries(problems)
+        .filter(([id]) => id !== "property")
+        .map(([, p]) => SAVE_PROBLEM_TEXT[p]),
+    ),
+  ];
+  const problemTexts = [...propertyTexts, ...rowTexts];
   // On a long property the row to fix can be far down the page, so the alert names it.
   const badRows = draft.rows.filter((row) => row.id in problems);
   const firstBad = badRows.length > 0 ? badRows[0].name.trim() || `row ${draft.rows.indexOf(badRows[0]) + 1}` : "";
@@ -265,14 +285,28 @@ export default function PropertyEditor({
     return () => window.clearTimeout(timer);
   }, [arrivedDetailsDropped]);
 
-  // After a blocked save, the first field to fix is brought to the middle of the screen and focused.
+  // Same for a property just created: screen readers hear "Saved" once its page opens.
+  useEffect(() => {
+    if (!arrivedCreated) return;
+    noteCreated(null);
+    const timer = window.setTimeout(() => setSave((s) => (s.kind === "idle" ? { kind: "saved" } : s)), ANNOUNCE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [arrivedCreated]);
+
+  // After a blocked save, the first field to fix is brought to the middle of the screen and
+  // focused: Rental units or Year built if either has a problem (they come first), else the first bad row.
   useEffect(() => {
     if (blockedSaves === 0) return;
-    const first = draft.rows.find((row) => row.id in problems);
-    if (!first) return;
-    const field = form.current?.querySelector<HTMLElement>(
-      `[aria-invalid="true"][aria-describedby*="-${CSS.escape(first.id)}-problem"]`,
-    );
+    let field: HTMLElement | null | undefined = null;
+    if (propertyProblems.length > 0) {
+      field = form.current?.querySelector<HTMLElement>('input[aria-invalid="true"]');
+    } else {
+      const first = draft.rows.find((row) => row.id in problems);
+      if (!first) return;
+      field = form.current?.querySelector<HTMLElement>(
+        `[aria-invalid="true"][aria-describedby*="-${CSS.escape(first.id)}-problem"]`,
+      );
+    }
     if (!field) return;
     field.scrollIntoView({ block: "center" });
     field.focus({ preventScroll: true });
@@ -425,6 +459,8 @@ export default function PropertyEditor({
       if (droppedFromNew) {
         keepUnsaved(unsavedKey(userId, newId), droppedFromNew);
         noteDetailsNotSaved(newId);
+      } else {
+        noteCreated(newId);
       }
       // The form stays locked until the property's own page opens, so nothing typed is lost.
       setSavedId(newId);
@@ -649,8 +685,11 @@ export default function PropertyEditor({
               Save as a new property
             </button>
           )}
+          {propertyTexts.map((text) => (
+            <p key={text}>{text}</p>
+          ))}
           {badRowsText && <p className="font-medium">{badRowsText}</p>}
-          {problemTexts.map((text) => (
+          {rowTexts.map((text) => (
             <p key={text}>{text}</p>
           ))}
         </div>
@@ -678,6 +717,7 @@ export default function PropertyEditor({
         library={library}
         typicalCosts={typicalCosts}
         rowNotes={rowNotes}
+        unitCountProblem={propertyProblems.includes("unit_count") ? SAVE_PROBLEM_TEXT.unit_count : undefined}
         where="property"
         ownerEmail={userEmail}
       />

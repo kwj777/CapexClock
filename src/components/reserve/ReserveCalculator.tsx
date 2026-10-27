@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import { shownFields } from "@/components/reserve/shown-fields";
 import { reserveCalculator, type ExpenseField } from "@/verticals/landlord";
+import { explainResult } from "./reserve-text";
+import { EXPENSES_STORAGE_KEY, keepSaved, loadSaved, parseSavedExpenses, useInBrowser } from "./reserve-storage";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -38,6 +40,25 @@ export default function ReserveCalculator() {
   // Field to focus after the next render (after removing a row).
   const focusNext = useRef<string | null>(null);
 
+  // What was typed here last time, read once the page is in the browser. Saving
+  // waits until then, so the empty first render never wipes it.
+  const inBrowser = useInBrowser();
+  const [restored, setRestored] = useState(false);
+  if (inBrowser && !restored) {
+    setRestored(true);
+    const saved = loadSaved(EXPENSES_STORAGE_KEY, parseSavedExpenses);
+    if (saved) {
+      setRows(saved.rows.map((r) => ({ ...r, id: nextId++ })));
+      setBalance(saved.balance);
+      setUnits(saved.units);
+    }
+  }
+  useEffect(() => {
+    if (!restored) return;
+    const typed = balance.trim() || units.trim() || rows.some((r) => r.name.trim() || r.cost.trim() || r.years.trim());
+    keepSaved(EXPENSES_STORAGE_KEY, typed ? { rows: rows.map(({ name, cost, years }) => ({ name, cost, years })), balance, units } : null);
+  }, [restored, rows, balance, units]);
+
   useEffect(() => {
     if (!focusNext.current) return;
     document.getElementById(focusNext.current)?.focus();
@@ -65,6 +86,29 @@ export default function ReserveCalculator() {
       shownFields(problems.get(r.id), new Set((["cost", "years"] as const).filter((f) => touched.has(`${r.id}:${f}`)))),
     ]),
   );
+
+  // Screen readers hear one short sentence once typing pauses, not every figure
+  // on every keystroke, and nothing until the owner changes something (same as
+  // the Quick estimate tab).
+  const summary = result
+    ? `Save ${formatReserve(result.monthly)} a month` +
+      (result.perUnit === null ? "." : `, ${formatReserve(result.perUnit)} per unit.`) +
+      (result.shortfallNow > 0 ? ` You're ${formatMoney(result.shortfallNow)} short right now.` : "")
+    : inputs.balanceProblem
+      ? "Fix the highlighted fields to see your monthly amount."
+      : problems.size > 0
+        ? "Finish each expense's cost and years until due to see your monthly amount."
+        : "";
+  const [spoken, setSpoken] = useState("");
+  const spokenSummary = useRef(summary);
+  useEffect(() => {
+    if (summary === spokenSummary.current) return;
+    const timer = window.setTimeout(() => {
+      spokenSummary.current = summary;
+      setSpoken(summary);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [summary]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -191,7 +235,10 @@ export default function ReserveCalculator() {
         )}
       </div>
 
-      <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800" aria-live="polite">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {spoken}
+      </p>
+      <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
         {result ? (
           <>
             {/* min-w-0 and wrapping keep a huge (typo-sized) amount inside its column. */}
@@ -213,10 +260,13 @@ export default function ReserveCalculator() {
                 </div>
               )}
             </dl>
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">{explainResult(result)}</p>
             <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-              This is the smallest steady monthly amount that has the cash ready for every expense on time, starting from your
-              current balance.
-              {result.shortfallNow > 0 && " Your balance doesn't cover what's due now, so that gap needs to be funded separately."}
+              Want a reminder before these come due?{" "}
+              <Link href="/#signup" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+                Get early access
+              </Link>
+              .
             </p>
           </>
         ) : inputs.balanceProblem ? (
@@ -237,3 +287,4 @@ export default function ReserveCalculator() {
     </div>
   );
 }
+

@@ -41,7 +41,7 @@ export default function TermsPage() {
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Terms</h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">

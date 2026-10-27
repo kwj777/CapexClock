@@ -1,14 +1,16 @@
-import { landlordForecast, type Component } from "@/verticals/landlord";
-import { breakLongWords, formatCostEach, formatPrice, formatQuantity, moneyColumn } from "../format";
+import { landlordForecast, type Component, type DraftRow } from "@/verticals/landlord";
+import { breakLongWords, formatCostEach, formatPrice, formatQuantity, moneyColumn, shortName } from "../format";
 import {
   atRiskShortText,
   barPercent,
   ESTIMATED_NOTE,
   exportDetails,
   exportRows,
+  formFacts,
   GUESS_NOTE,
   guessedYear,
   installYearNote,
+  leftOutNote,
   leftOutSummary,
   pdfYearFigures,
   sumTotals,
@@ -276,5 +278,72 @@ describe("left-out summary", () => {
     );
     const many = ["A", "B", "C", "D", "E", "F", "G"].map((name) => ({ name, category: "Other" }));
     expect(leftOutSummary(many)).toMatch(/^7 components aren't included yet: A, B, C, D, E and 2 more\./);
+  });
+});
+
+describe("left out for want of a cost", () => {
+  const row = (id: string, name: string, fields: Partial<DraftRow>): DraftRow => ({
+    id,
+    librarySlug: null,
+    category: "Other",
+    name,
+    quantity: "1",
+    unitLabel: "per_building",
+    installYear: "",
+    usefulLife: "25",
+    costEach: "",
+    scenario: "run_to_failure",
+    ...fields,
+  });
+  const formRows = [
+    row("windows", "Windows (vinyl)", { installYear: "1998" }),
+    row("lvp", "Luxury vinyl plank", { installYear: "2020" }),
+    row("roof", "Roof", { installYear: "2010", costEach: "38000" }),
+    row("deck", "Deck", { installYear: "abc" }),
+  ];
+  const facts = formFacts({ yearBuilt: "1998", rows: formRows }, 2026);
+  const details = exportDetails(formRows, [{ id: "roof" }], facts);
+
+  it("keeps why each row was left out", () => {
+    expect(details.leftOut?.map((l) => [l.name, l.problem])).toEqual([
+      ["Windows (vinyl)", "missing_cost"],
+      ["Luxury vinyl plank", "missing_cost"],
+      ["Deck", "bad_install_year"],
+    ]);
+    expect(leftOutNote({ problem: "missing_cost" })).toBe("Not included yet: no replacement cost");
+    expect(leftOutNote({ problem: "bad_install_year" })).toBe("Not included yet: details missing");
+  });
+
+  it("still lists costless rows that are at risk, but not ones that aren't", () => {
+    expect(details.atRiskWithoutCost?.map((a) => [a.name, atRiskShortText(a)])).toEqual([
+      ["Windows (vinyl)", "3 yrs past end of life"],
+    ]);
+  });
+
+  it("knows the year built, unless it can't be right", () => {
+    expect(details.yearBuilt).toBe(1998);
+    expect(formFacts({ yearBuilt: "98", rows: [] }, 2026).yearBuilt).toBeNull();
+    expect(formFacts({ yearBuilt: "", rows: [] }, 2026).yearBuilt).toBeNull();
+    expect(exportDetails([], []).yearBuilt).toBeNull();
+  });
+
+  it("says the missing detail is the cost", () => {
+    expect(leftOutSummary(details.leftOut ?? [])).toBe(
+      "Windows (vinyl) and Luxury vinyl plank have no replacement cost yet, so they aren't in the totals. " +
+        "1 component isn't included yet: Deck. Its details aren't complete, so the figures here leave it out.",
+    );
+    expect(leftOutSummary([{ name: "Windows", category: "Other", problem: "missing_cost" }])).toBe(
+      "Windows has no replacement cost yet, so it isn't in the totals.",
+    );
+  });
+});
+
+describe("short names", () => {
+  it("cuts a long name at a whole word", () => {
+    expect(shortName("Maple Court", 60)).toBe("Maple Court");
+    expect(shortName("The Residences at Maple Court Apartments and Townhomes East Building", 40)).toBe(
+      "The Residences at Maple Court…",
+    );
+    expect(shortName("x".repeat(80), 10)).toBe(`${"x".repeat(9)}…`);
   });
 });

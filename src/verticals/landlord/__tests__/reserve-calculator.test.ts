@@ -1,11 +1,13 @@
 import {
   BALANCE_PROBLEM,
+  COST_PROBLEM,
   readReserveInputs,
   reserveCalculator,
   reserveFromExpenses,
   ROW_PROBLEM,
   UNITS_PROBLEM,
   YEAR_TYPED_PROBLEM,
+  YEARS_PROBLEM,
 } from "../reserve-calculator";
 
 const row = (cost: string, years: string, id = 1) => ({ id, cost, years });
@@ -50,7 +52,7 @@ describe("reading the reserve calculator's fields", () => {
     // Too many years, but not a year, so it isn't called one.
     for (const tooMany of ["101", "1899", "2200", "10000000"]) {
       expect(readReserveInputs([row("60000", tooMany)], "", "").rowProblems.get(1)).toEqual({
-        message: ROW_PROBLEM,
+        message: YEARS_PROBLEM,
         fields: ["years"],
       });
     }
@@ -72,6 +74,41 @@ describe("reading the reserve calculator's fields", () => {
     expect(r.rowProblems.get(2)?.fields).toEqual(["years"]);
     expect(r.rowProblems.get(3)?.fields).toEqual(["cost"]);
     expect(r.rowProblems.get(4)?.fields).toEqual(["cost", "years"]);
+  });
+
+  it("says which field is wrong when only one is", () => {
+    const r = readReserveInputs([row("15k", "5", 1), row("-500", "5", 2), row("500", "2.5", 3), row("x", "y", 4)], "", "");
+    expect(r.rowProblems.get(1)?.message).toBe(COST_PROBLEM);
+    expect(r.rowProblems.get(2)?.message).toBe(COST_PROBLEM);
+    expect(r.rowProblems.get(3)?.message).toBe(YEARS_PROBLEM);
+    expect(r.rowProblems.get(4)?.message).toBe(ROW_PROBLEM);
+    expect(COST_PROBLEM).toBe("Enter the cost as a plain number, like 15000.");
+    expect(YEARS_PROBLEM).toBe("Enter whole years from 0 to 100, like 5.");
+  });
+});
+
+describe("what sets the monthly amount", () => {
+  it("names an early expense that sets it, and the smaller amount after it's paid", () => {
+    const r = reserveFromExpenses([{ cost: 40000, yearsUntilDue: 2 }, { cost: 10000, yearsUntilDue: 20 }], 5000, 0);
+    expect(r.monthly).toBeCloseTo(35000 / 24);
+    expect(r.setBy).not.toBeNull();
+    expect(r.setBy).toMatchObject({ cost: 40000, years: 2, spread: false });
+    expect(r.setBy?.after).toBeCloseTo(10000 / (12 * 18));
+  });
+
+  it("says over the next years when more than one year's costs set it", () => {
+    const r = reserveFromExpenses(
+      [{ cost: 5000, yearsUntilDue: 1 }, { cost: 40000, yearsUntilDue: 3 }, { cost: 1000, yearsUntilDue: 20 }],
+      0,
+      0,
+    );
+    expect(r.setBy).toMatchObject({ cost: 45000, years: 3, spread: true });
+  });
+
+  it("is null when the whole list sets it, or nothing is left to save for", () => {
+    expect(reserveFromExpenses([{ cost: 1000, yearsUntilDue: 2 }, { cost: 50000, yearsUntilDue: 20 }], 0, 0).setBy).toBeNull();
+    expect(reserveFromExpenses([{ cost: 40000, yearsUntilDue: 2 }], 0, 0).setBy).toBeNull();
+    expect(reserveFromExpenses([{ cost: 40000, yearsUntilDue: 0 }], 0, 0).setBy).toBeNull();
   });
 });
 

@@ -26,7 +26,7 @@ export default function PrivacyPage() {
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Privacy</h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
@@ -44,8 +44,8 @@ export default function PrivacyPage() {
 
           <Section title="The free calculators">
             <p>
-              The CapEx calculator keeps your work in your browser&apos;s local storage, so it&apos;s still there when you
-              come back. It isn&apos;t sent to us. PDF, Excel and CSV exports are made in your browser too, and so is reading a
+              The CapEx and reserve calculators keep your work in your browser&apos;s local storage, so it&apos;s still there
+              when you come back. It isn&apos;t sent to us. PDF, Excel and CSV exports are made in your browser too, and so is reading a
               spreadsheet you import: the file or pasted rows never leave your browser. We also remember in
               your browser whether you&apos;ve answered our short survey, so we don&apos;t ask twice. Clearing your
               browser data removes all of this.

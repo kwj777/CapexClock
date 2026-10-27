@@ -196,7 +196,7 @@ function EarlyAccessForm({
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="w-full rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-70"
+        className="w-full rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-70"
       >
         {status === "submitting" ? "Signing you up…" : "Get early access"}
       </button>

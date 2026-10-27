@@ -442,8 +442,11 @@ function Figure({ label, value, detail, extra }: { label: string; value: string;
     <div>
       <dt className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}</dt>
       <dd>
+        {/* The hidden commas keep the parts apart when read aloud: "$1,800 less, $201,200 in total, …". */}
         <span className="block text-xl font-semibold tabular-nums text-slate-950 dark:text-white">{value}</span>
+        <span className="sr-only">, </span>
         <span className="block text-sm tabular-nums text-slate-500 dark:text-slate-400">{detail}</span>
+        {extra && <span className="sr-only">, </span>}
         {extra && <span className="block text-sm tabular-nums text-slate-500 dark:text-slate-400">{extra}</span>}
       </dd>
     </div>

@@ -31,6 +31,13 @@ describe("pay question", () => {
     expect(html).toContain('aria-label="Dismiss question"');
   });
 
+  it("names the answers' group with the question, so Yes, Maybe and No aren't read bare", () => {
+    const html = renderWith(null, "csv");
+    const id = html.match(/<p id="([^"]+)"[^>]*>[^<]*Would you pay/)?.[1];
+    expect(id).toBeDefined();
+    expect(html).toContain(`<div role="group" aria-labelledby="${id}"`);
+  });
+
   it("asks about the real $12/month membership, never $19 or lender-ready", () => {
     expect(PAY_QUESTION).toContain("$12/month");
     expect(PAY_QUESTION).toContain("for lenders and buyers");

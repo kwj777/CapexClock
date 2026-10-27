@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: LayoutProps<"/app">) {
       <Suspense>
         <TrackWelcome userId={userId} />
       </Suspense>
-      <main className="flex-1">{children}</main>
+      <main id="main" className="flex-1">{children}</main>
       <SiteFooter />
     </>
   );

@@ -1,5 +1,6 @@
-import { validateComponent, type Component } from "@/engine";
+import { findAtRisk, validateComponent, type AtRiskComponent, type Component } from "@/engine";
 import { parseNumber } from "../parse";
+import { byUrgencyThenName, LANDLORD_RULES } from "../rules";
 import type { Draft, DraftRow } from "./model";
 
 /** Earliest install year a component can be given; older buildings use year built instead. */
@@ -93,6 +94,18 @@ export function toComponents(draft: Draft, currentYear: number): ConvertedRows {
   }
 
   return { components, problems };
+}
+
+/**
+ * Rows left out only because they have no cost yet that are past end of life or
+ * due soon, most urgent first. The downloads still list them as at risk, outside
+ * the totals.
+ */
+export function atRiskWithoutCost(draft: Pick<Draft, "yearBuilt" | "rows">, currentYear: number): AtRiskComponent[] {
+  // Any cost will do to see whether the rest of the row is complete; it isn't used.
+  const rows = draft.rows.filter((r) => parseNumber(r.costEach) === null).map((r) => ({ ...r, costEach: "0" }));
+  const { components } = toComponents({ unitCount: "", yearBuilt: draft.yearBuilt, rows }, currentYear);
+  return findAtRisk(components, currentYear, LANDLORD_RULES.atRiskYears).sort(byUrgencyThenName);
 }
 
 export const PROBLEM_TEXT: Record<RowProblem, string> = {

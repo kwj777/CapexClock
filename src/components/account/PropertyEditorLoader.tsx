@@ -7,7 +7,7 @@ import type { PropertyEditorProps } from "./PropertyEditor";
 const PropertyEditor = dynamic(() => import("./PropertyEditor"), {
   ssr: false,
   loading: () => (
-    <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" aria-hidden="true" />
+    <div className="h-64 motion-safe:animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" aria-hidden="true" />
   ),
 });
 

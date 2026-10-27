@@ -280,13 +280,13 @@ describe("a workbook with one tab per building", () => {
       "Type how many rental units it has.",
     ]);
     expect(plannedProblems(withEdits(planned[0], { unitCount: "12", yearBuilt: "1700" }), CURRENT_YEAR)).toEqual([
-      expect.stringMatching(/^Year built must be/),
+      expect.stringMatching(/^Year built should be/),
     ]);
     // A unit count that isn't a number doesn't hide a bad year built, and each says its field.
     const both = withEdits(planned[0], { unitCount: "abc", yearBuilt: "19" });
     expect(propertyFieldProblems(both, CURRENT_YEAR)).toEqual([
       { field: "unitCount", text: "Rental units must be a whole number up to 100,000." },
-      { field: "yearBuilt", text: expect.stringMatching(/^Year built must be/) },
+      { field: "yearBuilt", text: expect.stringMatching(/^Year built should be/) },
     ]);
     expect(plannedProblems(both, CURRENT_YEAR)).toHaveLength(2);
     expect(propertyFieldProblems(withEdits(planned[0], { name: "", unitCount: "" }), CURRENT_YEAR).map((p) => p.field)).toEqual([

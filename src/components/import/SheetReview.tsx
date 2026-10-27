@@ -45,6 +45,8 @@ export interface SheetReviewProps {
    * each row is in can't change, so the Building column and the layout stay as they are.
    */
   lockBuildings?: boolean;
+  /** Heading level for the sections: 3 under My properties' h2, 4 under the editor's h3. */
+  headingLevel?: 3 | 4;
 }
 
 /**
@@ -64,8 +66,10 @@ export default function SheetReview({
   listNotes,
   beforeCreate = false,
   lockBuildings = false,
+  headingLevel = 4,
 }: SheetReviewProps) {
   const baseId = useId();
+  const Heading = `h${headingLevel}` as const;
   const summaryId = `${baseId}-summary`;
   const sheetYearId = `${baseId}-sheet-year`;
   const { choices, sheetYearText } = state;
@@ -129,9 +133,9 @@ export default function SheetReview({
   return (
     <div className="space-y-6">
       <section aria-labelledby={`${baseId}-columns`}>
-        <h4 id={`${baseId}-columns`} className={headingClass}>
+        <Heading id={`${baseId}-columns`} className={headingClass}>
           Check the columns
-        </h4>
+        </Heading>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           We guessed what each column holds. Change any guess, or choose Ignore to leave a column out.
         </p>
@@ -254,9 +258,9 @@ export default function SheetReview({
 
       {preview.questions.length > 0 && (
         <section aria-labelledby={`${baseId}-questions`}>
-          <h4 id={`${baseId}-questions`} className={headingClass}>
+          <Heading id={`${baseId}-questions`} className={headingClass}>
             Which items are these?
-          </h4>
+          </Heading>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             We weren&apos;t sure, so we haven&apos;t matched them.{" "}
             {beforeCreate
@@ -295,9 +299,9 @@ export default function SheetReview({
       )}
 
       <section aria-labelledby={`${baseId}-preview`}>
-        <h4 id={`${baseId}-preview`} className={headingClass}>
+        <Heading id={`${baseId}-preview`} className={headingClass}>
           Preview
-        </h4>
+        </Heading>
         <p id={summaryId} tabIndex={-1} className="mt-1 text-sm font-medium text-slate-900 focus:outline-none dark:text-white">
           {summary}
         </p>
@@ -314,6 +318,7 @@ export default function SheetReview({
             fallbackFocusId={summaryId}
             onFix={fix}
             beforeCreate={beforeCreate}
+            headingLevel={headingLevel === 3 ? 4 : 5}
           />
         </div>
       </section>

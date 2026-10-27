@@ -486,6 +486,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       duplicateIds={NO_DUPLICATES}
                       beforeCreate
                       lockBuildings={sent.has(review.tab)}
+                      headingLevel={3}
                     />
                   </div>
                 )}

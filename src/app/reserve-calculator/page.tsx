@@ -24,7 +24,7 @@ const FAQ = [
   },
   {
     q: "How is the monthly amount calculated for listed expenses?",
-    a: "It's the smallest steady monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short.",
+    a: "It's the smallest monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short. Once that item is paid you'll need less, and the calculator shows about how much.",
   },
   {
     q: "What does 0 years until due mean?",
@@ -52,7 +52,7 @@ export default async function ReserveCalculatorPage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <div className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-balance text-slate-950 sm:text-4xl dark:text-white">
             Reserve calculator for rental properties
