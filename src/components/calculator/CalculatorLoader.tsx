@@ -24,7 +24,7 @@ function CalculatorPlaceholder() {
   return (
     <>
       <div
-        className="h-[532px] animate-pulse rounded-2xl bg-slate-100 sm:h-[412px] lg:h-[392px] dark:bg-slate-900"
+        className="h-[532px] motion-safe:animate-pulse rounded-2xl bg-slate-100 sm:h-[412px] lg:h-[392px] dark:bg-slate-900"
         style={height ? { height } : undefined}
         aria-hidden="true"
       />

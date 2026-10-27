@@ -95,7 +95,7 @@ function CtaButton({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/capex-calculator"
-      className={`inline-flex items-center justify-center rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg bg-amber-500 px-6 py-3 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${className}`}
     >
       Try the free calculator
     </Link>
@@ -112,7 +112,7 @@ export default function Home() {
 
       <SiteHeader />
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         {/* Hero */}
         <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-20 pt-10 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
           <div>
@@ -180,7 +180,7 @@ export default function Home() {
                 <Link
                   key={t.href}
                   href={t.href}
-                  className="group rounded-xl bg-white p-6 ring-1 ring-slate-200 transition hover:ring-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-slate-900 dark:ring-slate-800 dark:hover:ring-amber-500"
+                  className="group rounded-xl bg-white p-6 ring-1 ring-slate-200 transition hover:ring-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:bg-slate-900 dark:ring-slate-800 dark:focus-visible:ring-offset-slate-950 dark:hover:ring-amber-500"
                 >
                   <h3 className="font-semibold text-slate-950 group-hover:text-amber-700 dark:text-white dark:group-hover:text-amber-400">
                     {t.title} <span aria-hidden="true">→</span>

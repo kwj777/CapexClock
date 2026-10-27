@@ -506,6 +506,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       hasYearBuilt={(key) =>
                         /^\d{4}$/.test(planned.find((p) => p.tab === review.tab && p.building === key)?.yearBuilt.trim() ?? "")
                       }
+                      headingLevel={3}
                     />
                   </div>
                 )}

@@ -74,7 +74,7 @@ export default function PricingPage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Pricing</h1>
           <p className="mt-4 max-w-2xl text-lg text-pretty text-slate-600 dark:text-slate-300">

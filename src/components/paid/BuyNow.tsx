@@ -87,7 +87,7 @@ export default function BuyNow({ offer, link }: { offer: Offer; link: string }) 
           // says which offer, since a page can have two.
           aria-label={`Buy now: ${name}`}
           aria-describedby={noteId}
-          className="inline-block rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+          className="inline-block rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
         >
           Buy now
         </a>

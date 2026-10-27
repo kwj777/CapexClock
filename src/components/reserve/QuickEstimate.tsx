@@ -280,7 +280,7 @@ export default function QuickEstimate({
                 </tr>
                 {items.map((s) => (
                   <tr key={s.item.slug}>
-                    <td className="py-2 pr-2 align-top">
+                    <th scope="row" className="py-2 pr-2 text-left align-top font-normal">
                       <label className="flex items-start gap-2 text-slate-900 dark:text-white">
                         <input
                           type="checkbox"
@@ -290,7 +290,7 @@ export default function QuickEstimate({
                         />
                         <span>{s.item.name}</span>
                       </label>
-                    </td>
+                    </th>
                     <td className="py-2 pr-2 align-top">
                       <span className="tabular-nums text-slate-900 dark:text-white">
                         {formatCostRange(s.cost.low, s.cost.high)}

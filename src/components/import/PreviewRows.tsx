@@ -55,13 +55,14 @@ export interface PreviewRowsProps {
   beforeCreate?: boolean;
   /** A year built is known for this building (a BuildingInfo key), so a blank install year can use it. */
   hasYearBuilt?: (building: string) => boolean;
+  /** One below the review's own headings. */
+  headingLevel?: 4 | 5;
 }
 
 const asIs = (text: string) => text;
-
-/** The preview's rows by status, Needs you first, then the skipped rows. */
 const always = () => true;
 
+/** The preview's rows by status, Needs you first, then the skipped rows. */
 function PreviewRows({
   preview,
   duplicateIds,
@@ -70,7 +71,9 @@ function PreviewRows({
   onFix,
   beforeCreate = false,
   hasYearBuilt = always,
+  headingLevel = 5,
 }: PreviewRowsProps) {
+  const Heading = `h${headingLevel}` as const;
   const baseId = useId();
   const formId = (rowId: string) => `${baseId}-${rowId}-fix`;
   // After a fix, focus stays with the row if it still needs something, else moves to the next one.
@@ -106,6 +109,7 @@ function PreviewRows({
             count={rows.length}
             blurb={beforeCreate && status === "needs_you" ? NEEDS_YOU_TEXT.beforeCreate : blurb}
             badge={badge}
+            headingLevel={headingLevel}
           >
             {(shown) =>
               rows.slice(0, shown).map((r) => (
@@ -125,17 +129,15 @@ function PreviewRows({
         );
       })}
       {skipped.length > 0 && (
-        <section aria-labelledby={`${baseId}-skipped`}>
-          <h4 id={`${baseId}-skipped`} className={headingClass}>
-            Skipped ({preview.counts.skipped.toLocaleString("en-US")})
-          </h4>
+        <div>
+          <Heading className={headingClass}>Skipped ({preview.counts.skipped.toLocaleString("en-US")})</Heading>
           <p className="text-sm text-slate-600 dark:text-slate-400">These rows aren&apos;t added.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
             {skipped.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-        </section>
+        </div>
       )}
     </div>
   );
@@ -148,23 +150,28 @@ function RowSection({
   count,
   blurb,
   badge,
+  headingLevel,
   children,
 }: {
   title: string;
   count: number;
   blurb: string;
   badge: string;
+  headingLevel: 4 | 5;
   children: (shown: number) => ReactNode;
 }) {
-  const id = useId();
+  const Heading = `h${headingLevel}` as const;
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? count : SHOWN_AT_FIRST;
   return (
-    <section aria-labelledby={id}>
-      <h4 id={id} className={headingClass}>
+    // A plain block, not a region: the review around it is already one.
+    <div>
+      <Heading className={headingClass}>
         <span className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{title}</span>
+        {/* Read as "Needs you, 2 rows", not "Needs you 2 rows". */}
+        <span className="sr-only">, </span>
         {count.toLocaleString("en-US")} {count === 1 ? "row" : "rows"}
-      </h4>
+      </Heading>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{blurb}</p>
       <ul className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">{children(shown)}</ul>
       {count > SHOWN_AT_FIRST && !showAll && (
@@ -176,7 +183,7 @@ function RowSection({
           Show all {count.toLocaleString("en-US")} rows
         </button>
       )}
-    </section>
+    </div>
   );
 }
 

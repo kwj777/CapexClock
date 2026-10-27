@@ -29,7 +29,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/auth/sign
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <div className="mx-auto w-full max-w-md px-4 pb-24 pt-10 sm:px-6">
           {signedOut && (
             <p role="status" className="mb-6 rounded-lg bg-slate-100 p-3 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-200">
