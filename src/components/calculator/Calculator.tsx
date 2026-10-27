@@ -101,6 +101,8 @@ const REPLACE_LABEL = "Replace this year";
 
 const inputClass =
   "block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+// A red border on a field marked invalid (the property's own fields).
+const invalidClass = "aria-invalid:border-red-500 dark:aria-invalid:border-red-400";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 /** Lets the browser skip drawing a row that's out of view, sized as it last looked. */
 const offscreenClass =
@@ -299,6 +301,8 @@ export interface CalculatorViewProps {
    * with the fields they're about (marked invalid and pointed at the note).
    */
   rowNotes?: Record<string, RowNote>;
+  /** Why the unit count can't be saved, shown under the fields and marking Rental units invalid. */
+  unitCountProblem?: string;
   /** An undo to offer from the start: an import on the template page that changed the list. */
   initialUndo?: Undo | null;
   /** The row a lifespan page just added, pointed to above the property card. */
@@ -362,6 +366,7 @@ function CalculatorBody({
   library = COMPONENT_LIBRARY,
   typicalCosts = TYPICAL_COSTS,
   rowNotes,
+  unitCountProblem,
   initialUndo = null,
   arrival = null,
   onPayQuestionChange,
@@ -374,6 +379,7 @@ function CalculatorBody({
   const baseId = useId();
   const yearBuiltErrorId = `${baseId}-year-built-error`;
   const unitsErrorId = `${baseId}-units-error`;
+  const unitsSaveErrorId = `${baseId}-units-save-error`;
   const unitsId = `${baseId}-units`;
   const undoRemoveId = `${baseId}-undo-remove`;
   const addId = `${baseId}-add`;
@@ -407,6 +413,7 @@ function CalculatorBody({
   const yearBuiltIsBad = badYearBuilt(draft.yearBuilt, startYear);
   const showYearBuiltError = yearBuiltIsBad && !editingYearBuilt;
   const showUnitsError = badUnitCount(draft.unitCount) && !editingUnits;
+  const showUnitsSaveProblem = Boolean(unitCountProblem) && !showUnitsError;
 
   // Once per draft, as soon as it shows a forecast (the reserve can come from items after year 10).
   const trackedDraft = useRef<Draft | null>(null);
@@ -646,12 +653,14 @@ function CalculatorBody({
               <span className={labelClass}>Rental units</span>
               <input
                 id={unitsId}
-                className={`${inputClass} mt-1`}
+                className={`${inputClass} ${invalidClass} mt-1`}
                 inputMode="numeric"
                 placeholder="e.g. 12"
                 value={draft.unitCount}
-                aria-invalid={showUnitsError || undefined}
-                aria-describedby={showUnitsError ? unitsErrorId : undefined}
+                aria-invalid={showUnitsError || showUnitsSaveProblem || undefined}
+                aria-describedby={
+                  showUnitsError ? unitsErrorId : showUnitsSaveProblem ? unitsSaveErrorId : undefined
+                }
                 onFocus={() => setEditingUnits(true)}
                 onBlur={() => setEditingUnits(false)}
                 onChange={(e) => {
@@ -663,7 +672,7 @@ function CalculatorBody({
             <label className="block w-36">
               <span className={labelClass}>Year built</span>
               <input
-                className={`${inputClass} mt-1`}
+                className={`${inputClass} ${invalidClass} mt-1`}
                 inputMode="numeric"
                 placeholder="e.g. 1998"
                 value={draft.yearBuilt}
@@ -725,6 +734,13 @@ function CalculatorBody({
             >
               Undo
             </button>
+          </p>
+        )}
+        {/* Why a saved property's unit count can't be saved (e.g. over 100,000), when the
+            field's own message below doesn't already cover it. */}
+        {showUnitsSaveProblem && (
+          <p id={unitsSaveErrorId} className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+            {unitCountProblem}
           </p>
         )}
         {/* The errors take the hint's place in one grid cell, sized for the longest, so
@@ -1062,6 +1078,8 @@ function ComponentRow({
   const label = row.name.trim() || "this component";
   const problemId = `${idPrefix}-problem`;
   const hintId = `${idPrefix}-cost-hint`;
+  const lifeHintId = `${idPrefix}-life-hint`;
+  const costMathId = `${idPrefix}-cost-math`;
   const hint = costHint(row, lib, typical);
   const detailsId = `${idPrefix}-details`;
   const conditionHelpId = `${idPrefix}-condition-help`;
@@ -1073,6 +1091,7 @@ function ComponentRow({
       ? { "aria-invalid": problem.missing ? undefined : true, "aria-describedby": problemId }
       : {};
   const costFlag = flag("costEach");
+  const lifeFlag = flag("usefulLife");
   const summary = detailsSummary(row);
   const notes = row.notes ?? "";
   const notesLeft = notesLeftText(notes);
@@ -1168,11 +1187,12 @@ function ComponentRow({
             inputMode="numeric"
             value={row.usefulLife}
             aria-label={`Life (yrs), ${label}`}
-            {...flag("usefulLife")}
+            {...lifeFlag}
+            aria-describedby={[lifeFlag["aria-describedby"], lib && lifeHintId].filter(Boolean).join(" ") || undefined}
             onChange={(e) => onChange({ usefulLife: e.target.value })}
           />
           {lib && (
-            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+            <span id={lifeHintId} className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
               Typical {lib.lifeLow}–{lib.lifeHigh}
             </span>
           )}
@@ -1191,11 +1211,15 @@ function ComponentRow({
               placeholder="Quote or estimate"
               aria-label={`${costLabel(row)}, ${label}`}
               {...costFlag}
-              aria-describedby={[costFlag["aria-describedby"], hint && hintId].filter(Boolean).join(" ") || undefined}
+              // After any error: the row's maths ("12 × $650 = $7,800"), then the typical cost.
+              aria-describedby={
+                [costFlag["aria-describedby"], rowTotal(row) && costMathId, hint && hintId].filter(Boolean).join(" ") ||
+                undefined
+              }
               onChange={(e) => onChange({ costEach: e.target.value })}
             />
           </div>
-          <CostNote row={row} />
+          <CostNote row={row} id={costMathId} />
           {hint && (
             <span
               id={hintId}
@@ -1315,7 +1339,7 @@ function ComponentRow({
 }
 
 /** Shows the multiplication behind a row ("12 × $650 = $7,800"), or what the cost is for. */
-function CostNote({ row }: { row: DraftRow }) {
+function CostNote({ row, id }: { row: DraftRow; id: string }) {
   const total = rowTotal(row);
   if (total === null) {
     return (
@@ -1326,7 +1350,7 @@ function CostNote({ row }: { row: DraftRow }) {
   }
   const quantity = `${total.quantity.toLocaleString("en-US")}${row.unitLabel === "per_sq_ft" ? " sq ft" : ""}`;
   return (
-    <span className="mt-1 block text-xs text-slate-500 tabular-nums dark:text-slate-400">
+    <span id={id} className="mt-1 block text-xs text-slate-500 tabular-nums dark:text-slate-400">
       {quantity} × {formatUnitPrice(total.each)} = {formatMoney(total.total)}
     </span>
   );
@@ -1448,7 +1472,7 @@ function AtRisk({ forecast, rows, children }: { forecast: LandlordForecast; rows
       <p className="text-sm text-slate-500 dark:text-slate-400">Past end of life or within 2 years of it.</p>
       <AtRiskList forecast={forecast} rows={rows} />
       {forecast.atRisk.length > 0 && children}
-      {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" className="mt-5" />}
+      {forecast.atRisk.length > 0 && <PaidIdeaButton idea="reminders" where="for items at risk" className="mt-5" />}
     </div>
   );
 }

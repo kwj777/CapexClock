@@ -95,6 +95,12 @@ describe("saving an editor draft", () => {
     expect(toSaveInput("x", { ...draft, yearBuilt: "1799" }, 2026).problems).toEqual({ property: "year_built" });
   });
 
+  it("reports a bad unit count and a bad year built together", () => {
+    const input = toSaveInput("x", { ...exampleDraft(), unitCount: "2.5", yearBuilt: "1700" }, 2026);
+    expect(input.propertyProblems).toEqual(["unit_count", "year_built"]);
+    expect(input.problems).toEqual({ property: "unit_count" });
+  });
+
   it("reports values over the database's limits instead of failing the save", () => {
     const draft = exampleDraft();
     const [a, b, c] = draft.rows;

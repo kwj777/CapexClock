@@ -24,7 +24,7 @@ export default async function UnsubscribePage({ searchParams }: PageProps<"/emai
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <article className="mx-auto w-full max-w-2xl px-4 pb-20 pt-6 sm:px-6">
           {parsed ? (
             <UnsubscribeForm
