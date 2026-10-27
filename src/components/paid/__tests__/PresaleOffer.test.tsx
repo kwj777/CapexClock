@@ -44,7 +44,7 @@ describe("the pre-order panel", () => {
     expect(membership).toContain("$12/month founding price, kept for as long as you stay a member.");
     expect(membership).toContain("$12 every month until you cancel. Cancel any time online.");
     expect(membership).toContain("Full refund within 30 days.");
-    expect(membership).toContain("If we don't build reminders, we cancel every founding membership");
+    expect(membership).toContain("If we stop sending reminders, we cancel every founding membership");
   });
 
   it("sells the report for lenders and buyers, as a planning document, with a sample", () => {

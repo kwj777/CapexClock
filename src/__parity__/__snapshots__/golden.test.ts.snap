@@ -426,7 +426,7 @@ exports[`lifespan pages carpet 1`] = `
 
 exports[`lifespan pages central-ac 1`] = `
 [
-  "life 14 (12-15) per unit",
+  "life 14 (12-15) per apartment",
   "title How Long Does a Central AC Condenser Last? (12–15 Years)",
   "description A central AC condenser typically lasts 12 to 15 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A central AC condenser typically lasts 12 to 15 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -499,7 +499,7 @@ exports[`lifespan pages central-ac 1`] = `
 
 exports[`lifespan pages dishwasher 1`] = `
 [
-  "life 11 (9-12) per unit",
+  "life 11 (9-12) per apartment",
   "title How Long Does a Dishwasher Last? (9–12 Years) | CapexClock",
   "description A dishwasher typically lasts 9 to 12 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A dishwasher typically lasts 9 to 12 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -572,7 +572,7 @@ exports[`lifespan pages dishwasher 1`] = `
 
 exports[`lifespan pages electrical-panel 1`] = `
 [
-  "life 33 (25-40) per unit",
+  "life 33 (25-40) per apartment",
   "title How Long Does an Electrical Panel Last? (25–40 Years)",
   "description An electrical panel typically lasts 25 to 40 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes An electrical panel typically lasts 25 to 40 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -864,7 +864,7 @@ exports[`lifespan pages flat-membrane-roof 1`] = `
 
 exports[`lifespan pages gas-furnace 1`] = `
 [
-  "life 18 (15-20) per unit",
+  "life 18 (15-20) per apartment",
   "title How Long Does a Gas Furnace Last? (15–20 Years) | CapexClock",
   "description A gas furnace typically lasts 15 to 20 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A gas furnace typically lasts 15 to 20 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1010,7 +1010,7 @@ exports[`lifespan pages gutters 1`] = `
 
 exports[`lifespan pages heat-pump 1`] = `
 [
-  "life 14 (12-15) per unit",
+  "life 14 (12-15) per apartment",
   "title How Long Does a Heat Pump Last? (12–15 Years) | CapexClock",
   "description A heat pump typically lasts 12 to 15 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A heat pump typically lasts 12 to 15 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1083,7 +1083,7 @@ exports[`lifespan pages heat-pump 1`] = `
 
 exports[`lifespan pages interior-paint 1`] = `
 [
-  "life 5 (3-7) per unit",
+  "life 5 (3-7) per apartment",
   "title How Long Does Interior Paint Last? (3–7 Years) | CapexClock",
   "description Interior paint typically lasts 3 to 7 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes Interior paint typically lasts 3 to 7 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1156,7 +1156,7 @@ exports[`lifespan pages interior-paint 1`] = `
 
 exports[`lifespan pages kitchen-cabinets 1`] = `
 [
-  "life 25 (20-30) per unit",
+  "life 25 (20-30) per apartment",
   "title How Long Do Kitchen Cabinets Last? (20–30 Years)",
   "description Kitchen cabinets typically last 20 to 30 years. See when yours are likely due and what to set aside to replace them.",
   "description with notes Kitchen cabinets typically last 20 to 30 years. See what shortens their life, the signs they're near the end, and what to set aside to replace them.",
@@ -1229,7 +1229,7 @@ exports[`lifespan pages kitchen-cabinets 1`] = `
 
 exports[`lifespan pages laminate-countertops 1`] = `
 [
-  "life 18 (15-20) per unit",
+  "life 18 (15-20) per apartment",
   "title How Long Do Laminate Countertops Last? (15–20 Years)",
   "description Laminate countertops typically last 15 to 20 years. See when yours are likely due and what to set aside to replace them.",
   "description with notes Laminate countertops typically last 15 to 20 years. See what shortens their life, the signs they're near the end, and what to set aside to replace them.",
@@ -1521,7 +1521,7 @@ exports[`lifespan pages parking-lot-seal-coat 1`] = `
 
 exports[`lifespan pages range-oven 1`] = `
 [
-  "life 14 (13-15) per unit",
+  "life 14 (13-15) per apartment",
   "title How Long Does a Range or Oven Last? (13–15 Years)",
   "description A range or oven typically lasts 13 to 15 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A range or oven typically lasts 13 to 15 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1594,7 +1594,7 @@ exports[`lifespan pages range-oven 1`] = `
 
 exports[`lifespan pages refrigerator 1`] = `
 [
-  "life 13 (10-15) per unit",
+  "life 13 (10-15) per apartment",
   "title How Long Does a Refrigerator Last? (10–15 Years)",
   "description A refrigerator typically lasts 10 to 15 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A refrigerator typically lasts 10 to 15 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1667,7 +1667,7 @@ exports[`lifespan pages refrigerator 1`] = `
 
 exports[`lifespan pages tank-water-heater 1`] = `
 [
-  "life 10 (8-12) per unit",
+  "life 10 (8-12) per apartment",
   "title How Long Does a Tank Water Heater Last? (8–12 Years)",
   "description A tank water heater typically lasts 8 to 12 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A tank water heater typically lasts 8 to 12 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1740,7 +1740,7 @@ exports[`lifespan pages tank-water-heater 1`] = `
 
 exports[`lifespan pages tankless-water-heater 1`] = `
 [
-  "life 18 (15-20) per unit",
+  "life 18 (15-20) per apartment",
   "title How Long Does a Tankless Water Heater Last? (15–20 Years)",
   "description A tankless water heater typically lasts 15 to 20 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A tankless water heater typically lasts 15 to 20 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",
@@ -1886,7 +1886,7 @@ exports[`lifespan pages vinyl-siding 1`] = `
 
 exports[`lifespan pages vinyl-windows 1`] = `
 [
-  "life 25 (20-30) per unit",
+  "life 25 (20-30) per apartment",
   "title How Long Do Vinyl Windows Last? (20–30 Years) | CapexClock",
   "description Vinyl windows typically last 20 to 30 years. See when yours are likely due and what to set aside to replace them.",
   "description with notes Vinyl windows typically last 20 to 30 years. See what shortens their life, the signs they're near the end, and what to set aside to replace them.",
@@ -1959,7 +1959,7 @@ exports[`lifespan pages vinyl-windows 1`] = `
 
 exports[`lifespan pages washer-dryer 1`] = `
 [
-  "life 12 (10-13) per unit",
+  "life 12 (10-13) per apartment",
   "title How Long Does a Washer and Dryer Last? (10–13 Years)",
   "description A washer and dryer typically lasts 10 to 13 years. See when yours is likely due and what to set aside to replace it.",
   "description with notes A washer and dryer typically lasts 10 to 13 years. See what shortens its life, the signs it's near the end, and what to set aside to replace it.",

@@ -1,5 +1,14 @@
 import { COMPONENT_LIBRARY } from "../../library/components";
-import { badYearBuilt, PROBLEM_TEXT, problemFields, problemText, toComponents } from "../components";
+import {
+  badUnitCount,
+  badYearBuilt,
+  isMissingProblem,
+  PROBLEM_TEXT,
+  problemFields,
+  problemText,
+  toComponents,
+  type RowProblem,
+} from "../components";
 import { landlordForecast } from "../../forecast";
 import { exampleDraft } from "../example";
 import type { Draft, DraftRow } from "../model";
@@ -121,7 +130,7 @@ describe("pointing a row's note at the field it's about", () => {
     expect(problemFields(badCost, "invalid")).toEqual(["costEach"]);
     expect(problemText(badCost, "invalid")).toBe("Cost should be a plain number, like 1400.");
 
-    const badLifeAndQty = { ...dated, quantity: "twelve", usefulLife: "0" };
+    const badLifeAndQty = { ...dated, quantity: "twelve", followsUnitCount: false, usefulLife: "0" };
     expect(problemFields(badLifeAndQty, "invalid")).toEqual(["quantity", "usefulLife"]);
     expect(problemText(badLifeAndQty, "invalid")).toBe(
       "Quantity should be a number above 0, like 12. Useful life should be a whole number of years from 1 to 100.",
@@ -131,7 +140,32 @@ describe("pointing a row's note at the field it's about", () => {
     expect(problemText(badSqFt, "invalid")).toBe("Square feet should be a number above 0, like 1200.");
   });
 
+  it("points a row following the unit count back to Rental units", () => {
+    for (const unitCount of ["", "0", "abc"]) {
+      const row = { ...rowFromLibrary(waterHeater, unitCount), installYear: "2016", costEach: "900" };
+      const problem = toComponents({ unitCount, yearBuilt: "", rows: [row] }, 2026).problems[row.id];
+      expect(problem).toBe("invalid");
+      expect(problemFields(row, problem)).toEqual(["quantity"]);
+      expect(problemText(row, problem)).toBe("Enter the number of rental units at the top, or type how many here.");
+    }
+  });
+
+  it("treats a name, install year or cost not filled in yet as a next step, not a mistake", () => {
+    expect(["missing_name", "missing_install_year", "missing_cost"].every((p) => isMissingProblem(p as RowProblem))).toBe(true);
+    expect(["bad_install_year", "bad_year_built", "invalid"].some((p) => isMissingProblem(p as RowProblem))).toBe(false);
+  });
+
   it("keeps the fixed wording for the other problems", () => {
     expect(problemText(dated, "missing_cost")).toBe(PROBLEM_TEXT.missing_cost);
+  });
+});
+
+describe("rental units", () => {
+  it("is fine blank or as a whole number of 1 or more", () => {
+    for (const ok of ["", " ", "1", "12", "1,200"]) expect(badUnitCount(ok)).toBe(false);
+  });
+
+  it("is questioned as 0, a fraction or words", () => {
+    for (const bad of ["0", "-3", "2.5", "abc"]) expect(badUnitCount(bad)).toBe(true);
   });
 });

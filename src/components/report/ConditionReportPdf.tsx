@@ -10,10 +10,13 @@ import {
   conditionCounts,
   countNoun,
   LANDLORD_LABELS,
+  leftOutLife,
+  leftOutReasonText,
   remainingLifeText,
   statusText,
   type Component,
   type LandlordForecast,
+  type LeftOutComponent,
   type ReportRow,
 } from "@/verticals/landlord";
 
@@ -71,7 +74,7 @@ const s = StyleSheet.create({
 });
 
 // Component table columns, in points (the page has 524 between margins).
-const cols = { name: 124, qty: 58, installed: 46, age: 56, life: 38, remaining: 62, condition: 58, cost: 82 };
+const cols = { name: 124, qty: 68, installed: 46, age: 56, life: 38, remaining: 62, condition: 58, cost: 72 };
 
 export interface ConditionReportProps {
   propertyName: string;
@@ -81,6 +84,8 @@ export interface ConditionReportProps {
   rows: ReportRow[];
   forecast: LandlordForecast;
   components: readonly Component[];
+  /** Components the report leaves out (no cost or no install year): named, never counted. */
+  leftOut?: readonly LeftOutComponent[];
   /** "October 1, 2026" */
   preparedOn: string;
   /** "October 2026": when the owner's information is from. */
@@ -96,11 +101,22 @@ export default function ConditionReportPdf({
   rows,
   forecast,
   components,
+  leftOut = [],
   preparedOn,
   informationAsOf,
   sampleNote,
 }: ConditionReportProps) {
   const atRisk = rows.filter((r) => r.status !== "ok");
+  // Left out of every total, but an overdue one still belongs in the at-risk list.
+  const leftAtRisk = leftOut.flatMap((c) => {
+    const life = leftOutLife(c, forecast.startYear);
+    return life && life.status !== "ok" ? [{ ...c, ...life, endOfLifeYear: c.endOfLifeYear! }] : [];
+  });
+  const riskList = [
+    ...atRisk.map((r) => ({ kind: "row" as const, r, remainingLife: r.remainingLife, name: r.name })),
+    ...leftAtRisk.map((c) => ({ kind: "left" as const, c, remainingLife: c.remainingLife, name: c.name })),
+  ].sort((a, b) => a.remainingLife - b.remainingLife || a.name.localeCompare(b.name));
+  const listed = rows.length + leftOut.length;
   const estimated = rows.filter((r) => r.installYearIsEstimate);
   const due = exportRows(forecast, components, new Map(rows.map((r) => [r.id, r.unitLabel])));
   const money = moneyColumn(due.map((r) => r.total));
@@ -110,7 +126,7 @@ export default function ConditionReportPdf({
 
   const header = (
     <View style={s.topRow} fixed>
-      <Text style={s.brand}>CAPEXCLOCK · CONDITION REPORT</Text>
+      <Text style={s.brand}>CAPEXCLOCK · CONDITION REPORT · {propertyName}</Text>
       {sampleNote && <Text style={s.sample}>SAMPLE</Text>}
     </View>
   );
@@ -172,7 +188,16 @@ export default function ConditionReportPdf({
         <View style={s.facts}>
           <Fact name="Units" value={units} />
           <Fact name="Year built" value={yearBuilt === null ? "Not entered" : String(yearBuilt)} />
-          <Fact name="Components listed" value={String(rows.length)} />
+          <Fact
+            name="Components listed"
+            value={leftOut.length > 0 ? `${rows.length} of ${listed}` : String(rows.length)}
+          />
+          {leftOut.length > 0 && (
+            <Fact
+              name="Not in this report"
+              value={`${leftOut.map((c) => `${c.name} (${leftOutReasonText(c.missing)})`).join(", ")}. Not counted in any figure here.`}
+            />
+          )}
           <Fact
             name="Condition, rated by the owner"
             value={
@@ -181,27 +206,32 @@ export default function ConditionReportPdf({
                 : "Not rated"
             }
           />
-          <Fact name="At risk" value={`${atRisk.length} of ${rows.length} (past end of life or due within 2 years)`} />
+          <Fact name="At risk" value={`${riskList.length} of ${listed} (past end of life or due within 2 years)`} />
           <Fact name="Information supplied by" value={`The owner, ${informationAsOf}`} />
         </View>
 
         <Text style={s.h2}>At risk</Text>
-        {atRisk.length === 0 ? (
+        {riskList.length === 0 ? (
           <Text>Nothing is past its end of life or due within 2 years.</Text>
         ) : (
-          atRisk.map((r) => (
-            <View key={r.id} style={s.bullet} wrap={false}>
+          riskList.map((item) => (
+            <View key={item.kind === "row" ? item.r.id : item.c.componentId} style={s.bullet} wrap={false}>
               <Text style={s.bulletDot}>•</Text>
               <Text style={s.bulletText}>
-                <Text style={{ fontWeight: "bold" }}>{r.name}</Text>
+                <Text style={{ fontWeight: "bold" }}>{item.name}</Text>
                 {": "}
-                {r.status === "overdue"
-                  ? `${remainingLifeText(r.remainingLife)} its end of life (${r.endOfLifeYear})`
-                  : r.remainingLife === 0
-                    ? `due this year (${r.endOfLifeYear})`
-                    : `due in ${remainingLifeText(r.remainingLife)} (${r.endOfLifeYear})`}
-                {r.condition ? `, condition ${CONDITION_TEXT[r.condition].toLowerCase()}` : ""}
-                {r.installYearIsEstimate ? ". Install year estimated" : ""}. Replacement {formatMoney(r.replacementCost)}.
+                {lifeText(item.remainingLife, item.kind === "row" ? item.r.endOfLifeYear : item.c.endOfLifeYear)}
+                {item.kind === "row" ? (
+                  <>
+                    {item.r.condition ? `, condition ${CONDITION_TEXT[item.r.condition].toLowerCase()}` : ""}
+                    {item.r.installYearIsEstimate ? ". Install year estimated" : ""}. Replacement{" "}
+                    {formatMoney(item.r.replacementCost)}.
+                  </>
+                ) : item.c.missing === "cost" ? (
+                  ". Replacement cost not entered."
+                ) : (
+                  `. Not in this report: ${leftOutReasonText(item.c.missing)}.`
+                )}
               </Text>
             </View>
           ))
@@ -241,7 +271,7 @@ export default function ConditionReportPdf({
                 <Text style={[s.num, { width: cols.age }]}>{ageText(r)}</Text>
                 <Text style={[s.num, { width: cols.life }]}>{r.usefulLife} yrs</Text>
                 <Text style={[s.num, { width: cols.remaining }, r.status !== "ok" ? { color: warning } : {}]}>
-                  {remainingLifeText(r.remainingLife)}
+                  {remainingLifeText(r.remainingLife, true)}
                 </Text>
                 <Text style={{ width: cols.condition, paddingLeft: 8 }}>
                   {r.condition ? CONDITION_TEXT[r.condition] : "Not rated"}
@@ -322,6 +352,14 @@ export default function ConditionReportPdf({
       </Page>
     </Document>
   );
+}
+
+/** "4 years past its end of life (2023)", "due this year (2026)" or "due in 2 years (2028)". */
+function lifeText(remainingLife: number, endOfLifeYear: number): string {
+  if (remainingLife < 0) return `${remainingLifeText(remainingLife)} its end of life (${endOfLifeYear})`;
+  return remainingLife === 0
+    ? `due this year (${endOfLifeYear})`
+    : `due in ${remainingLifeText(remainingLife)} (${endOfLifeYear})`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

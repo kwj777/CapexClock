@@ -128,8 +128,8 @@ If you use your domain's DNS for email (support@capexclock.com), keep the existi
 
 **Netlify → your project → Forms → early-access** lists every submission (email, units,
 current method, biggest worry). **Forms → paid-interest** lists the "tell me first" sign-ups
-from the paid-idea buttons (email, units, which idea, and the page: `calculator` or
-`property`). The paid-interest form appears after the first deploy that includes it. From
+from the paid-idea buttons and /pricing (email, units, which idea, and the page: `calculator`,
+`property` or `pricing`). The paid-interest form appears after the first deploy that includes it. From
 either form you can:
 
 - **Export to CSV** from the form's page.
@@ -251,7 +251,9 @@ keeps that file and `supabase/seed.sql` in sync.
 
 Three buttons test paid ideas before any of them is built. Each is marked **Idea**, and the
 first click opens a panel on the page that says "Not built yet. We're deciding what to build
-next." with an email box (filled in for signed-in owners) and a units picker. Sign-ups go to the
+next." with an email box (filled in for signed-in owners) and a units picker. (Once an offer is
+on sale, its panel is headed with the offer and price instead, such as "Founding membership,
+$12/month".) Sign-ups go to the
 `paid-interest` Netlify form.
 
 | Idea | Button | Where |
@@ -274,8 +276,8 @@ PostHog events, all with `{idea, where}` and never the email or unit count:
 `paid_idea_clicked` (once per page view per idea) and `paid_idea_signup`.
 
 **The photo offer.** The photo idea's real test is a free offer (plan section 2): its panel says
-"Want it now? Email a photo of the label to support@capexclock.com and we'll fill in the row for
-you, free." The address opens an email with the subject "Photo of a label", and a click sends
+"Want it now? Email a photo of the label to support@capexclock.com and we'll email back the
+install year, size and model to enter, free." The address opens an email with the subject "Photo of a label", and a click sends
 `photo_offer_clicked` (`{idea, where}` only). When a photo arrives:
 
 1. Forward it to the CapexClock thread. Claude reads the label and drafts the row: the item, its
@@ -297,10 +299,20 @@ Building column, you check it and send it back, and the owner imports it. Delete
 30 days of sending it back, as /privacy says. No price shows on the site until the first 10 sheets
 are done.
 
-The pay question after an export keeps its wording. A Yes or Maybe now asks "Which would you
+The pay question after an export asks "Would you pay $12/month for an email before each
+replacement comes due, plus a yearly budget summary and a condition report for lenders and
+buyers?", the founding membership as /pricing sells it. A Yes or Maybe asks "Which would you
 use first?" and sends `pay_question_first_pick` with `pick` (`reminders`, `report`, `photo` or
-`other`). Every pay-question event now has `version` = `2`; events from before this change have
-no `version` but the same question and the same once-per-browser rule.
+`other`). A pick of reminders or the report then offers that idea's button (its panel shows Buy
+now or the "tell me first" list), and photo shows the photo offer. `pay_question_shown` goes
+only once at least half the card has been on screen, and only then is the browser marked as
+asked. Every pay-question event has `version`: `3` for this wording (from the day it went
+live), `2` for the old $19/month wording with the follow-up, and none before
+that. Count version 3 apart from the older answers.
+
+On /pricing, an offer that isn't on sale shows its own "tell me first" list (`where` =
+`pricing`, `idea` = `reminders` for the membership or `report`), so `paid_idea_signup` and the
+form count which offer each person wanted.
 
 ## Pre-orders (Stripe Payment Links)
 

@@ -92,7 +92,7 @@ describe("live", () => {
     const result = await run(store, "live", sent);
     expect(sent).toHaveLength(1);
     expect(sent[0].to).toBe("u1@example.com");
-    expect(sent[0].subject).toBe("2 replacements are due in 2027");
+    expect(sent[0].subject).toBe("Elm St <A>: 2 replacements due in 2027");
     expect(sent[0].html).toContain("Elm St &lt;A&gt;");
     expect(sent[0].text).toContain("- Roof: $12,000. Reaches its end of life this year.");
     expect(sent[0].oneClickUrl).toBe(`https://capexclock.com/email/unsubscribe/one-click?t=${TOKEN}&k=reminders`);
@@ -119,7 +119,7 @@ describe("live", () => {
     NOW = new Date("2027-03-17T15:00:00Z");
     await run(store, "live", sent);
     expect(sent).toHaveLength(2);
-    expect(sent[1].subject).toBe("Water heater is due for replacement in 2027");
+    expect(sent[1].subject).toBe("Elm St <A>: Water heater is due for replacement in 2027");
   });
 
   it("sends the budget summary in November, once", async () => {
@@ -192,7 +192,7 @@ describe("preview", () => {
     const builder = jest.fn().mockResolvedValue({ subject: "Report", html: "", text: "", attachments: [] });
     await run(store, "preview", sent, { conditionReport: builder });
     expect(sent.map((e) => [e.to, e.subject])).toEqual([
-      ["support@capexclock.com", "[Preview for u1@example.com] 2 replacements are due in 2027"],
+      ["support@capexclock.com", "[Preview for u1@example.com] Elm St <A>: 2 replacements due in 2027"],
       ["support@capexclock.com", expect.stringMatching(/^\[Preview for u1@example.com\] Your 2028 replacement budget/)],
       ["support@capexclock.com", "[Preview for u1@example.com] Report"],
     ]);
