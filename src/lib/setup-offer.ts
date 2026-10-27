@@ -10,6 +10,8 @@ export const SETUP_OFFER = {
   before: "Email your spreadsheet to",
   after:
     "and we'll set up your buildings for you, free for early users. Any layout works. Please delete tenant names first.",
+  // As the thank-you pages say for the reports we make by hand.
+  reply: "We reply within 2 business days with a file you can import.",
   subject: "Set up my buildings",
 } as const;
 

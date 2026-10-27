@@ -132,6 +132,11 @@ describe("import wording", () => {
     expect(detailsText(row({ installYear: "", usefulLife: "", costEach: "" }), false)).toBe(
       "Qty 12 · Installed: year built (estimate) · No useful life yet · No cost yet",
     );
+    // With no year built to use, it says so instead of promising one.
+    expect(detailsText(row({ installYear: "" }), false, false)).toBe(
+      "Qty 12 · No install year yet: add one, or a year built · Life 10 yrs · $1,400 each",
+    );
+    expect(detailsText(row({ replaceNow: true }), false)).toBe("Qty 12 · Installed 2014 · Life 10 yrs · $1,400 each · Replace this year");
     expect(detailsText(row({ installYear: "Jun-14", quantity: "a few", costEach: "call Bob" }), false)).toBe(
       'Qty "a few" · Installed "Jun-14" · Life 10 yrs · Cost "call Bob"',
     );
@@ -280,7 +285,10 @@ describe("an issue on My properties, where a row can't be saved as a guess", () 
     expect(issueBeforeCreate("The cost is per sq ft. Type the square feet. If you don't, it's added as 1 sq ft.")).toBe(
       "The cost is per sq ft. Type the square feet.",
     );
-    expect(issueBeforeCreate('Which item is "Roof"? Answer above, or it\'s added as its own item.')).toBe('Which item is "Roof"? Answer above.');
+    // A name question can be left: the name is kept as its own item.
+    expect(issueBeforeCreate('Which item is "Roof"? Answer above, or it\'s added as its own item.')).toBe(
+      'Which item is "Roof"? Answer above, or it\'s added as its own item.',
+    );
     // Words without such an ending stay as they are.
     expect(issueBeforeCreate("No useful life yet. Type how many years it lasts.")).toBe("No useful life yet. Type how many years it lasts.");
   });

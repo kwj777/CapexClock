@@ -1,5 +1,6 @@
 import { openSheet, parseSheetYear, startingChoices } from "../open";
-import { byteLength, decodeText, failedReason, fileKind, MAX_BYTES, PROBLEM_TEXT, readText } from "../read";
+import { byteLength, decodeText, failedReason, fileKind, MAX_BYTES, noHeaderProblem, PROBLEM_TEXT, readText } from "../read";
+import { onlyHeadings, openTabs } from "../tabs";
 import { match, parse } from "../__fixtures__/sheets";
 
 describe("reading pasted rows and CSV files", () => {
@@ -73,7 +74,12 @@ describe("reading pasted rows and CSV files", () => {
     expect(fileKind("libre.ods", "")).toBe("spreadsheet");
     // Windows calls CSV files "application/vnd.ms-excel"; the name says what they are.
     expect(fileKind("list.csv", "application/vnd.ms-excel")).toBe("text");
-    expect(fileKind("photo.jpg", "image/jpeg")).toBe("other");
+    // Chosen by mistake: each says what it is.
+    expect(fileKind("photo.jpg", "image/jpeg")).toBe("image");
+    expect(fileKind("IMG_2041.HEIC", "")).toBe("image");
+    expect(fileKind("Capex plan.pdf", "application/pdf")).toBe("pdf");
+    expect(fileKind("notes.docx", "")).toBe("document");
+    expect(fileKind("data.json", "application/json")).toBe("other");
   });
 });
 
@@ -144,5 +150,24 @@ describe("what the panel says when it can't read something", () => {
     expect(failedReason("loading_failed")).toBeNull();
     expect(failedReason("too_big")).toBe("too_big");
     expect(failedReason("unreadable")).toBe("unreadable");
+  });
+
+  it("tells a chosen file what's wrong with it in its own words, sent as the reasons it had before", () => {
+    expect(noHeaderProblem("paste")).toBe("no_header");
+    expect(noHeaderProblem("file")).toBe("no_header_file");
+    expect(noHeaderProblem("xlsx")).toBe("no_header_file");
+    expect(PROBLEM_TEXT.no_header_file).not.toContain("Copy");
+    expect(failedReason("no_header_file")).toBe("no_header");
+    expect(failedReason("no_rows")).toBe("no_header");
+    expect(PROBLEM_TEXT.pdf_file).toMatch(/^That's a PDF, not a spreadsheet\./);
+    for (const kind of ["pdf_file", "document_file", "image_file"] as const) expect(failedReason(kind)).toBe("unsupported");
+  });
+
+  it("knows a sheet of headings with no rows, like the blank template", () => {
+    const blank = [["Building", "Units", "Year built", "Component", "Quantity", "Install year", "Cost each"]];
+    expect(onlyHeadings(openTabs([{ name: "Template", grid: blank, hidden: false }], match, 2026))).toBe(true);
+    const filled = [...blank, ["Elm", "4", "1990", "Boiler", "1", "2010", "9000"]];
+    expect(onlyHeadings(openTabs([{ name: "Template", grid: filled, hidden: false }], match, 2026))).toBe(false);
+    expect(onlyHeadings([])).toBe(false);
   });
 });

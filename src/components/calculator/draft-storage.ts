@@ -58,6 +58,39 @@ export function clearImportUndo(): void {
 }
 
 /**
+ * What an import on the template page did ("Added 6 rows."), kept for this tab only,
+ * so the calculator it opens can say so once.
+ */
+export const IMPORT_NOTICE_KEY = "capexclock:calculator:import-notice:v1";
+
+export function saveImportNotice(said: string): void {
+  try {
+    window.sessionStorage.setItem(IMPORT_NOTICE_KEY, said);
+    // The import is the latest news: an older lifespan-page arrival note isn't shown.
+    window.sessionStorage.removeItem(ARRIVAL_KEY);
+  } catch {
+    // Storage blocked: the import still works, without the message.
+  }
+}
+
+/** The kept message, read without removing it. */
+export function peekImportNotice(): string | null {
+  try {
+    return window.sessionStorage.getItem(IMPORT_NOTICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearImportNotice(): void {
+  try {
+    window.sessionStorage.removeItem(IMPORT_NOTICE_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/**
  * The row a lifespan page just added or updated, kept for this tab only, so the
  * calculator it opens can say the item arrived and point to it, once.
  */
@@ -72,6 +105,8 @@ export interface Arrival {
 export function saveArrival(arrival: Arrival): void {
   try {
     window.sessionStorage.setItem(ARRIVAL_KEY, JSON.stringify(arrival));
+    // The arrival is the latest news: an older import message isn't shown.
+    window.sessionStorage.removeItem(IMPORT_NOTICE_KEY);
   } catch {
     // Storage blocked: the item still arrives, without the note.
   }

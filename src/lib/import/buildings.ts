@@ -25,9 +25,10 @@ export interface PlannedProperty {
   yearBuilt: string;
   rows: ImportedRow[];
   /**
-   * Rows (by index in `rows`) the preview marks Needs you: a question not answered
-   * yet, or a cell that couldn't be read. They'd be saved as a guess, so the property
-   * waits until they're answered or fixed.
+   * Rows (by index in `rows`) the preview marks Needs you for something other than a
+   * name question, like a cell that couldn't be read. They'd be saved as a guess, so
+   * the property waits until they're fixed. A name question left unanswered keeps the
+   * name as its own item, as the calculator's import does, so it doesn't wait.
    */
   waiting: number[];
   /** What the sheet said about the building that the owner should check. */
@@ -92,9 +93,16 @@ export function planProperties(
   }
   return preview.buildings.map((b) => {
     const rows = byBuilding.get(b.key) ?? [];
-    const waiting = rows.flatMap((r, i) => (r.status === "needs_you" ? [i] : []));
+    const waiting = rows.flatMap((r, i) => (waitsForFix(r) ? [i] : []));
     return planProperty(tab, b, rows.map((r) => r.row), names, waiting);
   });
+}
+
+/** The row needs a fix before it's saved: anything but its name question, which can be left. */
+export function waitsForFix(row: Pick<PreviewRow, "status" | "issues" | "question">): boolean {
+  if (row.status !== "needs_you") return false;
+  // The name question's words come first (see merge in preview.ts).
+  return row.issues.length > (row.question !== null ? 1 : 0);
 }
 
 /** A property's name in a form that ignores case, spaces and punctuation, so "12 Elm St" and "12 elm st." match. */
@@ -174,11 +182,7 @@ export function plannedProblems(property: PlannedProperty, currentYear: number):
   const name = (r: { name: string }) => r.name.trim() || "a row with no name";
   if (waiting.size > 0) {
     const names = property.rows.filter((_, i) => waiting.has(i)).map(name);
-    lines.push(
-      `${someNames(names)} ${names.length === 1 ? "needs" : "need"} you. Answer or fix ${
-        names.length === 1 ? "it" : "them"
-      } under Check the columns and rows first.`,
-    );
+    lines.push(`${someNames(names)} ${names.length === 1 ? "needs a fix" : "need fixes"} first.`);
   }
   const bad = draft.rows.filter((r, i) => problems[r.id] && !waiting.has(i));
   if (bad.length > 0) {

@@ -107,6 +107,22 @@ describe("matching names to the library", () => {
   });
 });
 
+describe("names close to another item's", () => {
+  it("prefers words spelled exactly over a near spelling", () => {
+    // "exterior" is two letters from "interior".
+    expect(match("Exterior paint - north side")).toEqual({ kind: "unsure", suggestions: ["exterior-paint"], extraWords: true });
+    expect(match("Interior paint - unit 4")).toEqual({ kind: "matched", slug: "interior-paint", extraWords: true });
+    expect(match("Hot water heatr")).toEqual({ kind: "matched", slug: "tank-water-heater", extraWords: false });
+  });
+
+  it("never offers asphalt or flat for a metal, tile, slate or wood roof", () => {
+    for (const name of ["Roof - metal", "Metal roof", "Standing seam roof", "Slate roof", "Tile roof", "Cedar shake roof"]) {
+      expect(match(name)).toEqual({ kind: "none" });
+    }
+    expect(match("Roof")).toMatchObject({ kind: "unsure", suggestions: ["asphalt-shingle-roof", "flat-membrane-roof"] });
+  });
+});
+
 describe("name helpers", () => {
   it("compares names by their words, without sizes or plurals", () => {
     expect(nameKey("Water Heaters (40gal)")).toBe("water heater");

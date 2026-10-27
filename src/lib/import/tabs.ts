@@ -1,7 +1,7 @@
 import type { LibraryComponent } from "@/verticals/landlord";
 import type { NameMatcher } from "./names";
 import { openSheet, startingChoices, type OpenedSheet } from "./open";
-import { buildPreview } from "./preview";
+import { buildPreview, dataRowCount } from "./preview";
 import type { FailReason } from "./read";
 import { tooWide, type Tab } from "./xlsx";
 
@@ -45,6 +45,12 @@ export function tabNote(tab: Tab, opened: OpenedTab, rows: number | null): strin
     note = `${n.toLocaleString("en-US")} ${n === 1 ? "row" : "rows"}`;
   }
   return tab.hidden ? `hidden, ${note}` : note;
+}
+
+/** Every tab with headings has nothing under them, like the blank template. */
+export function onlyHeadings(opened: readonly OpenedTab[]): boolean {
+  const usable = opened.filter((t) => typeof t === "object");
+  return usable.length > 0 && usable.every((t) => dataRowCount(t.sheet.grid, t.sheet.headerRow) === 0);
 }
 
 /**

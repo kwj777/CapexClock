@@ -70,7 +70,7 @@ describe("a property whose rows need the owner", () => {
     const [property] = planProperties(0, asked, names);
     expect(property.waiting).toEqual([0, 1]);
     expect(plannedProblems(withEdits(property, { unitCount: "12" }), CURRENT_YEAR)).toEqual([
-      "Tank water heater and Gas furnace need you. Answer or fix them under Check the columns and rows first.",
+      "Tank water heater and Gas furnace need fixes first.",
     ]);
     // Answered: the building's unit count, so each row counts as one.
     const answered = preview(sheet, { columns: ["item", "unitCount", "installYear", "life", "cost"], quantityAnswered: true });
@@ -83,7 +83,7 @@ describe("a property whose rows need the owner", () => {
   it("names a row once, under what it needs, not again as a row that can't be saved", () => {
     const [, birch] = planProperties(0, preview(BUILDINGS), names);
     expect(plannedProblems(birch, CURRENT_YEAR)).toEqual([
-      "Refrigerator needs you. Answer or fix it under Check the columns and rows first.",
+      "Refrigerator needs a fix first.",
     ]);
   });
 
@@ -92,7 +92,7 @@ describe("a property whose rows need the owner", () => {
     const row = preview(["Item,Qty,Year installed,Life,Cost", "Boiler,1,2010,30,9000"].join("\n")).rows[0].row;
     const rows = ["Boiler", "Roof", "Carpet", "Range", "Fridge", "Stove"].map((name) => ({ ...row, name }));
     expect(plannedProblems({ ...base, rows, waiting: [0, 1, 2, 3, 4, 5] }, CURRENT_YEAR)).toEqual([
-      "Boiler, Roof, Carpet and 3 more need you. Answer or fix them under Check the columns and rows first.",
+      "Boiler, Roof, Carpet and 3 more need fixes first.",
     ]);
   });
 });
@@ -119,7 +119,7 @@ describe("a column with each building's unit count on its rows", () => {
         ["Oak", [0, 1]],
       ]);
       expect(plannedProblems(withEdits(planned[0], { unitCount: "12" }), CURRENT_YEAR)).toEqual([
-        "Asphalt shingle roof and Tank water heater need you. Answer or fix them under Check the columns and rows first.",
+        "Asphalt shingle roof and Tank water heater need fixes first.",
       ]);
     }
   });
@@ -209,15 +209,14 @@ describe("after the first 20 of 23 buildings are created", () => {
     expect([...sentTabs([...planned, { id: "1:", tab: 1 }], results)]).toEqual([0]);
   });
 
-  it("says what's held back, by name, until it's answered there", () => {
+  it("keeps an unanswered name as its own item, so nothing is held back, and an answer still applies", () => {
     expect(rest.map((p) => [p.name, p.waiting])).toEqual([
       ["Bldg 21", []],
-      ["Bldg 22", [0]],
+      ["Bldg 22", []],
       ["Bldg 23", []],
     ]);
-    expect(plannedProblems(rest[1], CURRENT_YEAR)).toEqual([
-      "Roof needs you. Answer or fix it under Check the columns and rows first.",
-    ]);
+    expect(rest[1].rows[0]).toMatchObject({ name: "Roof", librarySlug: null });
+    expect(plannedProblems(rest[1], CURRENT_YEAR)).toEqual([]);
     const answer = preview(sheet).questions[0];
     const answered = planProperties(0, preview(sheet, { answers: { [answer.key]: "asphalt-shingle-roof" } }), names);
     // The answer changes only the rows of the building that waited.
@@ -230,7 +229,7 @@ describe("after the first 20 of 23 buildings are created", () => {
   it("announces the buildings ticked next, and nothing while there are none", () => {
     const state = { read: true, running: false, started: true };
     expect(planAnnouncement(state, [], 23)).toBe("");
-    expect(planAnnouncement(state, rest, 23)).toBe("3 properties to create from 3 rows. 1 row needs you.");
+    expect(planAnnouncement(state, rest, 23)).toBe("3 properties to create from 3 rows.");
     expect(planAnnouncement({ ...state, running: true }, rest, 23)).toBe("");
     // Before any are created, the plan is read out as before.
     expect(planAnnouncement({ ...state, started: false }, planned.slice(0, 20), 23)).toBe("20 properties to create from 20 rows.");

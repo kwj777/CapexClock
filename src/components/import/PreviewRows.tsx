@@ -53,11 +53,14 @@ export interface PreviewRowsProps {
    * needs the owner holds its property back instead of going in as a guess.
    */
   beforeCreate?: boolean;
+  /** A year built is known for this building (a BuildingInfo key), so a blank install year can use it. */
+  hasYearBuilt?: (building: string) => boolean;
   /** One below the review's own headings. */
   headingLevel?: 4 | 5;
 }
 
 const asIs = (text: string) => text;
+const always = () => true;
 
 /** The preview's rows by status, Needs you first, then the skipped rows. */
 function PreviewRows({
@@ -67,6 +70,7 @@ function PreviewRows({
   fallbackFocusId,
   onFix,
   beforeCreate = false,
+  hasYearBuilt = always,
   headingLevel = 5,
 }: PreviewRowsProps) {
   const Heading = `h${headingLevel}` as const;
@@ -115,6 +119,7 @@ function PreviewRows({
                   duplicate={duplicateIds.has(r.id)}
                   listNote={listNotes?.get(r.id)}
                   formId={formId(r.id)}
+                  yearBuiltKnown={hasYearBuilt(r.building)}
                   onFix={fix}
                   say={beforeCreate ? issueBeforeCreate : asIs}
                 />
@@ -187,6 +192,7 @@ function Row({
   duplicate,
   listNote,
   formId,
+  yearBuiltKnown,
   onFix,
   say,
 }: {
@@ -194,6 +200,7 @@ function Row({
   duplicate: boolean;
   listNote: string | undefined;
   formId: string;
+  yearBuiltKnown: boolean;
   onFix: (row: PreviewRow, values: Partial<Record<FixField, string>>) => void;
   /** An issue's words as shown here. */
   say: (text: string) => string;
@@ -215,7 +222,7 @@ function Row({
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{rowNumbers(row.sheetRows)}</p>
       </div>
-      <p className="mt-0.5 text-sm wrap-anywhere text-slate-600 dark:text-slate-300">{detailsText(row.row, row.lifeIsTypical)}</p>
+      <p className="mt-0.5 text-sm wrap-anywhere text-slate-600 dark:text-slate-300">{detailsText(row.row, row.lifeIsTypical, yearBuiltKnown)}</p>
       {listNote && (
         <p className="mt-0.5 text-sm font-medium wrap-anywhere text-emerald-800 dark:text-emerald-300">{listNote}</p>
       )}

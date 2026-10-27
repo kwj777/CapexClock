@@ -121,8 +121,11 @@ export function duplicateText(names: readonly string[]): string {
   return `Your list already has ${listText(shown)}. Adding puts in another row for ${these}, so remove any you don't need.`;
 }
 
-/** One line of what a row will hold: "Qty 12 · Installed 2014 (guess) · Life 10 yrs (typical) · $1,400 each". */
-export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
+/**
+ * One line of what a row will hold: "Qty 12 · Installed 2014 (guess) · Life 10 yrs (typical) · $1,400 each".
+ * A blank install year uses the year built, when there is one to use.
+ */
+export function detailsText(row: ImportedRow, lifeIsTypical: boolean, yearBuiltKnown = true): string {
   const parts: string[] = [];
   const quantity = Number(row.quantity);
   if (row.followsUnitCount && row.unitLabel === "per_unit") {
@@ -132,7 +135,7 @@ export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
   } else {
     parts.push(Number.isFinite(quantity) ? `Qty ${quantity.toLocaleString("en-US")}` : `Qty ${quote(row.quantity)}`);
   }
-  if (row.installYear === "") parts.push("Installed: year built (estimate)");
+  if (row.installYear === "") parts.push(yearBuiltKnown ? "Installed: year built (estimate)" : NO_INSTALL_YEAR);
   else if (/^\d{4}$/.test(row.installYear)) parts.push(`Installed ${row.installYear}${row.installYearIsGuess ? " (guess)" : ""}`);
   else parts.push(`Installed ${quote(row.installYear)}`);
   if (row.usefulLife === "") parts.push("No useful life yet");
@@ -143,11 +146,15 @@ export function detailsText(row: ImportedRow, lifeIsTypical: boolean): string {
   else if (Number.isFinite(cost)) parts.push(`${formatUnitPrice(cost)} ${row.unitLabel === "per_sq_ft" ? "per sq ft" : "each"}`);
   else parts.push(`Cost ${quote(row.costEach)}`);
   if (row.condition) parts.push(`${CONDITION_TEXT[row.condition]} condition`);
+  if (row.replaceNow) parts.push("Replace this year");
   return parts.join(" · ");
 }
 
-/** What's left to do, under the summary. */
-export function previewHints(preview: Preview): string[] {
+/** A row with no install year, where no year built is known either. */
+export const NO_INSTALL_YEAR = "No install year yet: add one, or a year built";
+
+/** What's left to do, under the summary. `yearBuiltKnown`: a year built is known for every building shown. */
+export function previewHints(preview: Preview, yearBuiltKnown = true): string[] {
   const hints: string[] = [];
   if (preview.missingItemColumn) hints.push("Choose which column has the item names.");
   // While the quantity question is open, it says what happens instead.
@@ -166,7 +173,9 @@ export function previewHints(preview: Preview): string[] {
   }
   if (preview.noYearColumn && !preview.missingItemColumn) {
     hints.push(
-      "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above.",
+      yearBuiltKnown
+        ? "No column has install years, so each item uses the year built, marked an estimate. If one does, choose Install year for it above."
+        : "No column has install years, and there's no year built yet. If a column has them, choose Install year for it above. If not, add install years or the year built after importing.",
     );
   }
   for (const { column, heading, role } of preview.doubtfulYears) {
@@ -245,8 +254,12 @@ export function quantityAnswers(
 export const NEEDS_YOU_TEXT = {
   section:
     "Fix these here if you can. If you add them as they are, the calculator flags anything missing or unreadable, and the rest go in as each one says.",
-  /** On My properties, where rows are saved straight away, so none is saved as a guess. */
-  beforeCreate: "Answer or fix each of these. A property can't be created while any of its rows still need you.",
+  /**
+   * On My properties, where rows are saved straight away, so none is saved as a guess.
+   * A name question left unanswered keeps the name as its own item, as everywhere else.
+   */
+  beforeCreate:
+    "Fix each of these. A property can't be created while any of its rows still need a fix. Names you don't answer are kept as their own items.",
   beforeAdd:
     "Rows that still need you are added too. The calculator flags anything missing or unreadable, and the rest go in as each one says.",
 };
@@ -255,9 +268,10 @@ export const NEEDS_YOU_TEXT = {
  * An issue's words where a row that needs the owner can't be saved as it is (My
  * properties): what would happen if it were left goes, since it can't be left.
  * "…or type the quantity. If you don't, it's added as 12." ends "…or type the quantity."
+ * A name question can be left: its name is kept as its own item.
  */
 export function issueBeforeCreate(text: string): string {
-  return text.replace(/\s*If you don't, [^.]*\.$/, "").replace(/, or it's added as its own item\.$/, ".");
+  return text.replace(/\s*If you don't, [^.]*\.$/, "");
 }
 
 /** The label of each field the preview lets the owner fix. */

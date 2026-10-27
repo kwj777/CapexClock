@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type SetStateAction } from "react";
 import { track } from "@/lib/analytics";
 import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
 import { buildPreview, type Preview } from "@/lib/import/preview";
-import { failedReason, PROBLEM_TEXT, type FailReason, type Problem } from "@/lib/import/read";
+import { failedReason, noHeaderProblem, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
 import {
   applyLabel,
   askText,
@@ -22,7 +23,7 @@ import {
   removeText,
   sheetDetails,
 } from "@/lib/import/reimport";
-import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
+import { onlyHeadings, openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { duplicates, duplicateText, longListText, NEEDS_YOU_TEXT } from "@/lib/import/wording";
 import type { Draft, DraftImport, LibraryComponent } from "@/verticals/landlord";
 import SheetReview, { type SheetState } from "./SheetReview";
@@ -105,6 +106,9 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
   // A detail the list already has a different value for changes only if the owner keeps it ticked.
   const takesDetail = (field: "unitCount" | "yearBuilt") => detailAnswers[field] ?? plan?.matched === true;
   const applied = [...details.fill, ...details.ask.filter((a) => takesDetail(a.field))];
+  // A blank install year uses the list's year built, or the one the sheet gives it.
+  const hasYearBuilt = (key: string) =>
+    /^\d{4}$/.test(draft.yearBuilt.trim()) || preview?.buildings.find((b) => b.key === key)?.yearBuilt != null;
 
   // Counts only: never names or anything from the sheet.
   useEffect(() => {
@@ -126,7 +130,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     return () => window.clearTimeout(timer);
   }, [summary, openedSheet]);
 
-  function failOpen(reason: FailReason, source: SourceRead["source"]) {
+  function failOpen(reason: Problem, source: SourceRead["source"]) {
     setSheet(null);
     setProblem(reason);
     const sent = failedReason(reason);
@@ -148,9 +152,12 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
     setTabs(list);
     const first = startingTabs(next.tabs, list)[0] ?? -1;
     if (first < 0) {
-      const reason = list[0];
-      return failOpen(typeof reason === "string" && list.length === 1 ? reason : "no_header", next.source);
+      const only = list[0];
+      const reason = typeof only === "string" && list.length === 1 ? only : "no_header";
+      return failOpen(reason === "no_header" ? noHeaderProblem(next.source) : reason, next.source);
     }
+    // Headings with nothing under them, like the blank template, are as good as empty.
+    if (onlyHeadings(list)) return failOpen("no_rows", next.source);
     setProblem(null);
     showTab(list, first);
   }
@@ -223,11 +230,17 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
         file. Your sheet is read in this browser and never uploaded.
       </p>
       <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-        Starting from scratch? <TemplateLink file="template" format="xlsx" where={`import_${where}`} /> or{" "}
-        <TemplateLink file="template" format="csv" where={`import_${where}`}>
-          the CSV version
-        </TemplateLink>
-        . A component list you downloaded here updates your rows when you import it again.
+        {/* The template page already offers the template, just above. */}
+        {where !== "template_page" && (
+          <>
+            Starting from scratch? <TemplateLink file="template" format="xlsx" where={`import_${where}`} /> or{" "}
+            <TemplateLink file="template" format="csv" where={`import_${where}`}>
+              the CSV version
+            </TemplateLink>
+            .{" "}
+          </>
+        )}
+        A component list you downloaded here updates your rows when you import it again.
       </p>
 
       <SourcePicker where={where} onRead={onRead} onProblem={onProblem} />
@@ -274,9 +287,23 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
               </label>
               <p id={`${baseId}-building-hint`} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 This sheet has {preview.buildings.length} buildings.{" "}
-                {where === "editor"
-                  ? "A property holds one, so choose the one to import. To make a property of each, use Import on My properties."
-                  : `The calculator takes one at a time.${accountsEnabled ? " Signed in, you can make a property of each from My properties." : ""}`}
+                {where === "editor" ? (
+                  "A property holds one, so choose the one to import. To make a property of each, use Import on My properties."
+                ) : (
+                  <>
+                    The calculator takes one at a time.
+                    {accountsEnabled && (
+                      <>
+                        {" "}
+                        <Link href="/auth/sign-in?next=/app" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+                          Sign in free
+                        </Link>{" "}
+                        (no password) and import all {preview.buildings.length} buildings at once from My properties.
+                        You&apos;ll choose the file again there.
+                      </>
+                    )}
+                  </>
+                )}
               </p>
               <select
                 id={`${baseId}-building`}
@@ -305,6 +332,7 @@ export default function ImportPanel({ id, library, draft, onApply, onClose, wher
             summary={summary}
             duplicateIds={dup.ids}
             listNotes={notes}
+            hasYearBuilt={hasYearBuilt}
           />
 
           <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
