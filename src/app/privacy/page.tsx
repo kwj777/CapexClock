@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // netlify/edge-functions/posthog-relay.ts, src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
 // src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
-const UPDATED = "October 3, 2026";
+const UPDATED = "October 27, 2026";
 
 // The sign-in check is mentioned only on deploys that have it switched on.
 const CAPTCHA_ON = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) !== null;
@@ -118,8 +118,10 @@ export default function PrivacyPage() {
               <li>clicks, without the text of what you clicked,</li>
               <li>
                 steps like starting the calculator, getting a forecast or a quick estimate (how many systems were
-                ticked, not your numbers), creating an account, saving a property, exporting, importing a spreadsheet
-                (how many rows, never what&apos;s in them), and coming back on a later day,
+                ticked, not your numbers), comparing replacing now with waiting, adding a lifespan estimate to the
+                calculator, creating an account, saving a property, exporting, downloading the spreadsheet template,
+                importing a spreadsheet (how many rows, never what&apos;s in them), clicking our setup or photo offers,
+                turning member emails on or off, and coming back on a later day,
               </li>
               <li>
                 your answers to our short survey (one question, and a second one if you answer Yes or Maybe), and which buttons for ideas we haven&apos;t built yet you saw,
@@ -136,10 +138,24 @@ export default function PrivacyPage() {
               We don&apos;t record your screen. If you block cookies, the site still works.
             </p>
             <p className="mt-3">
-              Analytics go to PostHog through capexclock.com rather than straight to PostHog, so most tracker blockers
-              don&apos;t stop them. On the way, we pass on only what PostHog needs and your IP address (for the rough
+              Analytics go to PostHog through capexclock.com rather than straight to PostHog, so we don&apos;t lose
+              visits. On the way, we pass on only what PostHog needs and your IP address (for the rough
               location above). Apart from the random ID PostHog keeps in its cookie, your cookies for this site,
               including your sign-in, are never passed on.
+            </p>
+            <p className="mt-3">
+              To turn analytics off in this browser, open{" "}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full page load applies it (src/lib/count-me.ts) */}
+              <a href="/?count-me=off" className={link}>
+                capexclock.com/?count-me=off
+              </a>{" "}
+              (and{" "}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full page load applies it (src/lib/count-me.ts) */}
+              <a href="/?count-me=on" className={link}>
+                ?count-me=on
+              </a>{" "}
+              to turn them back on). If your browser sends the Global Privacy Control signal, we don&apos;t load
+              analytics at all.
             </p>
           </Section>
 
