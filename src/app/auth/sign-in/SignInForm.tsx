@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import Script from "next/script";
-import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
+import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { CONTACT_EMAIL } from "@/lib/site";
 import { createClient } from "@/lib/supabase/client";
 import {
   CAPTCHA_FAILED_TEXT,
   CAPTCHA_WAIT_TEXT,
   captchaReducer,
   initialCaptcha,
+  sendErrorKind,
   sendErrorMessage,
   sendPlan,
   TURNSTILE_SCRIPT_URL,
@@ -27,12 +29,33 @@ type Status =
   | { kind: "idle" }
   | { kind: "sending" }
   | { kind: "sent"; email: string }
-  | { kind: "error"; message: string; detail: string };
+  // detail is Supabase's own reason, shown only when we don't recognise the error.
+  | { kind: "error"; message: string; detail: string | null };
 
-export default function SignInForm({ next }: { next: string }) {
+/** Text with the support address as a tappable mail link. */
+function withMailLink(text: string): ReactNode {
+  const at = text.indexOf(CONTACT_EMAIL);
+  if (at === -1) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <a href={`mailto:${CONTACT_EMAIL}`} className="underline underline-offset-2">
+        {CONTACT_EMAIL}
+      </a>
+      {text.slice(at + CONTACT_EMAIL.length)}
+    </>
+  );
+}
+
+export default function SignInForm({ next, linkFailed = false }: { next: string; linkFailed?: boolean }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  // The "link didn't work" note from the callback, until a new link is asked for.
+  const [showLinkFailed, setShowLinkFailed] = useState(linkFailed);
   const sentRef = useRef<HTMLDivElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  // Set when the owner goes back from "Check your email" to send another link.
+  const [sendAgain, setSendAgain] = useState(false);
   const [captcha, dispatch] = useReducer(captchaReducer, SITE_KEY, initialCaptcha);
   const [scriptReady, setScriptReady] = useState(false);
   // In state, not a ref, so the widget is drawn whenever the box appears.
@@ -99,7 +122,8 @@ export default function SignInForm({ next }: { next: string }) {
   // instead of letting it drop to the top of the page.
   useEffect(() => {
     if (status.kind === "sent") sentRef.current?.focus();
-  }, [status.kind]);
+    else if (sendAgain && status.kind === "idle") emailRef.current?.focus();
+  }, [status.kind, sendAgain]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,6 +134,7 @@ export default function SignInForm({ next }: { next: string }) {
       return;
     }
     setWaitShown(false);
+    setShowLinkFailed(false);
     setStatus({ kind: "sending" });
     const callback = new URL("/auth/callback", window.location.origin);
     callback.searchParams.set("next", next);
@@ -125,7 +150,8 @@ export default function SignInForm({ next }: { next: string }) {
       }));
     } catch (thrown) {
       // A setup or network failure that Supabase threw instead of returning.
-      error = { message: thrown instanceof Error ? thrown.message : String(thrown) };
+      error =
+        thrown instanceof Error ? { name: thrown.name, message: thrown.message } : { message: String(thrown) };
     }
     resetCaptcha();
     if (error) {
@@ -133,7 +159,8 @@ export default function SignInForm({ next }: { next: string }) {
       setStatus({
         kind: "error",
         // Supabase's own reason, so a setup problem (email sender, URL settings) can be diagnosed.
-        detail: [error.status, error.code, error.message].filter(Boolean).join(" · "),
+        detail:
+          sendErrorKind(error) === "other" ? [error.status, error.code, error.message].filter(Boolean).join(" · ") : null,
         message: sendErrorMessage(error),
       });
       return;
@@ -162,16 +189,36 @@ export default function SignInForm({ next }: { next: string }) {
           >
             <p className="font-semibold">Check your email</p>
             <p className="mt-1 text-sm">
-              We sent a sign-in link to {status.email}. Open it in this browser to continue.
+              We sent a sign-in link to {status.email}. Open it on this device, in this browser. If your email app
+              opens it in its own browser, copy the link into Safari or Chrome.
             </p>
+            <p className="mt-2 text-sm">Not there after a minute? Check your spam or junk folder.</p>
+            {/* Brings the form back rather than sending at once: a security check token works only once. */}
+            <button
+              type="button"
+              onClick={() => {
+                setSendAgain(true);
+                setStatus({ kind: "idle" });
+              }}
+              className="mt-3 text-sm font-semibold underline underline-offset-2 hover:text-emerald-950 dark:hover:text-white"
+            >
+              Wrong address or didn&apos;t get it? Send another link
+            </button>
           </div>
         )}
       </div>
       {status.kind !== "sent" && (
         <form onSubmit={onSubmit} className="space-y-4">
+          {showLinkFailed && (
+            <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300">
+              That sign-in link didn&apos;t work. It may have expired or been opened in a different browser. Send
+              yourself a new one below.
+            </p>
+          )}
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
             <input
+              ref={emailRef}
               type="email"
               required
               autoComplete="email"
@@ -187,7 +234,7 @@ export default function SignInForm({ next }: { next: string }) {
               <div ref={setCaptchaBox} className={captcha.kind === "failed" ? undefined : "min-h-[65px]"} />
               {captcha.kind === "failed" && (
                 <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">
-                  {CAPTCHA_FAILED_TEXT}
+                  {withMailLink(CAPTCHA_FAILED_TEXT)}
                 </p>
               )}
               {waitShown && captcha.kind !== "failed" && (
@@ -213,8 +260,10 @@ export default function SignInForm({ next }: { next: string }) {
           </p>
           {status.kind === "error" && (
             <div role="alert" className="text-sm text-red-700 dark:text-red-400">
-              <p>{status.message}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Details: {status.detail}</p>
+              <p>{withMailLink(status.message)}</p>
+              {status.detail && (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Details: {status.detail}</p>
+              )}
             </div>
           )}
         </form>

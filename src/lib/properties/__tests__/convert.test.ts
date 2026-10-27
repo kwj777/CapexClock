@@ -77,7 +77,16 @@ describe("saving an editor draft", () => {
       [d.id]: "install_year",
       [e.id]: "cost",
     });
-    expect(input.property.name).toBe("Untitled property");
+    expect(input.property.name).toBe("12-unit building");
+  });
+
+  it("names an unnamed property after its units and year built", () => {
+    const draft = { ...exampleDraft(), unitCount: "12", yearBuilt: "1998" };
+    expect(toSaveInput("  ", draft, 2026).property.name).toBe("12-unit building (built 1998)");
+    expect(toSaveInput("", { ...draft, yearBuilt: "" }, 2026).property.name).toBe("12-unit building");
+    expect(toSaveInput("", { ...draft, unitCount: "" }, 2026).property.name).toBe("Building built 1998");
+    expect(toSaveInput("", { ...draft, unitCount: "", yearBuilt: "" }, 2026).property.name).toBe("Untitled property");
+    expect(toSaveInput("Maple Court", draft, 2026).property.name).toBe("Maple Court");
   });
 
   it("accepts a year built back to 1800, as the database does", () => {
