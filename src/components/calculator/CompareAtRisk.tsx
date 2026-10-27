@@ -13,6 +13,7 @@ import {
   type ReplaceNowComparison,
 } from "@/verticals/landlord";
 import {
+  allPaidThisYearEitherWay,
   applyChosen,
   applyLabel,
   appliedText,
@@ -278,6 +279,8 @@ export function ComparisonPanel({
   const monthly = formatReserve(replaceNow.monthlyReserve);
   const perUnit = perUnitText(asPlanned, replaceNow);
   const eitherWay = eitherWayVariants(items, startYear, percent);
+  // Everything is paid this year either way: say so first, as the figures barely change.
+  const eitherWayFirst = allPaidThisYearEitherWay(items);
   const sure = items.filter((i) => !i.estimated.installYear);
   const toCheck = items.filter((i) => i.estimated.installYear);
   const shownHint = showPercentError ? errorId : percent > 0 ? noteId : hintId;
@@ -316,6 +319,7 @@ export function ComparisonPanel({
   return (
     <div className="space-y-5">
       <div>
+        {eitherWayFirst && <OneOf variants={eitherWay} className="mb-3 text-sm font-medium text-slate-800 dark:text-slate-200" />}
         <OneOf
           variants={leadVariants(chosen.length, items.length, startYear)}
           className="text-sm text-slate-700 dark:text-slate-300"
@@ -334,11 +338,14 @@ export function ComparisonPanel({
             extra={perUnit}
           />
         </dl>
-        <OneOf
-          variants={reserveVariants(asPlanned.monthlyReserve, replaceNow.monthlyReserve)}
-          className="mt-3 text-sm text-slate-700 dark:text-slate-300"
-        />
-        {eitherWay.length > 0 && (
+        {/* Left out when everything is paid this year either way: the line at the top says it. */}
+        {!eitherWayFirst && (
+          <OneOf
+            variants={reserveVariants(asPlanned.monthlyReserve, replaceNow.monthlyReserve)}
+            className="mt-3 text-sm text-slate-700 dark:text-slate-300"
+          />
+        )}
+        {eitherWay.length > 0 && !eitherWayFirst && (
           <OneOf variants={eitherWay} className="mt-2 text-sm text-slate-500 dark:text-slate-400" />
         )}
       </div>
@@ -412,7 +419,12 @@ export function ComparisonPanel({
           type="button"
           onClick={onApply}
           disabled={chosen.length === 0}
-          className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          // A secondary button when it changes little but the plan: everything is paid this year either way.
+          className={`rounded-md px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+            eitherWayFirst
+              ? "text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800"
+              : "bg-amber-500 text-slate-950 hover:bg-amber-400"
+          }`}
         >
           {applyLabel(chosen.length)}
         </button>

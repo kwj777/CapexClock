@@ -20,6 +20,14 @@ export function badYearBuilt(value: string, currentYear: number): boolean {
 
 export const YEAR_BUILT_TEXT = `Year built should be a 4-digit year from ${EARLIEST_YEAR_BUILT} to this year.`;
 
+/** True when rental units is filled in but isn't a whole number of 1 or more. */
+export function badUnitCount(value: string): boolean {
+  const units = parseNumber(value);
+  return units !== null && !(Number.isInteger(units) && units >= 1);
+}
+
+export const UNIT_COUNT_TEXT = "Rental units should be a whole number of 1 or more, like 12.";
+
 export type RowProblem =
   | "missing_name"
   | "missing_install_year"
@@ -96,6 +104,14 @@ export const PROBLEM_TEXT: Record<RowProblem, string> = {
   invalid: "Check quantity (above 0), useful life (1–100 years) and cost (a plain number like 1400).",
 };
 
+/**
+ * True for a problem that's only something not filled in yet (a new row's name,
+ * install year or cost): a next step, not a mistake, so it isn't shown as an error.
+ */
+export function isMissingProblem(problem: RowProblem): boolean {
+  return problem === "missing_name" || problem === "missing_install_year" || problem === "missing_cost";
+}
+
 /** A row's fields that a problem can point at. */
 export type RowField = "name" | "quantity" | "installYear" | "usefulLife" | "costEach" | "notes";
 
@@ -133,10 +149,13 @@ export function problemFields(row: DraftRow, problem: RowProblem): RowField[] {
 export function problemText(row: DraftRow, problem: RowProblem): string {
   if (problem !== "invalid") return PROBLEM_TEXT[problem];
   const text: Record<NumberField, string> = {
+    // A row following the unit count gets its quantity from Rental units at the top.
     quantity:
       row.unitLabel === "per_sq_ft"
         ? "Square feet should be a number above 0, like 1200."
-        : "Quantity should be a number above 0, like 12.",
+        : row.unitLabel === "per_unit" && row.followsUnitCount
+          ? "Enter the number of rental units at the top, or type how many here."
+          : "Quantity should be a number above 0, like 12.",
     usefulLife: "Useful life should be a whole number of years from 1 to 100.",
     costEach: "Cost should be a plain number, like 1400.",
   };

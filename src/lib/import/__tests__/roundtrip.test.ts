@@ -236,11 +236,18 @@ describe("downloading the component list and importing it again", () => {
     expect(others(next)).toEqual(others(draft));
   });
 
-  it("keeps a count the owner typed, even one that matched the old unit count", () => {
-    const typed = { ...draft, rows: draft.rows.map((r) => (r.unitLabel === "per_unit" ? editRow(r, { quantity: "12" }, "12") : r)) };
+  it("keeps a count the owner typed", () => {
+    const typed = { ...draft, rows: draft.rows.map((r) => (r.unitLabel === "per_unit" ? editRow(r, { quantity: "10" }, "12") : r)) };
     const file = componentListCsv(building, typed.rows);
     const { next } = importInto(typed, withUnits(file, "14"));
-    expect(perUnit(next)).toEqual(perUnit(typed).map(([n]) => [n, "12", false]));
+    expect(perUnit(next)).toEqual(perUnit(typed).map(([n]) => [n, "10", false]));
+  });
+
+  it("moves a typed count that is the unit count, which keeps the row following it", () => {
+    const typed = { ...draft, rows: draft.rows.map((r) => (r.unitLabel === "per_unit" ? editRow(r, { quantity: "12" }, "12") : r)) };
+    expect(perUnit(typed).every(([, , follows]) => follows)).toBe(true);
+    const { next } = importInto(typed, withUnits(componentListCsv(building, typed.rows), "14"));
+    expect(perUnit(next)).toEqual(perUnit(typed).map(([n]) => [n, "14", true]));
   });
 });
 

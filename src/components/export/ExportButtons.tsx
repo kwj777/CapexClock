@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { exportFileName, forecastCsv } from "@/lib/export/csv";
 import { exportDetails, type ExportFormRow } from "@/lib/export/rows";
@@ -15,6 +15,9 @@ type Format = "csv" | "pdf";
 // aria-disabled rather than disabled while busy, so keyboard focus stays on the button.
 const button =
   "rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 aria-disabled:opacity-60 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800";
+// The PDF is the main download, so it leads.
+const mainButton =
+  "rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 aria-disabled:opacity-60";
 
 export default function ExportButtons({
   name,
@@ -40,6 +43,7 @@ export default function ExportButtons({
   const [exported, setExported] = useState<Format | null>(null);
   const [failed, setFailed] = useState(false);
   const buttons = useRef<Record<Format, HTMLButtonElement | null>>({ csv: null, pdf: null });
+  const headingId = useId();
 
   async function exportAs(format: Format) {
     if (busy) return;
@@ -71,14 +75,17 @@ export default function ExportButtons({
     // The condition report idea sits with the downloads; its panel opens below them.
     <PaidIdeaDisclosure idea="report">
       {(reportButton, reportPanel) => (
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
+        <section aria-labelledby={headingId}>
+          <h3 id={headingId} className="text-base font-semibold text-slate-950 dark:text-white">
+            Download your forecast
+          </h3>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               ref={(el) => {
                 buttons.current.pdf = el;
               }}
               type="button"
-              className={button}
+              className={mainButton}
               aria-disabled={busy !== null}
               onClick={() => exportAs("pdf")}
             >
@@ -93,7 +100,7 @@ export default function ExportButtons({
               aria-disabled={busy !== null}
               onClick={() => exportAs("csv")}
             >
-              Download forecast (CSV)
+              Forecast spreadsheet (CSV)
             </button>
             {list &&
               (["xlsx", "csv"] as const).map((format) => (
@@ -120,7 +127,7 @@ export default function ExportButtons({
             onDismiss={() => exported && buttons.current[exported]?.focus()}
             onAskingChange={onPayQuestionChange}
           />
-        </div>
+        </section>
       )}
     </PaidIdeaDisclosure>
   );

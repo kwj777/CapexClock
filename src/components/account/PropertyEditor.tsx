@@ -111,16 +111,19 @@ export default function PropertyEditor({
   const [calculator] = useState(() => {
     if (!importFromCalculator) return null;
     const work = loadDraft();
-    return { draft: work, stored: JSON.stringify(work) };
+    // The calculator's optional property name becomes this property's name.
+    const { name: workName, ...workDraft } = work;
+    return { draft: workDraft, name: (workName ?? "").trim(), stored: JSON.stringify(work) };
   });
   const startingDraft = calculator?.draft ?? initialDraft;
+  const startingName = calculator?.name || initialName;
   const [restored, setRestored] = useState(() => {
     const kept = loadUnsaved(backupKey);
     // Not over newer calculator work, and not when it matches what's already here.
     if (!kept || (calculator && kept.calculator !== calculator.stored)) return null;
-    return nothingToRestore(kept, initialName, startingDraft, currentYear) ? null : kept;
+    return nothingToRestore(kept, startingName, startingDraft, currentYear) ? null : kept;
   });
-  const [name, setName] = useState(() => restored?.name ?? initialName);
+  const [name, setName] = useState(() => restored?.name ?? startingName);
   const [draft, setDraft] = useState<Draft>(() => restored?.draft ?? startingDraft);
   // The copy in the database. Restored edits keep the version they started from, so
   // saving them over a newer copy is caught.
