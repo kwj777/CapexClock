@@ -44,8 +44,13 @@ function Switches({ initial }: { initial: EmailSwitches }) {
   const [switches, setSwitches] = useState(initial);
   const [saving, setSaving] = useState<EmailKind | null>(null);
   const [failed, setFailed] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function change(kind: EmailKind, on: boolean) {
+    // Clicks while a save runs are ignored rather than disabling the switches,
+    // which would drop keyboard focus to the top of the page.
+    if (saving !== null) return;
+    setSaved(false);
     const before = switches;
     const next = { ...switches, [kind]: on };
     setSwitches(next);
@@ -60,6 +65,7 @@ function Switches({ initial }: { initial: EmailSwitches }) {
       return;
     }
     void track("email_setting_changed", { kind, on });
+    setSaved(true);
   }
 
   return (
@@ -75,7 +81,6 @@ function Switches({ initial }: { initial: EmailSwitches }) {
                 type="checkbox"
                 className="mt-1 size-4 accent-amber-600"
                 checked={switches[kind]}
-                disabled={saving !== null}
                 onChange={(e) => void change(kind, e.target.checked)}
               />
               <span>
@@ -86,6 +91,9 @@ function Switches({ initial }: { initial: EmailSwitches }) {
           </li>
         ))}
       </ul>
+      <p role="status" className="mt-3 text-sm text-slate-600 empty:hidden dark:text-slate-400">
+        {saved ? "Saved." : ""}
+      </p>
       {failed && (
         <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-400">
           That change didn&apos;t save. Please try again.

@@ -281,8 +281,8 @@ describe("the comparison's wording", () => {
   });
 
   it("gives the change in the 10-year total in whole dollars", () => {
-    expect(totalChange(150000, 152000)).toEqual({ change: "$2,000 more", detail: "$152,000, or $150,000 if you wait" });
-    expect(totalChange(150000, 148700)).toEqual({ change: "$1,300 less", detail: "$148,700, or $150,000 if you wait" });
+    expect(totalChange(150000, 152000)).toEqual({ change: "$2,000 more", detail: "$152,000 in total, or $150,000 if you wait" });
+    expect(totalChange(150000, 148700)).toEqual({ change: "$1,300 less", detail: "$148,700 in total, or $150,000 if you wait" });
     expect(totalChange(150000, 150000.2)).toEqual({ change: "No change", detail: "$150,000 either way" });
   });
 

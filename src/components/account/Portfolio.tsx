@@ -79,11 +79,19 @@ export default function Portfolio({
       <ul className="mt-8 grid gap-4 md:grid-cols-2">
         {summaries.map(({ property, forecast, excluded, componentCount }) => (
           <li key={property.id}>
-            <Link
-              href={`/app/properties/${property.id}`}
-              className={`${card} block transition hover:border-amber-400 dark:hover:border-amber-500`}
+            {/* The whole card opens the property through the name's link, stretched over it, so
+                screen readers hear the name as a heading and a link rather than every figure. */}
+            <div
+              className={`${card} relative transition hover:border-amber-400 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-(--focus-ring) dark:hover:border-amber-500`}
             >
-              <p className="text-lg font-semibold text-slate-950 dark:text-white">{property.name}</p>
+              <h2 className="text-lg font-semibold text-slate-950 dark:text-white">
+                <Link
+                  href={`/app/properties/${property.id}`}
+                  className="after:absolute after:inset-0 after:rounded-2xl focus:outline-none"
+                >
+                  {property.name}
+                </Link>
+              </h2>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 {property.unit_count > 0
                   ? `${property.unit_count} ${countNoun(LANDLORD_LABELS.divisor, property.unit_count)}`
@@ -122,7 +130,7 @@ export default function Portfolio({
                   You have unsaved changes to this property on this device. Open it to save them.
                 </p>
               )}
-            </Link>
+            </div>
           </li>
         ))}
       </ul>

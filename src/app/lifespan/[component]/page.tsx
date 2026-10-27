@@ -79,7 +79,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <nav aria-label="Breadcrumb" className="text-sm text-slate-500 dark:text-slate-400">
             <ol className="flex flex-wrap gap-x-1.5">

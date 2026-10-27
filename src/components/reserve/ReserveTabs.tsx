@@ -71,7 +71,7 @@ export default function ReserveTabs({ panels }: { panels: Record<ReserveTab, Rea
               tabIndex={selected ? 0 : -1}
               onClick={() => choose(t)}
               onKeyDown={onKeyDown}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:focus-visible:ring-offset-slate-800 ${
                 selected
                   ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white"
                   : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"

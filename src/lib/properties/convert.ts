@@ -9,6 +9,7 @@ import {
   EARLIEST_YEAR_BUILT,
   MAX_NOTES_LENGTH,
   safetyBufferOf,
+  YEAR_BUILT_TEXT,
   type Draft,
   type DraftRow,
   type RowField,
@@ -77,7 +78,8 @@ export const SAVE_PROBLEM_TEXT: Record<SaveProblem, string> = {
   install_year: `Install years must be 4-digit years from ${EARLIEST_INSTALL_YEAR} to this year, or blank.`,
   cost: "Costs must be plain numbers like 1400, or blank.",
   notes_length: `Notes can be up to ${MAX_NOTES_LENGTH.toLocaleString("en-US")} characters.`,
-  year_built: `Year built must be a 4-digit year from ${EARLIEST_YEAR_BUILT} to this year, or blank.`,
+  // Worded as under the field itself.
+  year_built: YEAR_BUILT_TEXT,
   unit_count: "Rental units must be a whole number up to 100,000.",
 };
 
@@ -106,8 +108,10 @@ export function saveProblemFields(problem: SaveProblem): RowField[] {
 export interface SaveInput {
   property: SavePropertyInput;
   components: SaveComponentInput[];
-  /** Why the draft can't be saved yet, by row id ("property" for the property fields). */
+  /** Why the draft can't be saved yet, by row id ("property" for the property fields' first problem). */
   problems: Record<string, SaveProblem>;
+  /** Every problem with the property's own fields, so both can be shown at once. */
+  propertyProblems: SaveProblem[];
 }
 
 /** Characters as the database counts them, so an emoji is one, not two. */
@@ -133,8 +137,10 @@ export function toSaveInput(
   const problems: Record<string, SaveProblem> = {};
   const unitCount = parse(draft.unitCount) ?? 0;
   const yearBuilt = parse(draft.yearBuilt);
-  if (!Number.isInteger(unitCount) || unitCount < 0 || unitCount > MAX_UNIT_COUNT) problems.property = "unit_count";
-  else if (!validYear(yearBuilt, currentYear, EARLIEST_YEAR_BUILT)) problems.property = "year_built";
+  const propertyProblems: SaveProblem[] = [];
+  if (!Number.isInteger(unitCount) || unitCount < 0 || unitCount > MAX_UNIT_COUNT) propertyProblems.push("unit_count");
+  if (!validYear(yearBuilt, currentYear, EARLIEST_YEAR_BUILT)) propertyProblems.push("year_built");
+  if (propertyProblems.length > 0) problems.property = propertyProblems[0];
 
   const components: SaveComponentInput[] = [];
   draft.rows.forEach((row, index) => {
@@ -184,5 +190,6 @@ export function toSaveInput(
     },
     components,
     problems,
+    propertyProblems,
   };
 }

@@ -33,6 +33,7 @@ export default function PayQuestion({
   const followUp = useRef<HTMLParagraphElement>(null);
   const thanks = useRef<HTMLParagraphElement>(null);
   const followUpId = useId();
+  const questionId = useId();
   const open = trigger !== null && !askedBefore;
   const step = nextStep(answer, pick);
   const asksFirstPick = step === "first_pick";
@@ -96,7 +97,9 @@ export default function PayQuestion({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className={eyebrow}>One quick question</p>
-                <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">{PAY_QUESTION}</p>
+                <p id={questionId} className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
+                  {PAY_QUESTION}
+                </p>
               </div>
               <button
                 type="button"
@@ -107,7 +110,8 @@ export default function PayQuestion({
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            {/* Named by the question, so tabbing straight to an answer says what it answers. */}
+            <div role="group" aria-labelledby={questionId} className="mt-4 flex flex-wrap gap-2">
               {PAY_ANSWERS.map((a) => (
                 <button
                   key={a}

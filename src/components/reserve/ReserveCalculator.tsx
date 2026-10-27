@@ -66,6 +66,29 @@ export default function ReserveCalculator() {
     ]),
   );
 
+  // Screen readers hear one short sentence once typing pauses, not every figure
+  // on every keystroke, and nothing until the owner changes something (same as
+  // the Quick estimate tab).
+  const summary = result
+    ? `Save ${formatReserve(result.monthly)} a month` +
+      (result.perUnit === null ? "." : `, ${formatReserve(result.perUnit)} per unit.`) +
+      (result.shortfallNow > 0 ? ` You're ${formatMoney(result.shortfallNow)} short right now.` : "")
+    : inputs.balanceProblem
+      ? "Fix the highlighted fields to see your monthly amount."
+      : problems.size > 0
+        ? "Finish each expense's cost and years until due to see your monthly amount."
+        : "";
+  const [spoken, setSpoken] = useState("");
+  const spokenSummary = useRef(summary);
+  useEffect(() => {
+    if (summary === spokenSummary.current) return;
+    const timer = window.setTimeout(() => {
+      spokenSummary.current = summary;
+      setSpoken(summary);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [summary]);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
       <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Upcoming expenses</h2>
@@ -186,7 +209,10 @@ export default function ReserveCalculator() {
         )}
       </div>
 
-      <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800" aria-live="polite">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {spoken}
+      </p>
+      <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
         {result ? (
           <>
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">

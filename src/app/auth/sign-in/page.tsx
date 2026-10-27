@@ -20,7 +20,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/auth/sign
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <div className="mx-auto w-full max-w-md px-4 pb-24 pt-10 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">
             Sign in to CapexClock

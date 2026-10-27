@@ -58,10 +58,13 @@ function useSeenOnScreen(element: HTMLElement | null, onSeen: (() => void) | nul
 export function PaidIdeaDisclosure({
   idea,
   tone = "light",
+  where,
   children,
 }: {
   idea: PaidIdea;
   tone?: Tone;
+  /** Where this copy sits ("for items at risk"), when the same idea has a button elsewhere on the page. */
+  where?: string;
   children: (button: ReactNode, panel: ReactNode) => ReactNode;
 }) {
   const { enabled, seen, clicked, wantOwnerEmail } = usePaidIdeas();
@@ -110,14 +113,24 @@ export function PaidIdeaDisclosure({
       <span className={badgeClass[tone]}>Idea</span>
     </button>
   );
-  const panel = open ? <PaidIdeaPanel id={panelId} panelRef={panelRef} idea={idea} onClose={close} /> : null;
+  const panel = open ? (
+    <PaidIdeaPanel id={panelId} panelRef={panelRef} idea={idea} where={where} onClose={close} />
+  ) : null;
   return children(button, panel);
 }
 
 /** The button with its panel right below it. */
-export default function PaidIdeaButton({ idea, className }: { idea: PaidIdea; className?: string }) {
+export default function PaidIdeaButton({
+  idea,
+  where,
+  className,
+}: {
+  idea: PaidIdea;
+  where?: string;
+  className?: string;
+}) {
   return (
-    <PaidIdeaDisclosure idea={idea}>
+    <PaidIdeaDisclosure idea={idea} where={where}>
       {(button, panel) =>
         button && (
           <div className={className}>
@@ -138,11 +151,13 @@ function PaidIdeaPanel({
   id,
   panelRef,
   idea,
+  where: place,
   onClose,
 }: {
   id: string;
   panelRef: RefObject<HTMLElement | null>;
   idea: PaidIdea;
+  where?: string;
   onClose: () => void;
 }) {
   const { where, ownerEmail, signedUp, markSignedUp, offerLinks } = usePaidIdeas();
@@ -162,8 +177,9 @@ function PaidIdeaPanel({
     <section
       ref={panelRef}
       id={id}
-      // Named after its idea, not just "Not built yet", so the panels can be told apart.
-      aria-label={panelName(idea)}
+      // Named after its idea, not just "Not built yet", and where it sits when the idea
+      // has two buttons, so the panels can be told apart.
+      aria-label={place ? `${panelName(idea)}, ${place}` : panelName(idea)}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}

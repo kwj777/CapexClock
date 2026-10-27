@@ -30,6 +30,13 @@ describe("pay question", () => {
     expect(html).toContain('aria-label="Dismiss question"');
   });
 
+  it("names the answers' group with the question, so Yes, Maybe and No aren't read bare", () => {
+    const html = renderWith(null, "csv");
+    const id = html.match(/<p id="([^"]+)"[^>]*>[^<]*Would you pay/)?.[1];
+    expect(id).toBeDefined();
+    expect(html).toContain(`<div role="group" aria-labelledby="${id}"`);
+  });
+
   it("stays away once this browser has seen it, answered or not", () => {
     for (const stored of ["shown", "dismissed", "No"]) {
       expect(renderWith(stored, "pdf")).toBe('<div aria-live="polite"></div>');

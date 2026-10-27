@@ -93,7 +93,7 @@ export function totalChange(asPlanned: number, replaceNow: number): { change: st
   if (difference === 0) return { change: "No change", detail: `${formatMoney(replaceNow)} either way` };
   return {
     change: `${formatMoney(Math.abs(difference))} ${difference > 0 ? "more" : "less"}`,
-    detail: `${formatMoney(replaceNow)}, or ${formatMoney(asPlanned)} if you wait`,
+    detail: `${formatMoney(replaceNow)} in total, or ${formatMoney(asPlanned)} if you wait`,
   };
 }
 

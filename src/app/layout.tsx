@@ -39,6 +39,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
+        {/* Above the page until a keyboard user tabs to it; every page's main area has id="main". */}
+        <a
+          href="#main"
+          className="fixed top-3 left-3 z-50 -translate-y-[300%] rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg ring-2 ring-(--focus-ring) focus:translate-y-0 focus:outline-none dark:bg-slate-900 dark:text-white"
+        >
+          Skip to content
+        </a>
         {children}
         <Analytics />
       </body>

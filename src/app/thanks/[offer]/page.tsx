@@ -71,7 +71,7 @@ export default async function ThanksPage({ params }: PageProps<"/thanks/[offer]"
     <>
       <PresaleCompleted offer={offer} />
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-balance text-slate-950 sm:text-4xl dark:text-white">
             {TITLES[offer]}
