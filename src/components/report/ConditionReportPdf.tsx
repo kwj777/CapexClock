@@ -144,6 +144,7 @@ export default function ConditionReportPdf({
       subject={REPORT_LABEL}
       creator="CapexClock"
       producer="CapexClock"
+      language="en-US"
     >
       <Page size="LETTER" style={s.page}>
         {header}

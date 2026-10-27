@@ -47,6 +47,7 @@ exports[`has a deliberate public API 1`] = `
   "ageText",
   "assertUnitCount",
   "assetGroupFromSaved",
+  "atRiskWithoutCost",
   "badUnitCount",
   "badYearBuilt",
   "biggestDueCluster",

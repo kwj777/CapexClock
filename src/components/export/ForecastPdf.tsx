@@ -1,7 +1,7 @@
 import { Document, Font, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { dueClusterSentence, formatReserve, safetyBufferSentence } from "@/components/calculator/format";
-import { breakLongWords, formatCostEach, formatQuantity, moneyColumn } from "@/lib/export/format";
+import { breakLongWords, formatCostEach, formatQuantity, moneyColumn, shortName } from "@/lib/export/format";
 import {
   atRiskShortText,
   barPercent,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/export/rows";
 import {
   biggestDueCluster,
+  byUrgencyThenName,
   CONDITION_TEXT,
   countNoun,
   LANDLORD_LABELS,
@@ -94,7 +95,7 @@ export async function forecastPdfBlob(
   // A short table is kept on one page, but only if it fits on one: a block
   // that can't break and is taller than a page squeezes the whole page
   // together. Laying the table out on its own shows whether it fits. If it
-  // doesn't, it starts on a new page and runs on, like a long table.
+  // doesn't, it runs on from where it starts, like a long table.
   const keepTableTogether =
     rows.length <= MAX_ROWS_KEPT_TOGETHER &&
     (await pageCount(<DueTable rows={rows} money={money} printable={printable} />)) === 1;
@@ -169,8 +170,10 @@ const cols = { year: 30, name: 136, qty: 72, each: 76, total: 84, condition: 56 
 const NOTES_PADDING = 10;
 // eslint-disable-next-line no-restricted-syntax -- PDF column width in em, not a forecast figure
 const NOTES_LINE_EMS = Math.floor((612 - 2 * 40 - cols.name - cols.condition - NOTES_PADDING) / 9);
-// A longer table starts on a new page.
+// A longer table runs on from where it starts, across pages.
 const MAX_ROWS_KEPT_TOGETHER = 12;
+// The footer names the property in this many characters at most, so it stays on one line.
+const MAX_FOOTER_NAME = 60;
 // A row stays on one page unless its name is long enough that it might not fit
 // on one. The database allows 200 characters; the calculator has no limit.
 const MAX_NAME_KEPT_TOGETHER = 500;
@@ -189,8 +192,8 @@ export interface ForecastPdfProps {
   /** Makes names safe to print; see printableText. */
   printable?: (text: string) => string;
   /**
-   * Keeps the table on one page instead of starting it on a new one. Only set
-   * when it fits on one; see forecastPdfBlob.
+   * Keeps the table on one page instead of letting it break across two. Only
+   * set when it fits on one; see forecastPdfBlob.
    */
   keepTableTogether?: boolean;
 }
@@ -212,14 +215,21 @@ export default function ForecastPdf({
   // The saving-for list is its own column: cents on every line once one has them.
   const aheadMoney = moneyColumn(forecast.savingAhead.map((r) => r.cost));
   const cluster = biggestDueCluster(forecast);
+  // Rows with no cost yet are still listed when they're at risk, but aren't in the totals.
+  const atRisk = [
+    ...forecast.atRisk.map((a) => ({ ...a, noCost: false })),
+    ...(details.atRiskWithoutCost ?? []).map((a) => ({ ...a, noCost: true })),
+  ].sort(byUrgencyThenName);
+  const yearBuilt = details.yearBuilt ?? null;
 
   return (
-    <Document title={`${name} CapEx forecast`} author="CapexClock">
+    <Document title={`${name} CapEx forecast`} author="CapexClock" language="en-US">
       <Page size="LETTER" style={s.page}>
         <Text style={s.brand}>CAPEXCLOCK · CAPEX FORECAST</Text>
         <Text style={s.title}>{printable(name)}</Text>
         <Text style={s.subtitle}>
           {unitCount > 0 ? `${unitCount.toLocaleString("en-US")} ${countNoun(LANDLORD_LABELS.divisor, unitCount)} · ` : ""}
+          {yearBuilt !== null ? `built ${yearBuilt} · ` : ""}
           {forecast.startYear}–{forecast.endYear} · prepared {generatedOn}
         </Text>
 
@@ -257,10 +267,10 @@ export default function ForecastPdf({
           </View>
         ))}
 
-        {forecast.atRisk.length > 0 && (
+        {atRisk.length > 0 && (
           <>
             <Text style={s.h2}>At risk</Text>
-            {forecast.atRisk.map((a) => {
+            {atRisk.map((a) => {
               const d = details.rowDetails?.get(a.componentId);
               const yearNote = installYearNote(a.estimated.installYear, d);
               return (
@@ -269,6 +279,7 @@ export default function ForecastPdf({
                   {atRiskShortText(a)}
                   {d?.condition ? `, ${CONDITION_TEXT[d.condition].toLowerCase()} condition` : ""}
                   {yearNote ? ` (${yearNote.toLowerCase()})` : ""}
+                  {a.noCost ? ", cost not entered" : ""}
                 </Text>
               );
             })}
@@ -280,11 +291,11 @@ export default function ForecastPdf({
           money={money}
           printable={printable}
           keepTogether={keepTableTogether}
-          newPage={!keepTableTogether}
         />
         {rows.some((r) => r.notes.includes(ESTIMATED_NOTE)) && (
           <Text style={s.note}>
-            {ESTIMATED_NOTE}: no install year was entered, so the building&apos;s year built is used.
+            {ESTIMATED_NOTE}: no install year was entered, so the building&apos;s year built
+            {yearBuilt !== null ? ` (${yearBuilt})` : ""} is used.
           </Text>
         )}
         {rows.some((r) => r.notes.includes(GUESS_NOTE)) && (
@@ -319,8 +330,8 @@ export default function ForecastPdf({
         )}
 
         <View style={s.footer} fixed>
-          <Text>capexclock.com</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <Text>{printable(shortName(name, MAX_FOOTER_NAME))}</Text>
+          <Text render={({ pageNumber, totalPages }) => `capexclock.com · Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
     </Document>
@@ -329,26 +340,30 @@ export default function ForecastPdf({
 
 /**
  * The "What's due when" table. Its header row is fixed inside the table's view,
- * so it repeats on each page the table spans and nowhere else.
+ * so it repeats on each page the table spans and nowhere else. A long table runs
+ * on from where it starts rather than leaving the rest of a page blank.
  */
 function DueTable({
   rows,
   money,
   printable,
   keepTogether = false,
-  newPage = false,
 }: {
   rows: ExportRow[];
   money: (value: number) => string;
   printable: (text: string) => string;
   /** Keeps the whole table on one page. Only safe when it fits on one. */
   keepTogether?: boolean;
-  /** Starts the table on a new page. */
-  newPage?: boolean;
 }) {
-  return (
-    <View style={s.table} break={newPage} wrap={!keepTogether}>
-      <Text style={s.h2}>What&apos;s due when</Text>
+  const heading = (
+    // Outside the rows' view, so minPresenceAhead can carry it to the next page with
+    // the header row and the first row rather than leave it alone at the bottom.
+    <Text style={s.h2} minPresenceAhead={50}>
+      What&apos;s due when
+    </Text>
+  );
+  const table = (
+    <View style={s.table}>
       <View style={s.tr} fixed>
         <Text style={[s.th, { width: cols.year }]}>Year</Text>
         <Text style={[s.th, { width: cols.name }]}>Component</Text>
@@ -369,6 +384,18 @@ function DueTable({
       ))}
       {rows.length === 0 && <Text style={s.note}>Nothing comes due in these 10 years.</Text>}
     </View>
+  );
+  // Kept together, the heading moves to the next page with the whole table.
+  return keepTogether ? (
+    <View wrap={false}>
+      {heading}
+      {table}
+    </View>
+  ) : (
+    <>
+      {heading}
+      {table}
+    </>
   );
 }
 

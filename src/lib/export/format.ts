@@ -85,3 +85,16 @@ export function breakLongWords(text: string, lineEms: number): string {
     })
     .join("");
 }
+
+/**
+ * A long name cut at its last whole word before `maxCharacters`, with "…", for a
+ * one-line spot such as the PDF's footer. A name without a break near the end is
+ * cut where it is.
+ */
+export function shortName(text: string, maxCharacters: number): string {
+  const characters = Array.from(text.trim());
+  if (characters.length <= maxCharacters) return characters.join("");
+  const cut = characters.slice(0, maxCharacters - 1).join("");
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace >= cut.length / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
