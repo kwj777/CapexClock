@@ -56,3 +56,34 @@ export function clearImportUndo(): void {
     // Nothing to clear.
   }
 }
+
+/**
+ * What an import on the template page did ("Added 6 rows."), kept for this tab only,
+ * so the calculator it opens can say so once.
+ */
+export const IMPORT_NOTICE_KEY = "capexclock:calculator:import-notice:v1";
+
+export function saveImportNotice(said: string): void {
+  try {
+    window.sessionStorage.setItem(IMPORT_NOTICE_KEY, said);
+  } catch {
+    // Storage blocked: the import still works, without the message.
+  }
+}
+
+/** The kept message, read without removing it. */
+export function peekImportNotice(): string | null {
+  try {
+    return window.sessionStorage.getItem(IMPORT_NOTICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearImportNotice(): void {
+  try {
+    window.sessionStorage.removeItem(IMPORT_NOTICE_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}

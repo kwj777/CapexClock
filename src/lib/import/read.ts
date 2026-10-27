@@ -29,15 +29,33 @@ export const FAIL_TEXT: Record<FailReason, string> = {
 
 /**
  * What the panel tells the owner: a failed import, or "empty" (nothing pasted yet),
- * "empty_file" (a chosen file with nothing in it) or "loading_failed" (the importer
- * itself didn't load).
+ * "empty_file" (a chosen file with nothing in it), "no_rows" (headings and nothing
+ * under them, like the blank template), "no_header_file" (a chosen file with no
+ * heading row), a PDF, document or picture chosen by mistake, or "loading_failed"
+ * (the importer itself didn't load).
  */
-export type Problem = FailReason | "empty" | "empty_file" | "loading_failed";
+export type Problem =
+  | FailReason
+  | "empty"
+  | "empty_file"
+  | "no_rows"
+  | "no_header_file"
+  | "pdf_file"
+  | "document_file"
+  | "image_file"
+  | "loading_failed";
 
 export const PROBLEM_TEXT: Record<Problem, string> = {
   ...FAIL_TEXT,
   empty: "Paste some rows first, headings included.",
   empty_file: "That file is empty. Choose another file, or copy the rows and paste them here.",
+  no_rows: "This file has the headings but no rows yet. Fill in a row for each item, save it, then choose it again.",
+  no_header_file:
+    "We couldn't find a heading row in that file. Add a row at the top like Item, Qty, Year installed, Cost, save it, and choose it again.",
+  pdf_file:
+    "That's a PDF, not a spreadsheet. Choose the Excel or CSV file it was made from, or copy the rows and paste them here.",
+  document_file: "That's a document, not a spreadsheet. If it has a table, copy the rows and paste them here.",
+  image_file: "That's a picture, not a spreadsheet. Choose an Excel or CSV file, or type the rows into the template.",
   loading_failed: "The importer didn't load. Check your connection, then close this and try again.",
 };
 
@@ -46,21 +64,49 @@ export const PROBLEM_TEXT: Record<Problem, string> = {
  * paste box isn't an import, but a chosen file started one, and an empty file has no headings.
  */
 export function failedReason(problem: Problem): FailReason | null {
-  if (problem === "empty" || problem === "loading_failed") return null;
-  return problem === "empty_file" ? "no_header" : problem;
+  switch (problem) {
+    case "empty":
+    case "loading_failed":
+      return null;
+    // Sent as before these had their own words, so the event's reasons stay the same.
+    case "empty_file":
+    case "no_rows":
+    case "no_header_file":
+      return "no_header";
+    case "pdf_file":
+    case "document_file":
+    case "image_file":
+      return "unsupported";
+    default:
+      return problem;
+  }
+}
+
+/** The words for a sheet with no headings: a chosen file isn't told to copy the heading row. */
+export function noHeaderProblem(source: ImportSource): Problem {
+  return source === "paste" ? "no_header" : "no_header_file";
 }
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /**
  * What a chosen file is, by its name and type: text we can read, an Excel file we
- * can read, another spreadsheet file we can't (.xls, .ods, Numbers), or neither.
+ * can read, another spreadsheet file we can't (.xls, .ods, Numbers), a PDF, a
+ * document or a picture chosen by mistake, or none of these.
  */
-export function fileKind(name: string, type: string): "text" | "xlsx" | "spreadsheet" | "other" {
+export function fileKind(
+  name: string,
+  type: string,
+): "text" | "xlsx" | "spreadsheet" | "pdf" | "document" | "image" | "other" {
   const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
   if (["csv", "tsv", "txt", "tab"].includes(ext)) return "text";
   if (["xlsx", "xlsm"].includes(ext)) return "xlsx";
   if (["xls", "xlsb", "ods", "numbers"].includes(ext)) return "spreadsheet";
+  if (ext === "pdf" || type === "application/pdf") return "pdf";
+  if (["doc", "docx", "rtf", "odt", "pages"].includes(ext)) return "document";
+  if (["jpg", "jpeg", "png", "gif", "heic", "heif", "webp", "bmp", "tif", "tiff"].includes(ext) || type.startsWith("image/")) {
+    return "image";
+  }
   if (/^text\/(csv|plain|tab-separated-values)$/.test(type) || type === "application/csv") return "text";
   if (type === XLSX_TYPE) return "xlsx";
   return "other";

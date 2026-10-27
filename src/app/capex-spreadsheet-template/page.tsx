@@ -42,8 +42,11 @@ export default async function SpreadsheetTemplatePage() {
           </h1>
           <p className="mt-3 max-w-2xl text-lg text-pretty text-slate-600 dark:text-slate-300">
             One row for each big item you&apos;ll replace someday, with when it went in, how long it lasts and what it
-            costs. Fill it in, then import it to see what&apos;s due over the next 10 years and how much to set aside
-            each month. Free, no signup.
+            costs. Fill it in, then{" "}
+            <a href="#import-heading" className={link}>
+              import it
+            </a>{" "}
+            to see what&apos;s due over the next 10 years and how much to set aside each month. Free, no signup.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <TemplateLink
@@ -73,6 +76,17 @@ export default async function SpreadsheetTemplatePage() {
               example as CSV
             </TemplateLink>
             . The import reads both.
+          </p>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Already have a spreadsheet?{" "}
+            <a href="#import-heading" className={link}>
+              Import it&nbsp;↓
+            </a>{" "}
+            or{" "}
+            <a href="#setup-offer" className={link}>
+              send it to us
+            </a>{" "}
+            and we&apos;ll set it up, free for early users.
           </p>
 
           <section className="mt-14 max-w-3xl" aria-labelledby="columns-heading">
@@ -156,7 +170,7 @@ export default async function SpreadsheetTemplatePage() {
           </section>
 
           <section className="mt-14 max-w-3xl" aria-labelledby="import-heading">
-            <h2 id="import-heading" className={sectionHeading}>
+            <h2 id="import-heading" className={`${sectionHeading} scroll-mt-6`}>
               Import your spreadsheet
             </h2>
             <p className="mt-3 mb-5 text-slate-600 dark:text-slate-400">
@@ -168,7 +182,7 @@ export default async function SpreadsheetTemplatePage() {
               .
             </p>
             <TemplateImport library={library} accountsEnabled={supabaseEnv() !== null} />
-            <SetupOffer where="template_page" className="mt-6" />
+            <SetupOffer where="template_page" id="setup-offer" className="mt-6 scroll-mt-6" />
           </section>
 
           <section className="mt-16 max-w-3xl" aria-labelledby="faq-heading">

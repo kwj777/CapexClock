@@ -117,6 +117,8 @@ export default function SourcePicker({ where, onRead, onProblem, intro }: Source
     const source: ImportSource = kind === "xlsx" ? "xlsx" : "file";
     begin(source);
     if (kind === "spreadsheet") return fail("unsupported", source);
+    // A PDF, document or picture chosen by mistake says what it is, not that it can't be read.
+    if (kind === "pdf" || kind === "document" || kind === "image") return fail(`${kind}_file`, source);
     if (file.size > MAX_BYTES) return fail("too_big", source);
     setReading(true);
     try {

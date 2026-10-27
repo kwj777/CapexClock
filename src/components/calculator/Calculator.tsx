@@ -70,8 +70,10 @@ import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
 import { costHint } from "./cost-hint";
 import {
+  clearImportNotice,
   clearImportUndo,
   loadDraft,
+  peekImportNotice,
   peekImportUndo,
   saveDraft,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
@@ -124,14 +126,22 @@ export default function Calculator({
   const [start] = useState(() => {
     const loaded = loadDraft();
     const before = peekImportUndo(loaded, new Date().getFullYear());
-    return { draft: loaded, undo: before ? { before, after: loaded, action: "import" as const } : null };
+    const notice = peekImportNotice();
+    return {
+      draft: loaded,
+      undo: before ? { before, after: loaded, action: "import" as const } : null,
+      notice: notice ? { text: notice, after: loaded } : null,
+    };
   });
   const [draft, setDraft] = useState<Draft>(start.draft);
   // The Save box steps back while the pay question is asked, so the question isn't lost next to it.
   const [askingPay, setAskingPay] = useState(false);
   useEffect(() => saveDraft(draft), [draft]);
   // Offered once: a reload or a later visit doesn't offer it again.
-  useEffect(() => clearImportUndo(), []);
+  useEffect(() => {
+    clearImportUndo();
+    clearImportNotice();
+  }, []);
   // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
@@ -151,6 +161,7 @@ export default function Calculator({
       showExample
       accountsEnabled={accountsEnabled}
       initialUndo={start.undo}
+      initialNotice={start.notice}
       lookUpOwnerEmail={accountsEnabled}
       onPayQuestionChange={setAskingPay}
       footer={accountsEnabled && draft.rows.length > 0 ? <SaveToAccount quiet={askingPay} /> : null}
@@ -216,6 +227,8 @@ export interface CalculatorViewProps {
   rowNotes?: Record<string, RowNote>;
   /** An undo to offer from the start: an import on the template page that changed the list. */
   initialUndo?: Undo | null;
+  /** What an import on the template page did, said once from the start, with the list it left. */
+  initialNotice?: Notice | null;
   /** The page, for the paid-idea buttons' events and sign-ups. */
   where?: PaidWhere;
   /** The signed-in owner's email, filled in on the paid-idea "tell me first" forms. */
@@ -229,6 +242,12 @@ interface Undo {
   before: Draft;
   after: Draft;
   action: "clear" | "example" | "import";
+}
+
+/** What an import did, shown until the list changes. */
+interface Notice {
+  text: string;
+  after: Draft;
 }
 
 /** A note shown under a row, and the row's fields it's about. */
@@ -265,6 +284,7 @@ function CalculatorBody({
   typicalCosts = TYPICAL_COSTS,
   rowNotes,
   initialUndo = null,
+  initialNotice = null,
   onPayQuestionChange,
 }: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
@@ -284,6 +304,7 @@ function CalculatorBody({
   const [picked, setPicked] = useState("");
   // What Load an example, Clear or an import replaced, offered back until the next edit.
   const [undo, setUndo] = useState<Undo | null>(initialUndo);
+  const [notice] = useState<Notice | null>(initialNotice);
   const [announcement, setAnnouncement] = useState("");
   const [importing, setImporting] = useState(false);
   // Element to focus once the next render is on screen (after removing a row, say).
@@ -421,6 +442,18 @@ function CalculatorBody({
     undo.after.unitCount === draft.unitCount &&
     undo.after.yearBuilt === draft.yearBuilt;
 
+  // An import on the template page says what it did here, where the owner lands,
+  // until the list changes. Screen readers hear it once the page has settled.
+  const showNotice = notice !== null && notice.after.rows === draft.rows;
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(
+      () => announce(initialUndo ? `${notice.text} Undo brings back your list as it was.` : notice.text),
+      500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [notice, initialUndo, announce]);
+
   useEffect(() => {
     if (!focusNext.current) return;
     document.getElementById(focusNext.current)?.focus();
@@ -518,21 +551,28 @@ function CalculatorBody({
             )}
           </div>
         </div>
-        {canUndo && (
+        {(canUndo || showNotice) && (
           <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
-            {undo.action === "clear"
-              ? "Your entries were cleared."
-              : undo.action === "import"
-                ? "The import changed your list."
-                : "The example replaced your entries."}{" "}
-            <button
-              id={undoId}
-              type="button"
-              onClick={undoReplace}
-              className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
-            >
-              Undo
-            </button>
+            {showNotice
+              ? notice.text
+              : undo?.action === "clear"
+                ? "Your entries were cleared."
+                : undo?.action === "import"
+                  ? "The import changed your list."
+                  : "The example replaced your entries."}
+            {canUndo && (
+              <>
+                {" "}
+                <button
+                  id={undoId}
+                  type="button"
+                  onClick={undoReplace}
+                  className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+                >
+                  Undo
+                </button>
+              </>
+            )}
           </p>
         )}
         {/* The error takes the hint's place in one grid cell, sized for the longer of the two, so

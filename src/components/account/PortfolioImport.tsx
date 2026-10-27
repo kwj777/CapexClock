@@ -37,8 +37,8 @@ import {
 import { createMatcher } from "@/lib/import/names";
 import { startingChoices, type OpenedSheet } from "@/lib/import/open";
 import { buildPreview, type ImportChoices, type Preview } from "@/lib/import/preview";
-import { failedReason, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
-import { openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
+import { failedReason, noHeaderProblem, PROBLEM_TEXT, type Problem } from "@/lib/import/read";
+import { onlyHeadings, openTabs, startingTabs, tabNote, tabRowCounts, type OpenedTab } from "@/lib/import/tabs";
 import { previewSummary } from "@/lib/import/wording";
 import type { SaveInput } from "@/lib/properties/convert";
 import { compareSaved, DETAILS_NOT_SAVED_TEXT, saveFailure, sendsDetails } from "@/lib/properties/save";
@@ -105,6 +105,8 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
   // Sends import_completed once, when the first property of this import is created.
   const completed = useRef(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
+  // Counts the times the owner is taken to what holds a property back, once the review shows it.
+  const [seeks, setSeeks] = useState(0);
   const [runs, setRuns] = useState(0);
   // Each tab's preview, kept while its choices stay the same, so changing one tab
   // doesn't read the others again.
@@ -169,6 +171,24 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
     if (runs > 0) resultRef.current?.focus();
   }, [runs]);
 
+  // The first unanswered question or box to fix, in the review that's now open, is
+  // scrolled to and focused: on a phone it's screens above the Create button.
+  useEffect(() => {
+    if (seeks === 0) return;
+    const panel = document.getElementById(`${baseId}-review-panel`);
+    const target = panel?.querySelector<HTMLElement>("[data-waiting] input, form input") ?? panel;
+    target?.scrollIntoView({ block: "center" });
+    target?.focus({ preventScroll: true });
+  }, [seeks, baseId]);
+
+  /** Opens the review at the tab whose rows hold a property back, and goes to the first one. */
+  function showWaiting(tab: number | undefined) {
+    if (tab === undefined) return;
+    setReviewTab(tab);
+    setReviewOpen(true);
+    setSeeks((n) => n + 1);
+  }
+
   // Screen readers hear what will be created once the plan settles (after reading the
   // sheet, ticking a tab or changing a column or answer), not on every key press. That
   // includes buildings ticked after some are created. With nothing to say, the region
@@ -200,9 +220,10 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
   function onRead(next: SourceRead) {
     const list = openTabs(next.tabs, match, currentYear);
     const usable = list.flatMap((t, i) => (typeof t === "object" ? [i] : []));
-    if (usable.length === 0) {
+    if (usable.length === 0 || onlyHeadings(list)) {
       const only = list[0];
-      const reason = typeof only === "string" && list.length === 1 ? only : "no_header";
+      const failed = typeof only === "string" && list.length === 1 ? only : "no_header";
+      const reason: Problem = usable.length > 0 ? "no_rows" : failed === "no_header" ? noHeaderProblem(next.source) : failed;
       setRead(null);
       setProblem(reason);
       const sent = failedReason(reason);
@@ -302,12 +323,8 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
     if (send.length === 0 || send.length > MAX_PROPERTIES) return;
     if (blockedFor(send)) {
       setShowProblems(true);
-      // The questions and rows that need the owner are under the review, so it opens.
-      const tab = waitingTab(send);
-      if (tab !== undefined) {
-        setReviewTab(tab);
-        setReviewOpen(true);
-      }
+      // The questions and rows that need the owner are under the review, so it opens there.
+      showWaiting(waitingTab(send));
       return;
     }
     setRunning(true);
@@ -473,7 +490,7 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                   </p>
                 )}
                 {reviewOpen && typeof tabs[review.tab] === "object" && sheets[review.tab] && (
-                  <div id={`${baseId}-review-panel`} className="mt-4">
+                  <div id={`${baseId}-review-panel`} tabIndex={-1} className="mt-4 focus:outline-none">
                     <SheetReview
                       opened={tabs[review.tab] as OpenedSheet}
                       state={sheets[review.tab]}
@@ -486,6 +503,9 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                       duplicateIds={NO_DUPLICATES}
                       beforeCreate
                       lockBuildings={sent.has(review.tab)}
+                      hasYearBuilt={(key) =>
+                        /^\d{4}$/.test(planned.find((p) => p.tab === review.tab && p.building === key)?.yearBuilt.trim() ?? "")
+                      }
                     />
                   </div>
                 )}
@@ -630,6 +650,16 @@ export default function PortfolioImport({ library, existing, onClose, id }: Port
                           <li key={l}>{l}</li>
                         ))}
                       </ul>
+                    )}
+                    {showLines && p.waiting.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => showWaiting(p.tab)}
+                        className="mt-2 text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+                      >
+                        {p.waiting.length === 1 ? "Fix the row" : `Fix the ${p.waiting.length} rows`}
+                        <span className="sr-only"> for {whose}</span>
+                      </button>
                     )}
                     {result?.status === "created" && (
                       <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-300">

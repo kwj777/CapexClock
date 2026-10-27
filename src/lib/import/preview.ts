@@ -264,6 +264,8 @@ interface Record_ {
    * rows are merged, so it can say the quantity the merged row is added with.
    */
   quantityWaits: "question" | "sq_ft" | null;
+  /** The name is the library's, not the sheet's, so on its own row it's told apart by where it is. */
+  tidyName: boolean;
 }
 
 interface Context {
@@ -318,7 +320,7 @@ function fixed(ctx: Context, key: string, field: FixField): string | undefined {
 function resolveName(
   ctx: Context,
   original: string,
-  record: Pick<Record_, "changes" | "details" | "asked" | "pending" | "id">,
+  record: Pick<Record_, "changes" | "details" | "asked" | "pending" | "id" | "tidyName">,
 ): { slug: string | null; name: string } {
   // A row from a component list download that still has its name stays the same item.
   const known = record.id ? ctx.known.get(record.id) : undefined;
@@ -339,11 +341,15 @@ function resolveName(
   }
   const item = slug ? ctx.library.get(slug) : undefined;
   if (!item) return { slug: null, name: clip(original, 200) };
-  if (found.kind !== "exact") {
-    record.changes.push(`Matched ${quote(original)} to ${item.name}`);
-    // Words beyond the item's name (a brand, a size) are kept in the notes.
-    if (found.kind !== "none" && found.extraWords) record.details.push(original);
+  if (found.kind === "exact") return { slug, name: item.name };
+  // Words beyond the item's name ("Unit 101", "Building A", a brand or a size) tell one
+  // from another, so the owner's name stays, still linked to the item for its life and cost.
+  if (found.kind !== "none" && (found.extraWords || (/\d/.test(original) && !/\d/.test(item.name)))) {
+    record.changes.push(`Matched ${quote(original)} to ${item.name}, keeping your name`);
+    return { slug, name: clip(original, 200) };
   }
+  record.changes.push(`Matched ${quote(original)} to ${item.name}`);
+  record.tidyName = true;
   return { slug, name: item.name };
 }
 
@@ -420,6 +426,7 @@ function rowRecord(ctx: Context, row: readonly Cell[], index: number, section: s
     quantity: 1,
     followsUnits: false,
     quantityWaits: null,
+    tidyName: false,
   };
 
   if (isTotalRow(row, cellText(cell("item")))) return "total";
@@ -770,10 +777,11 @@ function columnRecords(ctx: Context, row: readonly Cell[], index: number, heads:
       quantity: 1,
       followsUnits: false,
       quantityWaits: null,
+      tidyName: true,
     };
     const fix = fixed(ctx, key, "installYear");
     if (fix === undefined && PRESENT.test(text)) {
-      record.changes.push(`Read ${quote(text)} as having one with no install year, so it uses the year built, marked an estimate`);
+      record.changes.push(`Read ${quote(text)} as having one, with no install year`);
     } else if (fix === undefined && headingTiming(heads[c]) === "age") {
       applyTiming(record, readTiming(ctx, key, { installYear: "", age: row[c], replaceBy: "", remaining: "" }, life));
     } else {
@@ -844,7 +852,9 @@ function mergeKey(r: Record_): string {
     r.id === null && !r.followsUnits ? "" : r.key,
     r.building,
     row.replaceNow,
-    row.librarySlug ?? `own:${row.name.trim().toLowerCase()}`,
+    row.librarySlug ?? "",
+    // Rows the owner named apart ("Water heater - Unit 101", "- Unit 102") stay apart.
+    row.name.trim().toLowerCase(),
     row.category,
     row.unitLabel,
     row.installYear,
@@ -899,12 +909,17 @@ function merge(records: Record_[], locationLabel: string, questionColumn: number
     }
     const status: RowStatus = issues.length > 0 ? "needs_you" : changes.length > 0 ? "changed" : "ready";
     const notes = mergedNotes(locationLabel, group);
+    // One item on its own row with the library's name says where it is, so two water
+    // heaters installed in different years read "Tank water heater - Apt 101" and "- Apt 102".
+    const where = group.length === 1 && first.tidyName ? first.location.trim() : "";
+    const label = /^\d/.test(where) && locationLabel !== "Location" ? `${locationLabel} ${where}` : where;
+    const name = label ? clip(`${first.row.name} - ${label}`, 200) : first.row.name;
     return {
       id: first.key,
       keys: group.map((r) => r.key),
       sheetRows: [...new Set(group.map((r) => r.sheetRow))],
       status,
-      row: { ...first.row, quantity, notes },
+      row: { ...first.row, name, quantity, notes },
       changes,
       issues,
       question: question?.key ?? null,

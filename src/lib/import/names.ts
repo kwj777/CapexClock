@@ -56,6 +56,10 @@ export const UNSURE_NAMES: Readonly<Record<string, readonly string[]>> = {
   electrical: ["electrical-panel"],
 };
 
+/** Roofs the library has no item for yet: asphalt and flat roofs last half as long, so they're never offered. */
+const OTHER_ROOFS = new Set("metal steel tin aluminum copper standing seam tile tiles clay concrete slate cedar shake shakes wood".split(" "));
+const ROOF_SLUGS = new Set(["asphalt-shingle-roof", "flat-membrane-roof"]);
+
 // Words that don't change what an item is: sizes, fuels, brands, "unit 3".
 const HARMLESS = new Set(
   (
@@ -171,11 +175,25 @@ export function createMatcher(library: readonly LibraryComponent[]): NameMatcher
     const key = nameKey(trimmed);
     let result = cache.get(key);
     if (!result) {
-      result = match(key, all);
+      result = withoutOtherRoofs(key, match(key, all));
       cache.set(key, result);
     }
     return result;
   };
+}
+
+/**
+ * "Roof - metal" or "Slate roof" isn't an asphalt or flat roof, even when it's
+ * spelled close to one ("slate roof" is two letters from "flat roof"), so those
+ * aren't matched or offered. With nothing else to offer, it's the owner's own item.
+ */
+function withoutOtherRoofs(key: string, found: NameMatch): NameMatch {
+  if (!key.split(" ").some((w) => OTHER_ROOFS.has(w))) return found;
+  if (found.kind === "matched" && ROOF_SLUGS.has(found.slug)) return { kind: "none" };
+  if (found.kind !== "unsure") return found;
+  const suggestions = found.suggestions.filter((s) => !ROOF_SLUGS.has(s));
+  if (suggestions.length === found.suggestions.length) return found;
+  return suggestions.length > 0 ? { ...found, suggestions } : { kind: "none" };
 }
 
 function sure(phrase: Phrase): NameMatch {
@@ -212,17 +230,31 @@ function match(key: string, phrases: Phrase[]): NameMatch {
 
   // A library name inside a longer name, typos allowed: "Rheem water heatr 40 gal".
   const tokens = key.split(" ");
-  const found: { phrase: Phrase; start: number }[] = [];
+  const all: { phrase: Phrase; start: number; exact: boolean }[] = [];
   for (const p of phrases) {
     const n = p.tokens.length;
     for (let start = 0; start + n <= tokens.length; start++) {
       const window = tokens.slice(start, start + n).join(" ");
-      if (window === p.key || editDistance(window, p.key) <= typosFor(p)) {
-        found.push({ phrase: p, start });
+      const exact = window === p.key;
+      if (exact || editDistance(window, p.key) <= typosFor(p)) {
+        all.push({ phrase: p, start, exact });
         break;
       }
     }
   }
+  // Words spelled exactly beat a near spelling of no more words over them: "exterior
+  // paint" is two letters from "interior paint", so that one goes. So does a shorter
+  // name inside an exact one, like the "paint" in "exterior paint".
+  const covers = (a: { phrase: Phrase; start: number }, i: number) => i >= a.start && i < a.start + a.phrase.tokens.length;
+  const exacts = all.filter((f) => f.exact);
+  const found = all.filter((f) => {
+    const n = f.phrase.tokens.length;
+    return !exacts.some((e) =>
+      f.exact
+        ? n < e.phrase.tokens.length && f.phrase.tokens.every((_, k) => covers(e, f.start + k))
+        : n <= e.phrase.tokens.length && f.phrase.tokens.some((_, k) => covers(e, f.start + k)),
+    );
+  });
   if (found.length === 0) return { kind: "none" };
   // Longest first: "tankless water heater" over "water heater".
   found.sort((a, b) => b.phrase.tokens.length - a.phrase.tokens.length || b.phrase.key.length - a.phrase.key.length);

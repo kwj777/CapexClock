@@ -16,6 +16,8 @@ describe("done-for-you import offer", () => {
     expect(html).toContain(SETUP_OFFER.heading);
     expect(html).toContain('href="mailto:support@capexclock.com?subject=Set%20up%20my%20buildings"');
     expect(html).toContain("delete tenant names");
+    expect(html).toContain("We reply within 2 business days with a file you can import.");
+    expect(html).toContain("Copy the address");
     expect(html).toContain('href="/privacy"');
     // No price until the first batch is done.
     expect(html).not.toMatch(/\$\d/);

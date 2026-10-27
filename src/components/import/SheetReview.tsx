@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   COLUMN_LAYOUT_FIELDS,
   FIELD_TEXT,
@@ -10,6 +10,7 @@ import {
   type ColumnRole,
   type Layout,
 } from "@/lib/import/columns";
+import { formatField, isCapexClockFormat } from "@/lib/import/format";
 import type { NameMatcher } from "@/lib/import/names";
 import { columnsFor, parseSheetYear, type OpenedSheet } from "@/lib/import/open";
 import { KEEP_OWN, type FixField, type ImportChoices, type Preview, type PreviewRow } from "@/lib/import/preview";
@@ -45,7 +46,11 @@ export interface SheetReviewProps {
    * each row is in can't change, so the Building column and the layout stay as they are.
    */
   lockBuildings?: boolean;
+  /** A year built is known for this building (a BuildingInfo key), so a blank install year can use it. */
+  hasYearBuilt?: (building: string) => boolean;
 }
+
+const always = () => true;
 
 /**
  * One sheet's columns, questions and preview. The owner can change any column's
@@ -64,8 +69,12 @@ export default function SheetReview({
   listNotes,
   beforeCreate = false,
   lockBuildings = false,
+  hasYearBuilt = always,
 }: SheetReviewProps) {
   const baseId = useId();
+  // A sheet whose columns are all our template's starts with them folded away.
+  const [showColumns, setShowColumns] = useState(false);
+  const focusColumns = useRef(false);
   const summaryId = `${baseId}-summary`;
   const sheetYearId = `${baseId}-sheet-year`;
   const { choices, sheetYearText } = state;
@@ -125,6 +134,22 @@ export default function SheetReview({
   const columnList = opened.headings
     .map((heading, i) => ({ heading, i, examples: samples(opened.sheet.grid, opened.sheet.headerRow, i) }))
     .filter((c) => c.heading !== "" || c.examples.length > 0);
+  // Every column is one of our template's, read as the template means it. Changing
+  // one unfolds the list, since it no longer matches.
+  const matchesTemplate =
+    choices.layout === "rows" &&
+    isCapexClockFormat(opened.headings) &&
+    columnList.length > 0 &&
+    columnList.every(({ heading, i }) => formatField(heading) !== null && choices.columns[i] === formatField(heading));
+  const folded = matchesTemplate && !showColumns;
+  const firstColumnId = columnList.length > 0 ? `${baseId}-column-${columnList[0].i}` : null;
+  const knownYearBuilt = [...new Set(preview.rows.map((r) => r.building))].every(hasYearBuilt);
+
+  useEffect(() => {
+    if (!focusColumns.current || !firstColumnId) return;
+    focusColumns.current = false;
+    document.getElementById(firstColumnId)?.focus();
+  });
 
   return (
     <div className="space-y-6">
@@ -132,9 +157,26 @@ export default function SheetReview({
         <h4 id={`${baseId}-columns`} className={headingClass}>
           Check the columns
         </h4>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          We guessed what each column holds. Change any guess, or choose Ignore to leave a column out.
-        </p>
+        {folded ? (
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            All {columnList.length} columns match the CapexClock template.{" "}
+            <button
+              type="button"
+              aria-expanded={false}
+              onClick={() => {
+                focusColumns.current = true;
+                setShowColumns(true);
+              }}
+              className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+            >
+              Check or change them
+            </button>
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            We guessed what each column holds. Change any guess, or choose Ignore to leave a column out.
+          </p>
+        )}
         {lockBuildings && (
           <p id={`${baseId}-locked`} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Some of these buildings are created, so the Building column and the layout stay as they are.
@@ -159,7 +201,7 @@ export default function SheetReview({
             </span>
           </label>
         )}
-        <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
+        <ul className={`mt-3 divide-y divide-slate-200 dark:divide-slate-800 ${folded ? "hidden" : ""}`}>
           {columnList.map(({ heading, i, examples }) => {
             const selectId = `${baseId}-column-${i}`;
             const fixed = lockBuildings && choices.columns[i] === "building";
@@ -207,7 +249,7 @@ export default function SheetReview({
       </section>
 
       {preview.usesSheetYear && (
-        <div>
+        <div data-waiting={sheetYearBad || undefined}>
           <label htmlFor={sheetYearId} className={headingClass}>
             What year was this sheet last updated?
           </label>
@@ -232,7 +274,8 @@ export default function SheetReview({
       )}
 
       {preview.quantityQuestion && (
-        <fieldset>
+        // Marked while unanswered, so My properties can take the owner to it.
+        <fieldset data-waiting={preview.quantityQuestion.answer === null || undefined}>
           <legend className={`${headingClass} wrap-anywhere`}>{quantityQuestionText(preview.quantityQuestion)}</legend>
           <div className="mt-2 flex flex-col gap-1.5">
             {quantityAnswers(preview.quantityQuestion).map(([value, text]) => (
@@ -258,10 +301,7 @@ export default function SheetReview({
             Which items are these?
           </h4>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            We weren&apos;t sure, so we haven&apos;t matched them.{" "}
-            {beforeCreate
-              ? "Answer each one, or keep it as its own item, before creating the properties."
-              : "Any you leave are added as their own items."}
+            We weren&apos;t sure, so we haven&apos;t matched them. Any you leave are added as their own items.
           </p>
           <div className="mt-2 space-y-3">
             {preview.questions.map((q, qi) => (
@@ -301,7 +341,7 @@ export default function SheetReview({
         <p id={summaryId} tabIndex={-1} className="mt-1 text-sm font-medium text-slate-900 focus:outline-none dark:text-white">
           {summary}
         </p>
-        {previewHints(preview).map((hint) => (
+        {previewHints(preview, knownYearBuilt).map((hint) => (
           <p key={hint} className="mt-1 text-sm wrap-anywhere text-slate-600 dark:text-slate-400">
             {hint}
           </p>
@@ -314,6 +354,7 @@ export default function SheetReview({
             fallbackFocusId={summaryId}
             onFix={fix}
             beforeCreate={beforeCreate}
+            hasYearBuilt={hasYearBuilt}
           />
         </div>
       </section>

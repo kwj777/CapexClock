@@ -850,7 +850,7 @@ describe("items the library counts in square feet", () => {
       ["Tank water heater", "2", "per_unit"],
       ["Carpet", "2", "per_unit"],
       ["Luxury vinyl plank", "2", "per_unit"],
-      ["Tank water heater", "1", "per_unit"],
+      ["Tank water heater - Apt 103", "1", "per_unit"],
     ]);
     expect(byName(p, "Carpet").changes).toContain("Counted apartments, not sq ft, so the cost is for each apartment");
   });
@@ -1156,5 +1156,36 @@ describe("a sheet in CapexClock's own columns", () => {
     const row = (id: string) => `,,,Refrigerator,Appliances,1,unit,2019,,13,900,,,,${id}`;
     expect(preview(sheet(row("a"), row("b"))).rows).toHaveLength(2);
     expect(preview(sheet(row(""), row(""))).rows).toHaveLength(1);
+  });
+});
+
+describe("names that tell items apart", () => {
+  it("keeps the owner's name when it says more than the item, still linked to the item", () => {
+    const sheet = [
+      "Item,Year installed,Cost each",
+      "Water heater - Unit 101,2014,1400",
+      "Water heater - Unit 102,2016,1400",
+      "Water heater - Unit 103,2016,1400",
+      "Asphalt shingle roof - Building A,2008,38000",
+      "HWH,2018,1400",
+    ].join("\n");
+    const p = preview(sheet);
+    expect(p.rows.map((r) => [r.row.name, r.row.librarySlug])).toEqual([
+      ["Water heater - Unit 101", "tank-water-heater"],
+      ["Water heater - Unit 102", "tank-water-heater"],
+      ["Water heater - Unit 103", "tank-water-heater"],
+      ["Asphalt shingle roof - Building A", "asphalt-shingle-roof"],
+      ["Tank water heater", "tank-water-heater"],
+    ]);
+    const unit = byName(p, "Water heater - Unit 101");
+    expect(unit.row.usefulLife).not.toBe("");
+    expect(unit.row.notes).toBe("");
+    expect(unit.changes).toContain('Matched "Water heater - Unit 101" to Tank water heater, keeping your name');
+  });
+
+  it("adds where a library-named item is when it's on its own row", () => {
+    const sheet = ["Unit,Item,Year installed", "101,Water heater,2014", "102,Water heater,2016", "103,Water heater,2016"].join("\n");
+    const names = preview(sheet).rows.map((r) => r.row.name);
+    expect(names).toEqual(["Tank water heater - Unit 101", "Tank water heater"]);
   });
 });

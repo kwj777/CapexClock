@@ -42,6 +42,11 @@ function missingUnitsNote(properties: readonly PropertyRow[]): string {
  * property editor, so both pages agree around New Year. The server's year is only
  * used for the first paint.
  */
+/** Each name once, so "Tank water heater" in three units isn't listed three times. */
+function atRiskNames(atRisk: readonly { name: string }[]): string[] {
+  return [...new Set(atRisk.map((a) => a.name))];
+}
+
 export default function Portfolio({
   properties,
   components,
@@ -113,8 +118,8 @@ export default function Portfolio({
               </dl>
               {forecast.atRisk.length > 0 && (
                 <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
-                  {forecast.atRisk.length} at risk: {forecast.atRisk.slice(0, 3).map((a) => a.name).join(", ")}
-                  {forecast.atRisk.length > 3 && "…"}
+                  {forecast.atRisk.length} at risk: {atRiskNames(forecast.atRisk).slice(0, 3).join(", ")}
+                  {atRiskNames(forecast.atRisk).length > 3 && "…"}
                 </p>
               )}
               {unsaved.has(property.id) && (
