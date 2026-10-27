@@ -2,28 +2,43 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { loadDraft, saveDraft } from "@/components/calculator/draft-storage";
-import { formatMoney, formatReserve } from "@/components/calculator/format";
+import { loadDraft, saveArrival, saveDraft } from "@/components/calculator/draft-storage";
+import { formatCostRange, formatMoney, formatReserve } from "@/components/calculator/format";
 import { track } from "@/lib/analytics";
 import {
   EARLIEST_INSTALL_YEAR,
   LANDLORD_RULES,
   lifespanEstimate,
+  readNumber,
   subjectFor,
+  typicalCostFor,
   withLibraryItem,
   type LibraryComponent,
+  type TypicalCost,
 } from "@/verticals/landlord";
 
 const input =
-  "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
+  "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
 const label = "text-xs font-medium text-slate-600 dark:text-slate-400";
 
+/** "Typical $2,500–$5,000 per apartment, use your quote", worded as the calculator words its hint. */
+function costHintFor(item: LibraryComponent, typical: TypicalCost | undefined): string | null {
+  // Asked the calculator's way for a new row: per apartment or per sq ft. Building-wide
+  // items get none, since their typical cost is a 12-unit building's shared out.
+  const cost = typicalCostFor({ unitLabel: item.unitLabel, quantity: "", followsUnitCount: true }, item, typical);
+  if (!cost) return null;
+  return `Typical ${formatCostRange(cost.low, cost.high)} ${item.unitLabel === "per_sq_ft" ? "per sq ft" : "per apartment"}, use your quote`;
+}
+
 /** "When will mine need replacing, and what should I set aside?" for one component. */
-export default function LifespanEstimator({ item }: { item: LibraryComponent }) {
+export default function LifespanEstimator({ item, typical }: { item: LibraryComponent; typical?: TypicalCost }) {
   const router = useRouter();
   const baseId = useId();
   const yearNoteId = `${baseId}-year-note`;
   const moneyNoteId = `${baseId}-money-note`;
+  const costHintId = `${baseId}-cost-hint`;
+  const costField = useRef<HTMLInputElement>(null);
+  const sqFt = item.unitLabel === "per_sq_ft";
   const [startYear] = useState(() => new Date().getFullYear());
   const [installYear, setInstallYear] = useState("");
   const [quantity, setQuantity] = useState(item.unitLabel === "per_building" ? "1" : "");
@@ -46,7 +61,11 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
       setAlreadyAdded(true);
       return;
     }
-    saveDraft(withLibraryItem(draft, item, { installYear, quantity, costEach: cost }, mode ?? "add"));
+    const next = withLibraryItem(draft, item, { installYear, quantity, costEach: cost }, mode ?? "add");
+    saveDraft(next);
+    // The row it went into: the one updated, or the new last row.
+    const row = mode === "update" ? next.rows.find((r) => r.librarySlug === item.slug) : next.rows[next.rows.length - 1];
+    if (row) saveArrival({ rowId: row.id, name: `your ${subjectFor(item).noun.replace(/^an? /, "")}` });
     void track("lifespan_added_to_calculator", { component: item.slug });
     router.push("/capex-calculator");
   }
@@ -56,6 +75,13 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
     moneyHint?.field === field
       ? { "aria-describedby": moneyNoteId, "aria-invalid": moneyHint.invalid || undefined }
       : {};
+  const costHint = costHintFor(item, typical);
+  const costNote = noteFor("cost");
+  const costDescribedBy = [costHint ? costHintId : "", costNote["aria-describedby"] ?? ""].filter(Boolean).join(" ") || undefined;
+  // Flooring is counted across the building: 800 sq ft in each of 12 apartments. A
+  // parking lot at 500 sq ft each (see typical-costs.md).
+  const sqFtExample = item.category === "Site" ? "e.g. 6,000" : "e.g. 9,600";
+  const count = readNumber(quantity)?.toLocaleString("en-US") ?? "";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -74,26 +100,33 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
           />
         </label>
         <label className="block">
-          <span className={label}>{item.unitLabel === "per_sq_ft" ? "Square feet" : "How many"}</span>
+          <span className={label}>{sqFt ? "Square feet, whole building" : "How many"}</span>
           <input
             className={input}
             inputMode="numeric"
-            placeholder={item.unitLabel === "per_sq_ft" ? "e.g. 1,200" : "e.g. 12"}
+            placeholder={sqFt ? sqFtExample : "e.g. 12"}
             value={quantity}
             {...noteFor("quantity")}
             onChange={(e) => setQuantity(e.target.value)}
           />
         </label>
         <label className="block">
-          <span className={label}>Replacement cost {item.unitLabel === "per_sq_ft" ? "per sq ft" : "each"}</span>
+          <span className={label}>Replacement cost {sqFt ? "per sq ft" : "each"}</span>
           <input
+            ref={costField}
             className={input}
             inputMode="decimal"
             placeholder="Quote or estimate"
             value={cost}
-            {...noteFor("cost")}
+            aria-invalid={costNote["aria-invalid"]}
+            aria-describedby={costDescribedBy}
             onChange={(e) => setCost(e.target.value)}
           />
+          {costHint && (
+            <span id={costHintId} className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              {costHint}
+            </span>
+          )}
         </label>
       </div>
 
@@ -110,7 +143,13 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
         ) : (
           <div className="space-y-2">
             <p className="text-lg">
-              <span className="font-semibold text-slate-950 dark:text-white">
+              <span
+                className={
+                  result.yearsLeft < 0
+                    ? "font-semibold text-amber-800 dark:text-amber-300"
+                    : "font-semibold text-slate-950 dark:text-white"
+                }
+              >
                 {result.yearsLeft < 0
                   ? `Past expected life since ${result.due}`
                   : result.yearsLeft === 0
@@ -126,27 +165,59 @@ export default function LifespanEstimator({ item }: { item: LibraryComponent }) 
                 {moneyHint.text}
               </p>
             )}
+            {result.monthly === null && !moneyHint && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => costField.current?.focus()}
+                  className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                >
+                  Add a replacement cost
+                </button>{" "}
+                above to see how much to set aside each month.
+              </p>
+            )}
             {result.monthly !== null && result.neededNow !== null && (
-              <p className="text-sm">
+              <div className="space-y-2 text-sm">
                 {result.neededNow > 0 && (
-                  <>
-                    Budget <strong className="text-slate-950 dark:text-white">{formatMoney(result.neededNow)}</strong> this year.{" "}
-                  </>
+                  <p>
+                    Replace now: budget <strong className="text-slate-950 dark:text-white">{formatMoney(result.neededNow)}</strong>{" "}
+                    this year.
+                  </p>
                 )}
                 {result.monthly > 0 && (
-                  <>
-                    Set aside <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong> to
-                    have the cash ready for the next replacement.
-                  </>
+                  <p>
+                    {result.neededNow > 0 ? (
+                      <>
+                        After that, set aside{" "}
+                        <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong> so the
+                        next replacement (around {result.savingFor}) is paid for.
+                      </>
+                    ) : (
+                      <>
+                        Set aside <strong className="text-slate-950 dark:text-white">{formatReserve(result.monthly)}/month</strong>{" "}
+                        to have the cash ready for the next replacement.
+                      </>
+                    )}
+                    {result.forecastCountsFrom !== null && (
+                      <>
+                        {" "}
+                        The full calculator only saves for replacements due in the next{" "}
+                        {LANDLORD_RULES.reserveHorizonYears} years, so it won&apos;t include this one in your monthly amount
+                        until {result.forecastCountsFrom}.
+                      </>
+                    )}
+                  </p>
                 )}
-                {result.monthly > 0 && result.forecastCountsFrom !== null && (
-                  <>
-                    {" "}
-                    The building forecast looks {LANDLORD_RULES.reserveHorizonYears} years ahead, so its monthly reserve won&apos;t
-                    count this replacement until {result.forecastCountsFrom}.
-                  </>
+                {result.spreadMonthly !== null && result.spreadMonthly > 0 && (
+                  <p>
+                    {sqFt ? `This assumes all ${count} sq ft is replaced` : `This assumes all ${count} are done`}{" "}
+                    {result.neededNow > 0 ? "this year" : `in ${result.savingFor}`}. If you{" "}
+                    {sqFt ? "replace it apartment by apartment" : "redo them"} as tenants move out, plan on about{" "}
+                    <strong className="text-slate-950 dark:text-white">{formatReserve(result.spreadMonthly)}/month</strong>.
+                  </p>
                 )}
-              </p>
+              </div>
             )}
           </div>
         )}
