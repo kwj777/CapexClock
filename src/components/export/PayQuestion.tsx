@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { alreadyAsked, nextStep, PAY_ANSWERS, remember, versioned, waitsForAnswer, type PayAnswer } from "@/lib/export/pay-question";
-import { FIRST_PICK_QUESTION, FIRST_PICKS, type FirstPick } from "@/lib/paid-ideas";
+import { FIRST_PICK_QUESTION, FIRST_PICKS, offerForIdea, type FirstPick } from "@/lib/paid-ideas";
+import PaidIdeaButton, { PhotoOffer } from "@/components/paid/PaidIdeaButton";
+import { usePaidIdeas } from "@/components/paid/PaidIdeas";
+import { useSeenOnScreen } from "@/components/useSeenOnScreen";
 
+// The founding membership as /pricing sells it, at its real price.
 export const PAY_QUESTION =
-  "Would you pay $19/month for replacement reminders and a lender-ready condition report?";
+  "Would you pay $12/month for an email before each replacement comes due, plus a yearly budget summary and a condition report for lenders and buyers?";
 
 /**
  * A short pricing survey. It appears after the first export in a browser
- * and stays until answered or dismissed, but never comes back on a later
- * visit, even if it was ignored. A Yes or Maybe gets one more question: which
- * paid idea they'd use first.
+ * and stays until answered or dismissed. Once at least half of it has been on
+ * screen, it never comes back on a later visit, even if it was ignored. A Yes
+ * or Maybe gets one more question: which paid idea they'd use first, and the
+ * pick leads to that idea's panel (or the photo offer).
  */
 export default function PayQuestion({
   trigger,
@@ -30,6 +35,8 @@ export default function PayQuestion({
   const [answer, setAnswer] = useState<PayAnswer | "dismissed" | null>(null);
   const [pick, setPick] = useState<FirstPick | "skipped" | null>(null);
   const shown = useRef(false);
+  // In state, not a ref, so the check for being on screen starts when the card appears.
+  const [questionEl, setQuestionEl] = useState<HTMLDivElement | null>(null);
   const followUp = useRef<HTMLParagraphElement>(null);
   const thanks = useRef<HTMLParagraphElement>(null);
   const followUpId = useId();
@@ -45,12 +52,22 @@ export default function PayQuestion({
     return () => onAskingChange?.(false);
   }, [asking, onAskingChange]);
 
-  useEffect(() => {
-    if (!open || shown.current) return;
+  // Counted as shown only once it's been seen, not when it appears below the screen.
+  const markShown = useCallback(() => {
+    if (shown.current) return;
     shown.current = true;
     remember("shown");
-    void track("pay_question_shown", versioned({ trigger }));
-  }, [open, trigger]);
+    void track("pay_question_shown", versioned({ trigger: trigger ?? "" }));
+  }, [trigger]);
+  useSeenOnScreen(questionEl, open ? markShown : null);
+
+  // A card that opens below the screen (a phone, after tapping Download) is scrolled
+  // into view; focus stays on the download button.
+  useEffect(() => {
+    if (!questionEl) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    questionEl.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+  }, [questionEl]);
 
   // The buttons just pressed go away, so focus moves to what replaces them.
   useEffect(() => {
@@ -59,6 +76,7 @@ export default function PayQuestion({
   }, [asksFirstPick, thanked]);
 
   function choose(value: PayAnswer) {
+    markShown();
     setAnswer(value);
     remember(value);
     void track("pay_question_answered", versioned({ answer: value.toLowerCase(), trigger: trigger ?? "" }));
@@ -73,6 +91,7 @@ export default function PayQuestion({
   }
 
   function dismiss() {
+    markShown();
     setAnswer("dismissed");
     remember("dismissed");
     void track("pay_question_dismissed", versioned({ trigger: trigger ?? "" }));
@@ -92,7 +111,7 @@ export default function PayQuestion({
       {/* Always in the page, so screen readers announce the question when it appears. */}
       <div aria-live="polite">
         {open && step === "question" && (
-          <div className={askCard}>
+          <div ref={setQuestionEl} className={askCard}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className={eyebrow}>One quick question</p>
@@ -155,10 +174,33 @@ export default function PayQuestion({
         </div>
       )}
       {open && thanked && (
-        <p ref={thanks} tabIndex={-1} className={`${card} text-sm text-slate-700 focus:outline-none dark:text-slate-200`}>
-          Thanks, that helps us decide what to build next.
-        </p>
+        <div className={card}>
+          <p ref={thanks} tabIndex={-1} className="text-sm text-slate-700 focus:outline-none dark:text-slate-200">
+            Thanks, that helps us decide what to build next.
+          </p>
+          {pick !== null && pick !== "skipped" && <NextStep pick={pick} />}
+        </div>
       )}
+    </>
+  );
+}
+
+/**
+ * After a pick, the way on: the panel for reminders or the report (Buy now once
+ * its Stripe link is set, the "tell me first" list until then), or the photo offer.
+ * Nothing when the test buttons are off or the pick was "Something else".
+ */
+function NextStep({ pick }: { pick: FirstPick }) {
+  const { enabled, where, offerLinks } = usePaidIdeas();
+  if (!enabled || pick === "other") return null;
+  if (pick === "photo") return <PhotoOffer where={where} className="mt-3" />;
+  const offer = offerForIdea(pick);
+  return (
+    <>
+      <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+        {offer && offerLinks[offer] ? "You can get it now:" : "Get on the list for it:"}
+      </p>
+      <PaidIdeaButton idea={pick} className="mt-2" />
     </>
   );
 }

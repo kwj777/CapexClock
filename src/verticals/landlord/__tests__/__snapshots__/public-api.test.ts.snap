@@ -81,6 +81,8 @@ exports[`has a deliberate public API 1`] = `
   "landlordForecast",
   "landlordMetrics",
   "landlordOptions",
+  "leftOutLife",
+  "leftOutReasonText",
   "lifeDrivers",
   "lifespanDescription",
   "lifespanEstimate",

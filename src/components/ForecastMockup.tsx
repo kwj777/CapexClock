@@ -1,20 +1,23 @@
 // Static illustration of the forecast output. The spending is made up; the
 // reserve figure is worked out from it the same way the calculator does.
+// Colors are the calculator chart's (.viz-root), so each category looks the same in both.
 
 import { MOCKUP_SPEND, MOCKUP_UNITS, mockupBadgeReserve, type MockupKey } from "@/verticals/landlord";
 
 const SERIES = [
-  { key: "roof", label: "Roof", color: "#f59e0b" },
-  { key: "hvac", label: "HVAC", color: "#0ea5e9" },
-  { key: "water", label: "Water heaters", color: "#10b981" },
-  { key: "other", label: "Other", color: "#94a3b8" },
+  { key: "roof", label: "Roof", color: "var(--series-1)" },
+  { key: "hvac", label: "HVAC", color: "var(--series-2)" },
+  { key: "water", label: "Plumbing", color: "var(--series-3)" },
+  { key: "other", label: "Other", color: "var(--series-8)" },
 ] as const satisfies readonly { key: MockupKey; label: string; color: string }[];
 
 const ROOF_YEAR = 3;
 
+// Labels are 18 in the 560-wide viewBox so they stay readable when it shrinks to a phone.
 const W = 560;
-const H = 260;
-const PAD = { top: 16, right: 12, bottom: 28, left: 40 };
+const H = 280;
+const LABEL = 18;
+const PAD = { top: 16, right: 12, bottom: 38, left: 58 };
 const MAX = 50;
 const TICKS = [0, 10, 20, 30, 40, 50];
 
@@ -29,7 +32,7 @@ export default function ForecastMockup() {
   const y = (v: number) => PAD.top + plotH - (v / MAX) * plotH;
 
   return (
-    <figure className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-6 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+    <figure className="viz-root rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-6 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -39,7 +42,7 @@ export default function ForecastMockup() {
         </div>
         <div className="rounded-lg bg-amber-50 px-3.5 py-2 text-right ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
           <p className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-300">
-            Recommended reserve
+            Monthly reserve
           </p>
           <p className="text-xl font-semibold text-slate-900 dark:text-white">
             ${reserve}<span className="text-sm font-normal text-slate-600 dark:text-slate-400"> /unit/mo</span>
@@ -68,7 +71,7 @@ export default function ForecastMockup() {
               y={y(t)}
               dy="0.32em"
               textAnchor="end"
-              fontSize={11}
+              fontSize={LABEL}
               className="fill-slate-500 dark:fill-slate-400"
             >
               ${t}k
@@ -94,9 +97,9 @@ export default function ForecastMockup() {
               })}
               <text
                 x={x + barW / 2}
-                y={H - PAD.bottom + 17}
+                y={H - PAD.bottom + 26}
                 textAnchor="middle"
-                fontSize={11}
+                fontSize={LABEL}
                 className="fill-slate-500 dark:fill-slate-400"
               >
                 {`'${String(startYear + i).slice(2)}`}
@@ -111,7 +114,7 @@ export default function ForecastMockup() {
             x={PAD.left + ROOF_YEAR * band + band / 2}
             y={y(42) - 8}
             textAnchor="middle"
-            fontSize={11}
+            fontSize={LABEL}
             fontWeight={600}
             className="fill-slate-900 dark:fill-white"
           >

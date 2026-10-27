@@ -112,7 +112,10 @@ export default function SignInForm({ next }: { next: string }) {
     setWaitShown(false);
     setStatus({ kind: "sending" });
     const callback = new URL("/auth/callback", window.location.origin);
-    callback.searchParams.set("next", next);
+    // A link like /app#email-settings reaches this page with its #part still on, but
+    // the server never sees it: put it back so the magic link lands in the same place.
+    const hash = window.location.hash;
+    callback.searchParams.set("next", hash && !next.includes("#") ? `${next}${hash}` : next);
     let error: SendError | null;
     try {
       ({ error } = await createClient().auth.signInWithOtp({

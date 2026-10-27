@@ -43,13 +43,14 @@ describe("the filled-in example", () => {
     }
   });
 
-  it("shows the condition, notes, guess and replace now columns in use, and has no CapexClock IDs", () => {
+  it("shows the condition, notes and guess columns in use, leaves Replace now blank, and has no CapexClock IDs", () => {
     const col = (heading: string) => FORMAT_HEADINGS.indexOf(heading);
     const body = rows.slice(1);
     expect(body.some((r) => r[col("Condition")] !== "")).toBe(true);
     expect(body.some((r) => r[col("Notes")] !== "")).toBe(true);
     expect(body.some((r) => r[col("Install year is a guess")] === "yes")).toBe(true);
-    expect(body.some((r) => r[col("Replace now")] === "yes")).toBe(true);
+    // Replace now would change the forecast, so the example matches the calculator's.
+    expect(body.every((r) => r[col("Replace now")] === "")).toBe(true);
     expect(body.every((r) => r[col("CapexClock ID")] === "")).toBe(true);
     expect(new Set(body.map((r) => r[col("Counted per")]))).toEqual(new Set(["unit", "building", "sq ft"]));
   });

@@ -75,8 +75,24 @@ export default function SignupForm() {
               You&apos;re on the list.
             </p>
             <p className="mt-2 text-emerald-800 dark:text-emerald-200">
-              We&apos;ll email you when your spot opens.
+              We&apos;ll email you when reminders and condition reports are ready.
             </p>
+            {/* Everything else is usable today, so give them somewhere to go. */}
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <Link
+                href="/app"
+                prefetch={false}
+                className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-5 py-2.5 text-base font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-emerald-950"
+              >
+                Save your property with a free account
+              </Link>
+              <Link
+                href="/capex-calculator"
+                className="text-sm font-medium text-emerald-900 underline underline-offset-2 hover:text-emerald-950 dark:text-emerald-100 dark:hover:text-white"
+              >
+                Run the free calculator
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -142,7 +158,7 @@ function EarlyAccessForm({
         </div>
         <div>
           <label htmlFor="current_method" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            How do you track CapEx today?
+            How do you plan for big replacements today?
           </label>
           <select
             id="current_method"
@@ -195,7 +211,11 @@ function EarlyAccessForm({
 
       {status === "error" && (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-          Something went wrong. Please try again, or email us at {CONTACT_EMAIL}.
+          Something went wrong. Please try again, or email us at{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline underline-offset-2">
+            {CONTACT_EMAIL}
+          </a>
+          .
         </p>
       )}
     </form>

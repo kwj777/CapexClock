@@ -29,12 +29,15 @@ export default function TellMeFirstForm({
   idea,
   where,
   defaultEmail,
+  stacked = false,
   onSignedUp,
 }: {
   idea: PaidIdea;
   where: PaidWhere;
   /** The signed-in owner's email; it can arrive after the form opens. */
   defaultEmail: string;
+  /** One field under the other at every width, for a narrow column. */
+  stacked?: boolean;
   onSignedUp: () => void;
 }) {
   const id = useId();
@@ -106,7 +109,7 @@ export default function TellMeFirstForm({
         </label>
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={stacked ? "grid gap-4" : "grid gap-4 sm:grid-cols-2"}>
         <div>
           <label htmlFor={`${id}-email`} className={labelClass}>
             Email
@@ -171,7 +174,7 @@ export default function TellMeFirstForm({
           {status === "submitting" ? "Sending…" : "Tell me first"}
         </button>
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          We&apos;ll only email you about this idea. See our{" "}
+          We&apos;ll only email you about this {where === "pricing" ? "offer" : "idea"}. See our{" "}
           <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
             privacy page
           </Link>

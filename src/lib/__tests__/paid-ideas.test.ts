@@ -3,7 +3,11 @@ import { join } from "node:path";
 import {
   FIRST_PICKS,
   firstTimeEach,
+  IDEA_FOR_OFFER,
   NOT_BUILT_TEXT,
+  OFFERS,
+  offerForIdea,
+  offerHeading,
   PAID_IDEA_TEXT,
   PAID_IDEAS,
   PAID_INTEREST_FORM,
@@ -111,16 +115,27 @@ describe("wording", () => {
   });
 
   it("names each panel after its idea, so screen readers can tell them apart", () => {
-    expect(PAID_IDEAS.map(panelName)).toEqual([
+    expect(PAID_IDEAS.map((idea) => panelName(idea))).toEqual([
       "Email me before these are due: not built yet",
       "Condition report for lenders and buyers: not built yet",
       "Add from a photo of the label: not built yet",
     ]);
   });
 
-  it("offers to fill in rows from an emailed photo, free, with a subject line", () => {
+  it("heads a panel with the offer and its price, not 'not built yet', once it's on sale", () => {
+    expect(offerHeading("membership")).toBe("Founding membership, $12/month");
+    expect(offerHeading("report")).toBe("Condition report, $29 once");
+    expect(panelName("reminders", "membership")).toBe("Email me before these are due: Founding membership, $12/month");
+    expect(panelName("report", "report")).toBe("Condition report for lenders and buyers: Condition report, $29 once");
+  });
+
+  it("signs up for the matching idea from an offer that isn't on sale", () => {
+    for (const offer of OFFERS) expect(offerForIdea(IDEA_FOR_OFFER[offer])).toBe(offer);
+  });
+
+  it("offers to read an emailed photo and reply with what to enter, free, with a subject line", () => {
     expect(`${PHOTO_OFFER.before} support@capexclock.com ${PHOTO_OFFER.after}`).toBe(
-      "Want it now? Email a photo of the label to support@capexclock.com and we'll fill in the row for you, free.",
+      "Want it now? Email a photo of the label to support@capexclock.com and we'll email back the install year, size and model to enter, free.",
     );
     expect(photoOfferHref("support@capexclock.com")).toBe("mailto:support@capexclock.com?subject=Photo%20of%20a%20label");
     expect(`${PHOTO_OFFER.before} ${PHOTO_OFFER.after}`).not.toMatch(/—/);
