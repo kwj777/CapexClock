@@ -1,3 +1,5 @@
+import { roundUpReserve } from "@/verticals/landlord";
+
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -15,13 +17,9 @@ export function formatMoney(value: number): string {
   return money.format(value);
 }
 
-/**
- * Monthly reserve amounts round up to the next dollar, so saving the amount
- * shown never leaves the fund short. The tiny allowance keeps float noise
- * (200.0000000001) from adding a dollar.
- */
+/** Monthly reserve amounts round up to the next dollar (see roundUpReserve). */
 export function formatReserve(value: number): string {
-  return money.format(Math.ceil(value - 1e-6) || 0);
+  return money.format(roundUpReserve(value));
 }
 
 export function formatCompactMoney(value: number): string {

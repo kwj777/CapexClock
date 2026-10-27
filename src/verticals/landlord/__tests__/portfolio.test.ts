@@ -1,5 +1,5 @@
 import type { ComponentCondition } from "../draft/model";
-import { summarizePortfolio } from "../portfolio";
+import { byNeedsMoneyFirst, roundUpReserve, summarizePortfolio } from "../portfolio";
 import { forecastProperty, type SavedComponent, type SavedProperty } from "../property";
 import type { UnitLabel } from "../units";
 
@@ -115,6 +115,47 @@ describe("portfolio totals", () => {
     const { summaries, totals } = summarizePortfolio([noUnits], [roof("c2", noUnits.id)], 2026);
     expect(summaries[0].property).toBe(noUnits);
     expect(totals.missingUnits[0]).toBe(noUnits);
+  });
+
+  it("totals the monthly reserves as each card shows them, rounded up", () => {
+    const small = property("a0000000-0000-4000-8000-000000000003", "Small", 2);
+    const { summaries, totals } = summarizePortfolio(
+      [tenUnits, small],
+      [roof("c1", tenUnits.id, { replacement_cost_each: 7_201 }), roof("c3", small.id, { replacement_cost_each: 7_777 })],
+      2026,
+    );
+    // About $60.01 and $64.81: the cards show $61 and $65, so the total must show $126, not $125.
+    const cards = summaries.map((s) => Math.ceil(s.forecast.monthlyReserve));
+    expect(cards).toEqual([61, 65]);
+    expect(Math.ceil(totals.monthly)).toBe(125);
+    expect(totals.monthlyRoundedUp).toBe(126);
+  });
+
+  it("puts the property that needs the most money this year first, then most at risk, then by name", () => {
+    const p = (n: number, name: string) => property(`a0000000-0000-4000-8000-00000000001${n}`, name, 1);
+    const [due, risky, building2, building10] = [p(1, "Due now"), p(2, "Risky"), p(3, "Building 2"), p(4, "Building 10")];
+    const { summaries } = summarizePortfolio(
+      [building10, building2, risky, due],
+      [
+        roof("c1", due.id, { install_year: 2000 }),
+        roof("c2", risky.id, { install_year: 2005 }),
+        roof("c3", building2.id),
+        roof("c4", building10.id),
+      ],
+      2026,
+    );
+    expect([...summaries].sort(byNeedsMoneyFirst).map((s) => s.property.name)).toEqual([
+      "Due now",
+      "Risky",
+      "Building 2",
+      "Building 10",
+    ]);
+  });
+
+  it("rounds a reserve up to the dollar, ignoring float noise", () => {
+    expect(roundUpReserve(200.0000000001)).toBe(200);
+    expect(roundUpReserve(200.01)).toBe(201);
+    expect(roundUpReserve(0)).toBe(0);
   });
 
   it("checks every unit count before forecasting any property", () => {

@@ -21,3 +21,18 @@ export function toChartRows(forecast: LandlordForecast): { rows: ChartRow[]; pre
 export function tooltipTotal(amounts: readonly number[]): number {
   return amounts.reduce((sum, amount) => sum + amount, 0);
 }
+
+/** What's due when, grouped by year in order, with each year's total of the rows shown. */
+export function dueByYear<R extends { year: number; cost: number }>(rows: readonly R[]) {
+  const years: { year: number; total: number; items: R[] }[] = [];
+  for (const r of rows) {
+    const last = years[years.length - 1];
+    if (last?.year === r.year) {
+      last.items.push(r);
+      last.total += r.cost;
+    } else {
+      years.push({ year: r.year, total: r.cost, items: [r] });
+    }
+  }
+  return years;
+}

@@ -14,11 +14,35 @@ export interface PropertySummary<P extends SavedProperty> {
 }
 
 export interface PortfolioTotals<P extends SavedProperty> {
+  /** Σ each property's monthly reserve, unrounded. */
   readonly monthly: number;
+  /** Σ each property's monthly reserve rounded up to the dollar, so it equals the cards added up. */
+  readonly monthlyRoundedUp: number;
   readonly neededNow: number;
   readonly atRisk: number;
   readonly perUnit: number | null;
   readonly missingUnits: readonly P[];
+}
+
+/**
+ * A monthly reserve rounded up to the next dollar, so saving the amount shown never
+ * leaves the fund short. The tiny allowance keeps float noise (200.0000000001) from
+ * adding a dollar.
+ */
+export function roundUpReserve(value: number): number {
+  return Math.ceil(value - 1e-6) || 0;
+}
+
+/**
+ * Orders property summaries so the one that needs money first comes first: most
+ * needed this year, then most items at risk, then by name.
+ */
+export function byNeedsMoneyFirst(a: PropertySummary<SavedProperty>, b: PropertySummary<SavedProperty>): number {
+  return (
+    b.forecast.neededNow - a.forecast.neededNow ||
+    b.forecast.atRisk.length - a.forecast.atRisk.length ||
+    a.property.name.localeCompare(b.property.name, "en-US", { numeric: true })
+  );
 }
 
 /** Each saved property becomes an engine AssetGroup; the engine forecasts them all, the landlord adds per-unit figures. */
@@ -57,6 +81,7 @@ export function summarizePortfolio<P extends SavedProperty>(
     summaries,
     totals: {
       monthly: sums.monthlyReserve,
+      monthlyRoundedUp: summaries.reduce((sum, s) => sum + roundUpReserve(s.forecast.monthlyReserve), 0),
       neededNow: sums.neededNow,
       atRisk: sums.atRiskCount,
       perUnit: metrics.perUnit,

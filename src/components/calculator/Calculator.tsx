@@ -67,7 +67,7 @@ import {
   type TypicalCost,
 } from "@/verticals/landlord";
 import { forecastSummary } from "./announce";
-import { toChartRows } from "./chartData";
+import { dueByYear, toChartRows } from "./chartData";
 import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
 import { costHint } from "./cost-hint";
@@ -286,6 +286,11 @@ export interface CalculatorViewProps {
   showExample?: boolean;
   /** Extra controls shown above the property fields, e.g. a property name. */
   header?: ReactNode;
+  /**
+   * Shows the key numbers under the header with a link down to the forecast, which
+   * can be far down a long property's page.
+   */
+  quickSummary?: boolean;
   /** Shows the draft's own optional Property name field (the public calculator). */
   nameField?: boolean;
   footer?: ReactNode;
@@ -372,6 +377,7 @@ function CalculatorBody({
   trackEvents = false,
   showExample = false,
   header,
+  quickSummary = false,
   nameField = false,
   footer,
   exportName = "My property",
@@ -658,6 +664,32 @@ function CalculatorBody({
       {/* Property */}
       <section className={cardClass} aria-labelledby="property-heading">
         {header}
+        {quickSummary && components.length > 0 && (
+          <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
+            <span className="whitespace-nowrap">
+              Monthly reserve{" "}
+              <span className="font-semibold tabular-nums text-slate-950 dark:text-white">
+                {formatReserve(forecast.monthlyReserve)}
+              </span>
+            </span>{" "}
+            ·{" "}
+            <span className="whitespace-nowrap">
+              Needed in {forecast.startYear}{" "}
+              <span className="font-semibold tabular-nums text-slate-950 dark:text-white">
+                {formatMoney(forecast.neededNow)}
+              </span>
+            </span>{" "}
+            ·{" "}
+            <a
+              href="#forecast-heading"
+              className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+            >
+              <span className="whitespace-nowrap">
+                See forecast<span aria-hidden="true"> ↓</span>
+              </span>
+            </a>
+          </p>
+        )}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap gap-4">
             <h2 id="property-heading" className="sr-only">
@@ -1017,7 +1049,8 @@ function CalculatorBody({
             )}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+          {/* Cards keep their own height on desktop, so a long list doesn't stretch the other. */}
+          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr] lg:items-start">
             <AtRisk forecast={forecast} rows={rowsById}>
               <CompareAtRisk
                 startYear={startYear}
@@ -1519,7 +1552,12 @@ const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Land
   return forecast.atRisk.length === 0 ? (
     <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Nothing is close to end of life.</p>
   ) : (
-    <ul className="mt-4 space-y-3">
+    // On desktop it scrolls past the height of What's due when, beside it.
+    <ul
+      tabIndex={0}
+      aria-label="Components at risk"
+      className={`mt-4 space-y-3 lg:max-h-96 lg:overflow-y-auto lg:pr-2 ${scrollBoxFocus}`}
+    >
       {forecast.atRisk.map((item) => {
         const row = rows.get(item.componentId);
         // Already set to Replace this year, so it's planned for, not a warning.
@@ -1548,47 +1586,72 @@ const AtRiskList = memo(function AtRiskList({ forecast, rows }: { forecast: Land
   );
 });
 
+/** A scroll box's focus ring, for the keyboard only. */
+const scrollBoxFocus =
+  "rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900";
+
 const DueTable = memo(function DueTable({ forecast, rows: formRows }: { forecast: LandlordForecast; rows: RowsById }) {
   const rows = forecast.replacements;
   // Every row shows cents once any row has them, so the rows add up.
   const money = moneyColumn(rows.map((r) => r.cost));
+  const byYear = dueByYear(rows);
+  const headingId = useId();
   return (
     <div className={cardClass}>
-      <h3 className="text-base font-semibold text-slate-950 dark:text-white">What&apos;s due when</h3>
+      <h3 id={headingId} className="text-base font-semibold text-slate-950 dark:text-white">
+        What&apos;s due when
+      </h3>
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
           No replacements fall in the next 10 years.
         </p>
       ) : (
-        <div className="mt-4 max-h-96 overflow-y-auto">
+        // Focusable, so it scrolls from the keyboard in every browser.
+        <div
+          role="region"
+          tabIndex={0}
+          aria-labelledby={headingId}
+          className={`mt-4 max-h-96 overflow-y-auto ${scrollBoxFocus}`}
+        >
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white text-left dark:bg-slate-900">
+            <thead className="text-left">
               <tr className="border-b border-slate-200 dark:border-slate-800">
-                <th className={`${labelClass} py-2 pr-3`}>Year</th>
                 <th className={`${labelClass} py-2 pr-3`}>Component</th>
                 <th className={`${labelClass} py-2 text-right`}>Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rows.map((r) => (
-                <tr key={`${r.componentId}-${r.year}`}>
-                  <td className="py-2 pr-3 tabular-nums text-slate-600 dark:text-slate-300">{r.year}</td>
-                  <td className="py-2 pr-3 text-slate-900 dark:text-white">
-                    {r.name}
-                    {r.overdue && (
-                      <>
-                        {" "}
-                        <span className="ml-0.5 text-xs text-red-700 dark:text-red-400">overdue</span>
-                      </>
-                    )}
-                    <NameNotes row={formRows.get(r.componentId)} isEstimate={r.estimated.installYear} />
-                  </td>
-                  <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
-                    {money(r.cost)}
-                  </td>
+            {/* One group per year, headed by its total, so nobody adds up rows. The year stays in view while its rows scroll. */}
+            {byYear.map(({ year, total, items }) => (
+              <tbody key={year} className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr>
+                  {/* -top-0.5: at top-0, rows scrolling under the year show through a gap above it in Chromium. */}
+                  <th
+                    scope="rowgroup"
+                    colSpan={2}
+                    className="sticky -top-0.5 z-10 bg-slate-100 px-2 py-1.5 text-left text-xs font-semibold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {year} · {money(total)}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
+                {items.map((r) => (
+                  <tr key={`${r.componentId}-${r.year}`}>
+                    <td className="py-2 pr-3 text-slate-900 dark:text-white">
+                      {r.name}
+                      {r.overdue && (
+                        <>
+                          {" "}
+                          <span className="ml-0.5 text-xs text-red-700 dark:text-red-400">overdue</span>
+                        </>
+                      )}
+                      <NameNotes row={formRows.get(r.componentId)} isEstimate={r.estimated.installYear} />
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-slate-900 dark:text-white">
+                      {money(r.cost)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
         </div>
       )}

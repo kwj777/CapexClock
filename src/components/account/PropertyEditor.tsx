@@ -159,6 +159,9 @@ export default function PropertyEditor({
   const [arrivedCreated] = useState(() => propertyId !== undefined && createdNow === propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
+  // Counts blocked saves, so each one moves focus to the first row to fix.
+  const [blockedSaves, setBlockedSaves] = useState(0);
+  const form = useRef<HTMLFieldSetElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
   const leaving = useRef(false);
@@ -179,14 +182,24 @@ export default function PropertyEditor({
     [showProblems, name, draft, currentYear, savedId],
   );
   // Both of the property's own problems, then the rows'.
-  const problemTexts = [
-    ...new Set([
-      ...propertyProblems.map((p) => SAVE_PROBLEM_TEXT[p]),
-      ...Object.entries(problems)
+  const propertyTexts = [...new Set(propertyProblems.map((p) => SAVE_PROBLEM_TEXT[p]))];
+  const rowTexts = [
+    ...new Set(
+      Object.entries(problems)
         .filter(([id]) => id !== "property")
         .map(([, p]) => SAVE_PROBLEM_TEXT[p]),
-    ]),
+    ),
   ];
+  const problemTexts = [...propertyTexts, ...rowTexts];
+  // On a long property the row to fix can be far down the page, so the alert names it.
+  const badRows = draft.rows.filter((row) => row.id in problems);
+  const firstBad = badRows.length > 0 ? badRows[0].name.trim() || `row ${draft.rows.indexOf(badRows[0]) + 1}` : "";
+  const badRowsText =
+    badRows.length === 0
+      ? null
+      : badRows.length === 1
+        ? `1 row needs fixing: ${firstBad}.`
+        : `${badRows.length} rows need fixing. The first is ${firstBad}.`;
   const rowNotes = Object.fromEntries(
     Object.entries(problems)
       .filter(([id]) => id !== "property")
@@ -280,6 +293,27 @@ export default function PropertyEditor({
     return () => window.clearTimeout(timer);
   }, [arrivedCreated]);
 
+  // After a blocked save, the first field to fix is brought to the middle of the screen and
+  // focused: Rental units or Year built if either has a problem (they come first), else the first bad row.
+  useEffect(() => {
+    if (blockedSaves === 0) return;
+    let field: HTMLElement | null | undefined = null;
+    if (propertyProblems.length > 0) {
+      field = form.current?.querySelector<HTMLElement>('input[aria-invalid="true"]');
+    } else {
+      const first = draft.rows.find((row) => row.id in problems);
+      if (!first) return;
+      field = form.current?.querySelector<HTMLElement>(
+        `[aria-invalid="true"][aria-describedby*="-${CSS.escape(first.id)}-problem"]`,
+      );
+    }
+    if (!field) return;
+    field.scrollIntoView({ block: "center" });
+    field.focus({ preventScroll: true });
+    // Only when a save is blocked, not as the owner fixes rows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockedSaves]);
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -344,6 +378,7 @@ export default function PropertyEditor({
     const input = toSaveInput(name, draft, currentYear, id);
     if (Object.keys(input.problems).length > 0) {
       setShowProblems(true);
+      setBlockedSaves((n) => n + 1);
       return;
     }
     setShowProblems(false);
@@ -650,7 +685,11 @@ export default function PropertyEditor({
               Save as a new property
             </button>
           )}
-          {problemTexts.map((text) => (
+          {propertyTexts.map((text) => (
+            <p key={text}>{text}</p>
+          ))}
+          {badRowsText && <p className="font-medium">{badRowsText}</p>}
+          {rowTexts.map((text) => (
             <p key={text}>{text}</p>
           ))}
         </div>
@@ -662,6 +701,7 @@ export default function PropertyEditor({
     // Locked while a new property is created and its page opens, so nothing typed
     // in that moment is lost.
     <fieldset
+      ref={form}
       disabled={save.kind === "opening" || (save.kind === "saving" && save.creating)}
       className="min-w-0 space-y-8"
     >
@@ -669,6 +709,7 @@ export default function PropertyEditor({
         draft={draft}
         setDraft={updateDraft}
         header={header}
+        quickSummary={savedId !== undefined}
         exportName={name.trim() || "My property"}
         listName={name.trim()}
         importWhere="editor"
