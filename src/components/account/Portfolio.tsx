@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { formatMoney, formatReserve } from "@/components/calculator/format";
 import type { ComponentRow, PropertyRow } from "@/lib/supabase/database.types";
-import { countNoun, LANDLORD_LABELS, summarizePortfolio } from "@/verticals/landlord";
+import { byNeedsMoneyFirst, countNoun, LANDLORD_LABELS, summarizePortfolio } from "@/verticals/landlord";
 import { keptPropertyIds } from "./unsaved";
 
 const card = "rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900";
@@ -56,16 +56,17 @@ export default function Portfolio({
   const startYear = useSyncExternalStore(subscribe, () => new Date().getFullYear(), () => serverYear);
   const kept = useSyncExternalStore(subscribeToStorage, () => keptSnapshot(userId), () => "");
   const unsaved = useMemo(() => new Set(kept.split(",")), [kept]);
-  const { summaries, totals } = useMemo(
-    () => summarizePortfolio(properties, components, startYear),
-    [properties, components, startYear],
-  );
+  // The property that needs money first comes first.
+  const { summaries, totals } = useMemo(() => {
+    const portfolio = summarizePortfolio(properties, components, startYear);
+    return { ...portfolio, summaries: [...portfolio.summaries].sort(byNeedsMoneyFirst) };
+  }, [properties, components, startYear]);
   const missing = totals.missingUnits;
 
   return (
     <>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Monthly reserve, all properties" value={formatReserve(totals.monthly)} emphasis />
+        <Stat label="Monthly reserve, all properties" value={formatMoney(totals.monthlyRoundedUp)} emphasis />
         <Stat
           label="Per unit, per month"
           value={totals.perUnit === null ? "Add units" : formatReserve(totals.perUnit)}
@@ -76,7 +77,12 @@ export default function Portfolio({
         <Stat label="Items at risk" value={String(totals.atRisk)} />
       </div>
 
-      <ul className="mt-8 grid gap-4 md:grid-cols-2">
+      {summaries.length > 1 && (
+        <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
+          Sorted by what each property needs in {startYear}, most first.
+        </p>
+      )}
+      <ul className={`${summaries.length > 1 ? "mt-3" : "mt-8"} grid gap-4 md:grid-cols-2`}>
         {summaries.map(({ property, forecast, excluded, componentCount }) => (
           <li key={property.id}>
             <Link

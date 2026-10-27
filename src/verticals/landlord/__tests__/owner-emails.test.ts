@@ -65,7 +65,10 @@ describe("budgetSummary", () => {
     expect(s.properties[1]).toMatchObject({ excluded: 1, componentCount: 2, monthlyReservePerUnit: null });
     expect(s.totals.budgetYearTotal).toBe(20500);
     expect(s.totals.tenYearTotal).toBeCloseTo(s.properties[0].tenYearTotal + s.properties[1].tenYearTotal);
-    expect(s.totals.monthlyReserve).toBeCloseTo(s.properties[0].monthlyReserve + s.properties[1].monthlyReserve);
+    // Each property's reserve rounded up, as the site and the email show them, so the total adds up.
+    expect(s.totals.monthlyReserve).toBe(
+      Math.ceil(s.properties[0].monthlyReserve) + Math.ceil(s.properties[1].monthlyReserve),
+    );
   });
 });
 

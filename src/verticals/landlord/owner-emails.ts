@@ -131,7 +131,7 @@ export function budgetSummary(
     totals: {
       budgetYearTotal: totals.neededNow,
       tenYearTotal: rows.reduce((sum, p) => sum + p.tenYearTotal, 0),
-      monthlyReserve: totals.monthly,
+      monthlyReserve: totals.monthlyRoundedUp,
       atRiskCount: totals.atRisk,
     },
   };

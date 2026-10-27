@@ -135,6 +135,9 @@ export default function PropertyEditor({
   const [arrivedDetailsDropped] = useState(() => propertyId !== undefined && detailsNotSavedFor === propertyId);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [showProblems, setShowProblems] = useState(false);
+  // Counts blocked saves, so each one moves focus to the first row to fix.
+  const [blockedSaves, setBlockedSaves] = useState(0);
+  const form = useRef<HTMLFieldSetElement>(null);
   const busy = useRef(false);
   const leaving = useRef(false);
   const mounted = useRef(true);
@@ -151,6 +154,15 @@ export default function PropertyEditor({
     [showProblems, name, draft, currentYear, savedId],
   );
   const problemTexts = [...new Set(Object.values(problems).map((p) => SAVE_PROBLEM_TEXT[p]))];
+  // On a long property the row to fix can be far down the page, so the alert names it.
+  const badRows = draft.rows.filter((row) => row.id in problems);
+  const firstBad = badRows.length > 0 ? badRows[0].name.trim() || `row ${draft.rows.indexOf(badRows[0]) + 1}` : "";
+  const badRowsText =
+    badRows.length === 0
+      ? null
+      : badRows.length === 1
+        ? `1 row needs fixing: ${firstBad}.`
+        : `${badRows.length} rows need fixing. The first is ${firstBad}.`;
   const rowNotes = Object.fromEntries(
     Object.entries(problems)
       .filter(([id]) => id !== "property")
@@ -236,6 +248,21 @@ export default function PropertyEditor({
     return () => window.clearTimeout(timer);
   }, [arrivedDetailsDropped]);
 
+  // After a blocked save, the first field to fix is brought to the middle of the screen and focused.
+  useEffect(() => {
+    if (blockedSaves === 0) return;
+    const first = draft.rows.find((row) => row.id in problems);
+    if (!first) return;
+    const field = form.current?.querySelector<HTMLElement>(
+      `[aria-invalid="true"][aria-describedby*="-${CSS.escape(first.id)}-problem"]`,
+    );
+    if (!field) return;
+    field.scrollIntoView({ block: "center" });
+    field.focus({ preventScroll: true });
+    // Only when a save is blocked, not as the owner fixes rows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockedSaves]);
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -300,6 +327,7 @@ export default function PropertyEditor({
     const input = toSaveInput(name, draft, currentYear, id);
     if (Object.keys(input.problems).length > 0) {
       setShowProblems(true);
+      setBlockedSaves((n) => n + 1);
       return;
     }
     setShowProblems(false);
@@ -586,6 +614,7 @@ export default function PropertyEditor({
               Save as a new property
             </button>
           )}
+          {badRowsText && <p className="font-medium">{badRowsText}</p>}
           {problemTexts.map((text) => (
             <p key={text}>{text}</p>
           ))}
@@ -598,6 +627,7 @@ export default function PropertyEditor({
     // Locked while a new property is created and its page opens, so nothing typed
     // in that moment is lost.
     <fieldset
+      ref={form}
       disabled={save.kind === "opening" || (save.kind === "saving" && save.creating)}
       className="min-w-0 space-y-8"
     >
@@ -605,6 +635,7 @@ export default function PropertyEditor({
         draft={draft}
         setDraft={updateDraft}
         header={header}
+        quickSummary={savedId !== undefined}
         exportName={name.trim() || "My property"}
         listName={name.trim()}
         importWhere="editor"
