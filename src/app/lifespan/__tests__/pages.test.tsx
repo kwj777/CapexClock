@@ -20,7 +20,7 @@ const mockLibrary: LibraryComponent[] = [
   row("to-string", "toString", "__proto__"),
 ];
 
-jest.mock("@/lib/library/source", () => ({ getLibrary: async () => mockLibrary }));
+jest.mock("@/lib/library/source", () => ({ getLibrary: async () => mockLibrary, getTypicalCosts: async () => [] }));
 jest.mock("@/components/lifespan/LifespanEstimator", () => () => null);
 
 const text = (html: string) => html.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'");

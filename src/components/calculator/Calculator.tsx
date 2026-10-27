@@ -72,10 +72,13 @@ import { NEW_COMPARE_STATE, riskText, type CompareState } from "./compare";
 import CompareAtRisk from "./CompareAtRisk";
 import { costHint } from "./cost-hint";
 import {
+  clearArrival,
   clearImportUndo,
   loadDraft,
+  peekArrival,
   peekImportUndo,
   saveDraft,
+  type Arrival,
   STORAGE_KEY as DRAFT_STORAGE_KEY,
 } from "./draft-storage";
 import { dueClusterSentence, formatMoney, formatReserve, formatUnitPrice, safetyBufferSentence } from "./format";
@@ -126,14 +129,22 @@ export default function Calculator({
   const [start] = useState(() => {
     const loaded = loadDraft();
     const before = peekImportUndo(loaded, new Date().getFullYear());
-    return { draft: loaded, undo: before ? { before, after: loaded, action: "import" as const } : null };
+    return {
+      draft: loaded,
+      undo: before ? { before, after: loaded, action: "import" as const } : null,
+      // A lifespan page that just added a row says so here.
+      arrival: peekArrival(loaded),
+    };
   });
   const [draft, setDraft] = useState<Draft>(start.draft);
   // The Save box steps back while the pay question is asked, so the question isn't lost next to it.
   const [askingPay, setAskingPay] = useState(false);
   useEffect(() => saveDraft(draft), [draft]);
   // Offered once: a reload or a later visit doesn't offer it again.
-  useEffect(() => clearImportUndo(), []);
+  useEffect(() => {
+    clearImportUndo();
+    clearArrival();
+  }, []);
   // Follow changes from other tabs, e.g. this work being saved to an account and cleared.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
@@ -158,6 +169,7 @@ export default function Calculator({
       listName={name}
       accountsEnabled={accountsEnabled}
       initialUndo={start.undo}
+      arrival={start.arrival}
       lookUpOwnerEmail={accountsEnabled}
       onPayQuestionChange={setAskingPay}
       footer={
@@ -294,6 +306,8 @@ export interface CalculatorViewProps {
   rowNotes?: Record<string, RowNote>;
   /** An undo to offer from the start: an import on the template page that changed the list. */
   initialUndo?: Undo | null;
+  /** The row a lifespan page just added, pointed to above the property card. */
+  arrival?: Arrival | null;
   /** The page, for the paid-idea buttons' events and sign-ups. */
   where?: PaidWhere;
   /** The signed-in owner's email, filled in on the paid-idea "tell me first" forms. */
@@ -355,6 +369,7 @@ function CalculatorBody({
   typicalCosts = TYPICAL_COSTS,
   rowNotes,
   initialUndo = null,
+  arrival = null,
   onPayQuestionChange,
 }: Omit<CalculatorViewProps, "where" | "ownerEmail" | "lookUpOwnerEmail">) {
   const libraryBySlug = useMemo(() => new Map(library.map((c) => [c.slug, c])), [library]);
@@ -530,6 +545,21 @@ function CalculatorBody({
     undo.after.unitCount === draft.unitCount &&
     undo.after.yearBuilt === draft.yearBuilt;
 
+  // Said once on arrival from a lifespan page, a moment after the page is up so screen
+  // readers have the live region; the note above the property card stays.
+  useEffect(() => {
+    if (!arrival) return;
+    const timer = window.setTimeout(() => announce(`Added ${arrival.name} to your list below.`), 500);
+    return () => window.clearTimeout(timer);
+  }, [arrival, announce]);
+  const arrivedRow = arrival && draft.rows.some((r) => r.id === arrival.rowId) ? arrival : null;
+
+  function showArrivedRow(rowId: string) {
+    const field = document.getElementById(`${rowIdPrefix(rowId)}-name`);
+    field?.scrollIntoView({ block: "center" });
+    field?.focus({ preventScroll: true });
+  }
+
   useEffect(() => {
     if (!focusNext.current) return;
     document.getElementById(focusNext.current)?.focus();
@@ -588,6 +618,14 @@ function CalculatorBody({
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </p>
+      {arrivedRow && (
+        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-slate-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-slate-100 dark:ring-amber-500/30">
+          Added {arrivedRow.name} to your list.{" "}
+          <button type="button" onClick={() => showArrivedRow(arrivedRow.rowId)} className={textButton}>
+            See it below<span aria-hidden="true"> ↓</span>
+          </button>
+        </p>
+      )}
       {/* Property */}
       <section className={cardClass} aria-labelledby="property-heading">
         {header}

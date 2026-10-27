@@ -10,6 +10,7 @@ const find = (slug: string): LibraryComponent => {
 const waterHeater = find("tank-water-heater"); // 8–12 years, 10 in the middle, per unit
 const carpet = find("carpet"); // 5–10 years, 8 in the middle, per sq ft
 const panel = find("electrical-panel"); // 25–40 years, 33 in the middle
+const paint = find("interior-paint"); // 3–7 years, 5 in the middle, redone at turnover
 
 const estimate = (item: LibraryComponent, installYear: string, quantity = "", costEach = "") =>
   lifespanEstimate({ item, installYear, quantity, costEach, currentYear: START });
@@ -37,6 +38,7 @@ describe("the install year", () => {
       neededNow: null,
       savingFor: null,
       forecastCountsFrom: null,
+      spreadMonthly: null,
     });
     expect(estimate(waterHeater, "2016").result?.yearsLeft).toBe(0);
     expect(estimate(waterHeater, "2010").result?.yearsLeft).toBe(-6);
@@ -85,6 +87,18 @@ describe("what to set aside", () => {
     for (const r of [estimate(waterHeater, "2020", "12", "1.4k"), estimate(waterHeater, "2020", "", "1400")]) {
       expect(r.result).toMatchObject({ due: 2030, monthly: null, neededNow: null, savingFor: null });
     }
+  });
+
+  it("also gives the spread-out amount for items redone as tenants move out", () => {
+    // 12 apartments at $2,500, painted 2023 and due 2028: $30,000 over 2 years all at once,
+    // or $30,000 over the 5-year life a few apartments at a time.
+    expect(estimate(paint, "2023", "12", "2500").result).toMatchObject({ monthly: 1250, savingFor: 2028, spreadMonthly: 500 });
+    // One apartment has nothing to spread out.
+    expect(estimate(paint, "2023", "1", "2500").result?.spreadMonthly).toBeNull();
+    // Carpet across the building: 9,600 sq ft at $4 over an 8-year life.
+    expect(estimate(carpet, "2020", "9,600", "4").result?.spreadMonthly).toBe(400);
+    expect(estimate(waterHeater, "2020", "12", "1400").result?.spreadMonthly).toBeNull();
+    expect(estimate(paint, "2023", "12", "").result?.spreadMonthly).toBeNull();
   });
 
   it("needs a cost before anything about money shows", () => {

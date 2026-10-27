@@ -145,7 +145,7 @@ export default function PricingPage() {
               {FAQ.map(({ q, a }) => (
                 <div key={q} className="py-4">
                   <dt className="font-semibold text-slate-950 dark:text-white">{q}</dt>
-                  <dd className="mt-1 text-slate-600 dark:text-slate-400">{a}</dd>
+                  <dd className="mt-1 text-slate-600 dark:text-slate-400">{withEmailLink(a)}</dd>
                 </div>
               ))}
             </dl>
@@ -154,6 +154,21 @@ export default function PricingPage() {
       </main>
       <SiteFooter />
     </>
+  );
+}
+
+/** An FAQ answer with our email address as a link. The FAQPage data keeps the plain text. */
+function withEmailLink(text: string): ReactNode {
+  const parts = text.split(CONTACT_EMAIL);
+  return parts.flatMap((part, i) =>
+    i === 0
+      ? [part]
+      : [
+          <a key={i} href={`mailto:${CONTACT_EMAIL}`} className={link}>
+            {CONTACT_EMAIL}
+          </a>,
+          part,
+        ],
   );
 }
 
