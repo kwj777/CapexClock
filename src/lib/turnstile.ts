@@ -102,14 +102,38 @@ export const CAPTCHA_FAILED_TEXT = `The security check isn't working. Check your
 export interface SendError {
   status?: number;
   code?: string;
+  name?: string;
   message: string;
+}
+
+/** Why a sign-in email didn't go. "other" is anything we don't recognise. */
+export type SendErrorKind = "rate_limited" | "captcha" | "network" | "other";
+
+export function sendErrorKind(error: SendError): SendErrorKind {
+  if (error.status === 429) return "rate_limited";
+  if (error.code === "captcha_failed" || /captcha/i.test(error.message)) return "captcha";
+  // Supabase reports a request that never reached it as AuthRetryableFetchError (status 0
+  // when offline); a browser's own fetch error says "Failed to fetch" or similar.
+  if (
+    error.name === "AuthRetryableFetchError" ||
+    error.status === 0 ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(error.message)
+  ) {
+    return "network";
+  }
+  return "other";
 }
 
 /** Plain words for a failed sign-in email. */
 export function sendErrorMessage(error: SendError): string {
-  if (error.status === 429) return "Too many sign-in emails just now. Please wait a minute and try again.";
-  if (error.code === "captcha_failed" || /captcha/i.test(error.message)) {
-    return `The security check didn't pass. Please try again. If it keeps happening, reload the page or email ${CONTACT_EMAIL}.`;
+  switch (sendErrorKind(error)) {
+    case "rate_limited":
+      return "Too many sign-in emails just now. Please wait a minute and try again.";
+    case "captcha":
+      return `The security check didn't pass. Please try again. If it keeps happening, reload the page or email ${CONTACT_EMAIL}.`;
+    case "network":
+      return "We couldn't reach CapexClock just now. Check your connection and try again.";
+    case "other":
+      return `We couldn't send the link. Check the address, or email ${CONTACT_EMAIL}.`;
   }
-  return `We couldn't send the link. Check the address, or email ${CONTACT_EMAIL}.`;
 }
