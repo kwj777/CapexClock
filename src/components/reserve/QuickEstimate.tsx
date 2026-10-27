@@ -14,6 +14,7 @@ import {
   quickEstimate,
   quickSystems,
   readQuickInputs,
+  smallBuildingShare,
   SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
   TYPICAL_COST_SOURCES,
@@ -24,6 +25,7 @@ import {
   type TypicalCost,
 } from "@/verticals/landlord";
 import { estimateText, quickPrompt } from "./estimate-text";
+import { keepSaved, loadSaved, parseSavedQuick, QUICK_STORAGE_KEY, useInBrowser } from "./reserve-storage";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -51,6 +53,27 @@ export default function QuickEstimate({
   const [ticked, setTicked] = useState<ReadonlySet<string>>(
     () => new Set(systems.map((s) => s.item.slug).filter((slug) => TICKED_BY_DEFAULT.has(slug))),
   );
+  // What was typed here last time, read once the page is in the browser (the
+  // built page starts blank). Saving waits until then, so it never wipes it.
+  const inBrowser = useInBrowser();
+  const [restored, setRestored] = useState(false);
+  if (inBrowser && !restored) {
+    setRestored(true);
+    const saved = loadSaved(QUICK_STORAGE_KEY, parseSavedQuick);
+    if (saved) {
+      const known = new Set(systems.map((s) => s.item.slug));
+      setUnits(saved.units);
+      setYearBuilt(saved.yearBuilt);
+      setTicked(new Set(saved.ticked.filter((slug) => known.has(slug))));
+    }
+  }
+  useEffect(() => {
+    if (!restored) return;
+    const defaults = systems.filter((s) => TICKED_BY_DEFAULT.has(s.item.slug));
+    const changed = ticked.size !== defaults.length || defaults.some((s) => !ticked.has(s.item.slug));
+    keepSaved(QUICK_STORAGE_KEY, units.trim() || yearBuilt.trim() || changed ? { units, yearBuilt, ticked: [...ticked] } : null);
+  }, [restored, systems, units, yearBuilt, ticked]);
+
   // A year built is only checked once the owner leaves the field, so typing "1998" never flags "19".
   const [editingYear, setEditingYear] = useState(false);
   const [currentYear] = useState(() => new Date().getFullYear());
@@ -194,6 +217,15 @@ export default function QuickEstimate({
                 Use the full CapEx calculator
               </Link>{" "}
               with your own costs and dates for a number to plan on.
+              {smallBuildingShare(ticked, shown.units) &&
+                ` Roof, siding and other whole-building costs are shared out as if for a ${ESTIMATE_BUILDING_UNITS}-unit building, so a smaller building's share per unit is usually a bit higher.`}
+            </p>
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+              Want a reminder before these come due?{" "}
+              <Link href="/#signup" className={link}>
+                Get early access
+              </Link>
+              .
             </p>
           </>
         ) : (
@@ -278,6 +310,17 @@ export default function QuickEstimate({
             ))}
           </table>
         </div>
+        {/* Sticks to the bottom of the screen while the list is in view, so ticking a box shows what it changes. */}
+        <p className="sticky bottom-0 -mx-4 mt-2 border-t border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-950 backdrop-blur-sm sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-slate-900/95 dark:text-white">
+          {shown ? (
+            <>
+              About <span className="tabular-nums">{shown.text.perUnit}</span> per unit a month ·{" "}
+              {shown.systems === 1 ? "1 system" : `${shown.systems} systems`}
+            </>
+          ) : (
+            <span className="font-normal text-slate-600 dark:text-slate-400">{prompt}</span>
+          )}
+        </p>
       </fieldset>
 
       <section className="mt-8" aria-labelledby={`${baseId}-how`}>

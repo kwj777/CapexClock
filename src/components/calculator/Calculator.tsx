@@ -1024,6 +1024,7 @@ function CalculatorBody({
             forecast={forecast}
             components={components}
             rows={deferredDraft.rows}
+            yearBuilt={deferredDraft.yearBuilt}
             list={{ draft, building: listName }}
             onPayQuestionChange={onPayQuestionChange}
           />

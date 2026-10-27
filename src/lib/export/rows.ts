@@ -1,5 +1,16 @@
 import type { ComponentCondition } from "@/lib/supabase/database.types";
-import type { AtRiskComponent, Component, LandlordForecast, UnitLabel } from "@/verticals/landlord";
+import {
+  atRiskWithoutCost,
+  badYearBuilt,
+  parseNumber,
+  toComponents,
+  type AtRiskComponent,
+  type Component,
+  type Draft,
+  type LandlordForecast,
+  type RowProblem,
+  type UnitLabel,
+} from "@/verticals/landlord";
 
 /** What the owner noted about a component, as the exports show it. */
 export interface RowDetails {
@@ -16,6 +27,8 @@ export interface LeftOut {
   category: string;
   condition?: ComponentCondition | null;
   notes?: string;
+  /** Why it's left out, when known. */
+  problem?: RowProblem;
 }
 
 /** A component with a condition or notes, for the PDF's list of them. */
@@ -35,6 +48,26 @@ export interface ExportDetails {
   leftOut?: LeftOut[];
   /** Every row with a condition or notes, in the form's order. */
   conditionNotes?: ConditionNote[];
+  /** Rows left out only for want of a cost that are still at risk, most urgent first. */
+  atRiskWithoutCost?: readonly AtRiskComponent[];
+  /** The building's year built, when one was given. */
+  yearBuilt?: number | null;
+}
+
+/** What the exports learn from the whole form, beyond each row: see formFacts. */
+export interface FormFacts {
+  problems?: Readonly<Record<string, RowProblem>>;
+  atRiskWithoutCost?: readonly AtRiskComponent[];
+  yearBuilt?: number | null;
+}
+
+/** Why each row was left out, the costless rows still at risk, and the year built. */
+export function formFacts(draft: Pick<Draft, "yearBuilt" | "rows">, startYear: number): FormFacts {
+  return {
+    problems: toComponents({ unitCount: "", ...draft }, startYear).problems,
+    atRiskWithoutCost: atRiskWithoutCost(draft, startYear),
+    yearBuilt: badYearBuilt(draft.yearBuilt, startYear) ? null : parseNumber(draft.yearBuilt),
+  };
 }
 
 /** A calculator form row, as far as the exports need it. */
@@ -72,16 +105,20 @@ function rowName(row: Pick<ExportFormRow, "name">): string {
 export function exportDetails(
   formRows: readonly ExportFormRow[],
   components: readonly Pick<Component, "id">[],
+  facts: FormFacts = {},
 ): ExportDetails {
   const included = new Set(components.map((c) => c.id));
   return {
+    atRiskWithoutCost: facts.atRiskWithoutCost ?? [],
+    yearBuilt: facts.yearBuilt ?? null,
     unitLabels: new Map(formRows.map((r) => [r.id, r.unitLabel])),
     rowDetails: new Map(formRows.map((r) => [r.id, rowDetails(r)])),
     leftOut: formRows
       .filter((r) => !included.has(r.id))
       .map((r) => {
         const { condition, notes } = rowDetails(r);
-        return { name: rowName(r), category: r.category, condition, notes };
+        const problem = facts.problems?.[r.id];
+        return { name: rowName(r), category: r.category, condition, notes, ...(problem ? { problem } : {}) };
       }),
     conditionNotes: formRows
       .map((r) => ({ name: rowName(r), ...rowDetails(r) }))
@@ -112,6 +149,7 @@ export interface ExportRow {
 export const ESTIMATED_NOTE = "Install year estimated";
 export const GUESS_NOTE = "Install year is a guess";
 export const LEFT_OUT_NOTE = "Not included yet: details missing";
+export const NO_COST_NOTE = "Not included yet: no replacement cost";
 
 /**
  * Why a forecast's install year is an estimate: year built standing in for a blank
@@ -199,14 +237,35 @@ export function atRiskShortText(item: Pick<AtRiskComponent, "status" | "yearsRem
 
 const MAX_NAMES = 5;
 
-/** "2 components aren't included yet: Boiler and Carpet. …" for the top of the PDF. */
-export function leftOutSummary(leftOut: LeftOut[]): string {
-  const count = leftOut.length;
-  if (count === 0) return "";
+/** "Boiler, Carpet and 2 more" */
+function nameList(leftOut: readonly LeftOut[]): string {
   const names = leftOut.slice(0, MAX_NAMES).map((l) => l.name);
-  if (count > MAX_NAMES) names.push(`${count - MAX_NAMES} more`);
-  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
-  return count === 1
-    ? `1 component isn't included yet: ${list}. Its details aren't complete, so the figures here leave it out.`
-    : `${count} components aren't included yet: ${list}. Their details aren't complete, so the figures here leave them out.`;
+  if (leftOut.length > MAX_NAMES) names.push(`${leftOut.length - MAX_NAMES} more`);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+}
+
+/**
+ * "Windows has no replacement cost yet, so it isn't in the totals. 2 components
+ * aren't included yet: Boiler and Carpet. …" for the top of the PDF.
+ */
+export function leftOutSummary(leftOut: readonly LeftOut[]): string {
+  const noCost = leftOut.filter((l) => l.problem === "missing_cost");
+  const other = leftOut.filter((l) => l.problem !== "missing_cost");
+  const sentences: string[] = [];
+  if (noCost.length === 1) sentences.push(`${nameList(noCost)} has no replacement cost yet, so it isn't in the totals.`);
+  if (noCost.length > 1) sentences.push(`${nameList(noCost)} have no replacement cost yet, so they aren't in the totals.`);
+  if (other.length === 1) {
+    sentences.push(`1 component isn't included yet: ${nameList(other)}. Its details aren't complete, so the figures here leave it out.`);
+  }
+  if (other.length > 1) {
+    sentences.push(
+      `${other.length} components aren't included yet: ${nameList(other)}. Their details aren't complete, so the figures here leave them out.`,
+    );
+  }
+  return sentences.join(" ");
+}
+
+/** The CSV's note on a row left out of the forecast. */
+export function leftOutNote(item: Pick<LeftOut, "problem">): string {
+  return item.problem === "missing_cost" ? NO_COST_NOTE : LEFT_OUT_NOTE;
 }
