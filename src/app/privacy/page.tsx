@@ -77,7 +77,7 @@ export default function PrivacyPage() {
           <Section title="The early access list and idea sign-ups">
             <p>
               If you join the early access list, Netlify, our web host, stores what you send through Netlify Forms: your
-              email, how many units you own, how you track CapEx today and, if you answer it, what worries you most. We
+              email, how many units you own, how you plan for big replacements today and, if you answer it, what worries you most. We
               use it to contact you about CapexClock.
             </p>
             <p className="mt-3">

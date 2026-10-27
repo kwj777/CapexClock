@@ -9,7 +9,7 @@ import { explainResult } from "./reserve-text";
 import { EXPENSES_STORAGE_KEY, keepSaved, loadSaved, parseSavedExpenses, useInBrowser } from "./reserve-storage";
 
 const input =
-  "mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
+  "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
 const label = "text-xs font-medium text-slate-600 dark:text-slate-400";
 
 interface Row {
@@ -91,7 +91,8 @@ export default function ReserveCalculator() {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
       <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Upcoming expenses</h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Costs in today&apos;s dollars. Use 0 years for anything due now.</p>
-      <div className="mt-4 space-y-3">
+      {/* Phones stack each expense over two rows, so a divider keeps them apart. */}
+      <div className="mt-4 divide-y divide-slate-200 sm:space-y-3 sm:divide-y-0 dark:divide-slate-800">
         {rows.map((r, i) => {
           // Row names keep each field's label unique, starting with the visible label.
           const rowName = r.name.trim() || `expense ${i + 1}`;
@@ -102,7 +103,10 @@ export default function ReserveCalculator() {
           const flag = (field: ExpenseField) =>
             fields.includes(field) ? { "aria-invalid": true, "aria-describedby": errorId } : {};
           return (
-            <div key={r.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+            <div
+              key={r.id}
+              className="grid grid-cols-[1fr_1fr_auto] gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[2fr_1fr_1fr_auto] sm:py-0"
+            >
               <label className="col-span-3 sm:col-span-1">
                 <span className={label}>What</span>
                 <input
@@ -133,6 +137,7 @@ export default function ReserveCalculator() {
                 <input
                   className={input}
                   inputMode="numeric"
+                  placeholder="e.g. 5"
                   value={r.years}
                   aria-label={`Years until due, ${rowName}`}
                   {...flag("years")}
@@ -145,7 +150,7 @@ export default function ReserveCalculator() {
                 type="button"
                 onClick={() => remove(r.id)}
                 disabled={rows.length === 1}
-                className="self-end rounded-md px-2 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
+                className="min-h-10 min-w-10 self-end rounded-md px-2 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
                 aria-label={`Remove ${rowName}`}
               >
                 ✕
@@ -165,7 +170,7 @@ export default function ReserveCalculator() {
       <button
         type="button"
         onClick={() => setRows((rs) => [...rs, { id: nextId++, name: "", cost: "", years: "" }])}
-        className="mt-3 text-sm font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400"
+        className="-mx-2 mt-2 rounded-md px-2 py-2 text-sm font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400"
       >
         + Add expense
       </button>
@@ -210,21 +215,22 @@ export default function ReserveCalculator() {
       <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800" aria-live="polite">
         {result ? (
           <>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {/* min-w-0 and wrapping keep a huge (typo-sized) amount inside its column. */}
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 [&>div]:min-w-0">
               <div>
                 <dt className={label}>Save each month</dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{formatReserve(result.monthly)}</dd>
+                <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-slate-950 dark:text-white">{formatReserve(result.monthly)}</dd>
               </div>
               <div>
                 <dt className={label}>Per unit</dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">
+                <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-slate-950 dark:text-white">
                   {result.perUnit === null ? "—" : formatReserve(result.perUnit)}
                 </dd>
               </div>
               {result.shortfallNow > 0 && (
                 <div>
                   <dt className={label}>Short right now</dt>
-                  <dd className="mt-1 text-2xl font-semibold tabular-nums text-red-700 dark:text-red-400">{formatMoney(result.shortfallNow)}</dd>
+                  <dd className="mt-1 text-2xl font-semibold tabular-nums wrap-anywhere text-red-700 dark:text-red-400">{formatMoney(result.shortfallNow)}</dd>
                 </div>
               )}
             </dl>

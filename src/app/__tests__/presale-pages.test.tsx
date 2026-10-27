@@ -118,9 +118,21 @@ describe("/pricing", () => {
     expect(text(await renderPricing(SETTINGS))).toContain(
       "Any time online, with Manage or cancel membership at the bottom of every page.",
     );
-    expect(text(await renderPricing({}))).toContain(
-      "which goes at the bottom of every page when memberships go on sale. Or email support@capexclock.com.",
+    const before = text(await renderPricing({}));
+    expect(before).toContain(
+      "Once memberships go on sale, you'll be able to cancel any time online, or by emailing support@capexclock.com.",
     );
+    expect(before).not.toContain("bottom of every page");
+  });
+
+  it("offers each offer's own tell me first list while it isn't on sale, tagged with the page", async () => {
+    const html = await renderPricing({});
+    expect(html.match(/<form name="paid-interest"/g)).toHaveLength(2);
+    expect(html.match(/<input type="hidden" name="where" value="pricing"\/>/g)).toHaveLength(2);
+    expect(html).toContain('<input type="hidden" name="idea" value="reminders"/>');
+    expect(html).toContain('<input type="hidden" name="idea" value="report"/>');
+    expect(text(html)).not.toContain("Join the early access list");
+    expect(await renderPricing(SETTINGS)).not.toContain('name="paid-interest"');
   });
 });
 
@@ -153,19 +165,20 @@ describe("/terms", () => {
     expect(page).toContain("You may share your report with anyone");
     expect(page).toContain("No one but you may rely on it, and buyers and lenders should get their own inspection.");
     expect(page).toContain("limited to the amount you paid us for it");
-    expect(page).toContain("If we don't build reminders, we cancel every founding membership and refund every payment");
+    expect(page).toContain("If we stop sending reminders, we cancel every founding membership and refund every payment");
     expect(page).toContain("support@capexclock.com");
     expect(page).toContain("licensed professional");
   });
 
-  it("links to the customer portal when it's set, and says where it goes when it isn't", async () => {
+  it("links to the customer portal when it's set, and says canceling comes with the sale when it isn't", async () => {
     const withPortal = await renderTerms(SETTINGS);
     expect(withPortal).toContain(`href="${SETTINGS.NEXT_PUBLIC_STRIPE_PORTAL_LINK}"`);
     expect(text(withPortal)).toContain("You can cancel any time online, through Manage or cancel membership");
     const without = text(await renderTerms({}));
-    expect(without).toContain("You can cancel any time online, through Stripe's customer portal.");
-    expect(without).toContain("goes at the bottom of every page when memberships go on sale");
-    expect(without).toContain("You can also cancel by emailing support@capexclock.com.");
+    expect(without).toContain(
+      "Once memberships go on sale, you'll be able to cancel any time online, or by emailing support@capexclock.com.",
+    );
+    expect(without).not.toContain("bottom of every page");
   });
 });
 
@@ -272,8 +285,6 @@ describe("the sitemap", () => {
 });
 
 describe("our own words (plan T5)", () => {
-  // The live pay question keeps its original wording, so it's left out.
-  const KEEPS_OLD_WORDING = new Set(["src/components/export/PayQuestion.tsx"]);
   const root = join(__dirname, "../../..");
 
   function sourceFiles(dir: string): string[] {
@@ -287,7 +298,6 @@ describe("our own words (plan T5)", () => {
   it("never call the report lender-ready or accepted by lenders, or show $12 as a discount", () => {
     for (const path of sourceFiles(join(root, "src"))) {
       const file = relative(root, path);
-      if (KEEPS_OLD_WORDING.has(file)) continue;
       // Comments may name the rules.
       const source = readFileSync(path, "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "")

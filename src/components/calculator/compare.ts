@@ -155,6 +155,14 @@ export function eitherWayVariants(
   ];
 }
 
+/**
+ * True when every item is past end of life or due this year, so it's paid this year
+ * either way: the panel then leads with that, since the figures show little or no change.
+ */
+export function allPaidThisYearEitherWay(items: readonly Pick<CompareItem, "paidInFirstYearEitherWay">[]): boolean {
+  return items.length > 0 && items.every((i) => i.paidInFirstYearEitherWay);
+}
+
 /** Under the emergency box once it has a percent in it. */
 export function emergencyNote(percent: number): string {
   const amount = percent.toLocaleString("en-US", { maximumFractionDigits: 2 });
