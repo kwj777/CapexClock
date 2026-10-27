@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Short addresses people type for the most-visited lifespan pages.
+  async redirects() {
+    return [
+      { source: "/lifespan/roof", destination: "/lifespan/asphalt-shingle-roof", permanent: true },
+      { source: "/lifespan/water-heater", destination: "/lifespan/tank-water-heater", permanent: true },
+      { source: "/lifespan/furnace", destination: "/lifespan/gas-furnace", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

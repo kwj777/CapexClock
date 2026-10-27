@@ -37,6 +37,15 @@ export function applyCountMe(location: Pick<Location, "search" | "href">, storag
   }
 }
 
+/**
+ * Whether the browser sends the Global Privacy Control signal. It wins over
+ * ?count-me=on: PostHog isn't loaded while it's on, whatever this browser's mark.
+ */
+export function sendsPrivacySignal(navigator: object): boolean {
+  // Not in TypeScript's Navigator yet.
+  return (navigator as { globalPrivacyControl?: unknown }).globalPrivacyControl === true;
+}
+
 /** Whether this browser was marked not to count, for the footer note. */
 export function isNotCounted(storage: () => Pick<Storage, "getItem">): boolean {
   try {
