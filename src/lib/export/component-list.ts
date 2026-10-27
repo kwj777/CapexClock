@@ -98,7 +98,8 @@ const EXAMPLE_DETAILS: Record<string, Partial<DraftRow>> = {
   "gas-furnace": { installYearIsGuess: true, condition: "fair" },
   "tank-water-heater": { condition: "good", notes: "40 gallon, gas" },
   refrigerator: { notes: "Original to the building, as far as we know" },
-  carpet: { condition: "poor", scenario: "replace_now" },
+  // No Replace now here: the example should forecast the same as the calculator's Load an example.
+  carpet: { condition: "poor" },
 };
 
 /** The example building, as a filled-in template: the same one the calculator's Load an example shows. */

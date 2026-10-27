@@ -10,9 +10,12 @@ const STORAGE_KEY = "capexclock:pay-question:v1";
  * question or flow can be counted apart. Events from before this tag (the
  * review fix, which first sent pay_question_shown) have the same wording and
  * the same once-per-browser rule. Version 2 adds the "Which would you use
- * first?" follow-up. Change it whenever the wording or the flow changes.
+ * first?" follow-up. Version 3 asks about the real $12/month membership, is
+ * counted as shown only once it's been on screen, and follows a pick with a
+ * next step. Change it whenever the wording or the flow changes. The storage
+ * key stays, so no one already asked is asked again.
  */
-export const PAY_QUESTION_VERSION = "2";
+export const PAY_QUESTION_VERSION = "3";
 
 /** A pay-question event's properties, with the version added. */
 export function versioned<T extends Record<string, string>>(properties: T): T & { version: string } {

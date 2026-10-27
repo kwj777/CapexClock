@@ -173,6 +173,17 @@ describe("the open panel", () => {
     expect(shownLines(bad)).toContain("Enter a percent from 0 to 500, like 25.");
   });
 
+  it("leads with why when everything at risk is paid this year either way", () => {
+    // Only the overdue refrigerator and the water heater due this year are at risk.
+    const html = render({ list: components.filter((c) => !["Carpet", "Parking lot seal coat"].includes(c.name)) });
+    const either = "Everything here is past end of life or due in 2026, so it&#x27;s paid in 2026 either way.";
+    expect(html.indexOf(either)).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf(either)).toBeLessThan(html.indexOf("Cash needed in 2026"));
+    expect(html.split(either)).toHaveLength(3); // drawn once with its emergency variant, not again below
+    expect(html).not.toContain("The monthly amount stays the same.");
+    expect(applyButton(html)).not.toContain("bg-amber-500");
+  });
+
   it("says so when everything at risk is already set to replace this year", () => {
     const html = render({ list: components.map((c) => ({ ...c, scenario: "replace_now" })) });
     expect(html).toContain("Everything at risk is set to Replace this year.");

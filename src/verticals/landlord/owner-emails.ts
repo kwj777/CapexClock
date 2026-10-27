@@ -7,7 +7,7 @@ import type { ComponentCondition } from "./draft/model";
 import { landlordForecast, type LandlordForecast } from "./forecast";
 import { safetyBufferOf } from "./rules";
 import { summarizePortfolio, type PropertySummary } from "./portfolio";
-import { assetGroupFromSaved, type SavedComponent, type SavedProperty } from "./property";
+import { assetGroupFromSaved, type LeftOutComponent, type SavedComponent, type SavedProperty } from "./property";
 import type { UnitLabel } from "./units";
 
 /** One component in a replacement reminder. */
@@ -17,8 +17,8 @@ export interface ReminderItem {
   readonly componentId: string;
   readonly name: string;
   readonly category: string;
-  /** Quantity × cost each, in today's dollars. */
-  readonly cost: number;
+  /** Quantity × cost each, in today's dollars. Null when the owner hasn't entered a cost. */
+  readonly cost: number | null;
   /** End of life was before this year: it's still waiting to be replaced. */
   readonly overdue: boolean;
   /** The owner chose "Replace now" for it. */
@@ -33,7 +33,8 @@ export function reminderKey(componentId: string, year: number): string {
 /**
  * The components due for replacement in `year` (past end of life, ending this year,
  * or marked "Replace now") that haven't been reminded about for this year yet. Rows
- * the forecast leaves out (no cost or no install year) aren't reminded about either.
+ * the forecast leaves out only for want of a cost are included with a null cost, so
+ * the owner hears about them too; rows with no install year can't be dated and aren't.
  * Ordered by property, then overdue first, then by name.
  */
 export function remindersDue(
@@ -44,10 +45,10 @@ export function remindersDue(
 ): ReminderItem[] {
   const replaceNow = new Set(components.filter((c) => c.scenario === "replace_now").map((c) => c.id));
   const { summaries } = summarizePortfolio(properties, components, year);
-  return summaries.flatMap(({ property, forecast }) =>
-    forecast.years[0].replacements
-      .filter((r) => !alreadySent.has(reminderKey(r.componentId, year)))
-      .map(
+  const categories = new Map(components.map((c) => [c.id, c.category]));
+  return summaries.flatMap(({ property, forecast, leftOut }) =>
+    [
+      ...forecast.years[0].replacements.map(
         (r): ReminderItem => ({
           propertyId: property.id,
           propertyName: property.name,
@@ -58,7 +59,23 @@ export function remindersDue(
           overdue: r.overdue,
           replaceNow: replaceNow.has(r.componentId),
         }),
-      )
+      ),
+      ...leftOut
+        .filter((c) => c.missing === "cost" && c.endOfLifeYear !== null && (c.endOfLifeYear <= year || c.replaceNow))
+        .map(
+          (c): ReminderItem => ({
+            propertyId: property.id,
+            propertyName: property.name,
+            componentId: c.componentId,
+            name: c.name,
+            category: categories.get(c.componentId) ?? "",
+            cost: null,
+            overdue: c.endOfLifeYear! < year,
+            replaceNow: c.replaceNow,
+          }),
+        ),
+    ]
+      .filter((r) => !alreadySent.has(reminderKey(r.componentId, year)))
       .sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.name.localeCompare(b.name, "en-US")),
   );
 }
@@ -73,6 +90,8 @@ export interface BudgetProperty {
   readonly budgetYearItems: readonly { readonly name: string; readonly cost: number; readonly overdue: boolean }[];
   /** The 10 years from the budget year on. */
   readonly tenYearTotal: number;
+  /** Replacements after the 10 years that the monthly reserve is already saving for. */
+  readonly savingAhead: readonly { readonly name: string; readonly year: number; readonly cost: number }[];
   /** The site's "never run short" monthly reserve, unrounded. */
   readonly monthlyReserve: number;
   readonly monthlyReservePerUnit: number | null;
@@ -80,6 +99,8 @@ export interface BudgetProperty {
   readonly atRiskCount: number;
   /** Components left out of the numbers (no cost or no install year). */
   readonly excluded: number;
+  /** The rows behind `excluded`, so the email can name them. */
+  readonly leftOut: readonly LeftOutComponent[];
   readonly componentCount: number;
 }
 
@@ -106,10 +127,12 @@ function budgetProperty(s: PropertySummary<SavedProperty>): BudgetProperty {
       .map((r) => ({ name: r.name, cost: r.baseCost, overdue: r.overdue }))
       .sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name, "en-US")),
     tenYearTotal: f.horizonTotal,
+    savingAhead: f.savingAhead.map((r) => ({ name: r.name, year: r.year, cost: r.baseCost })),
     monthlyReserve: f.monthlyReserve,
     monthlyReservePerUnit: f.monthlyReservePerUnit,
     atRiskCount: f.atRisk.length,
     excluded: s.excluded,
+    leftOut: s.leftOut,
     componentCount: s.componentCount,
   };
 }
@@ -154,6 +177,8 @@ export interface SavedConditionReport {
   readonly components: readonly Component[];
   /** Components left out (no cost or no install year). */
   readonly excluded: number;
+  /** The rows behind `excluded`, which the report names but leaves out of its totals. */
+  readonly leftOut: readonly LeftOutComponent[];
   /** Components in the report with no condition rating. */
   readonly unrated: number;
 }
@@ -167,7 +192,7 @@ export function savedConditionReport(
   rows: readonly SavedReportComponent[],
   year: number,
 ): SavedConditionReport | null {
-  const { group, excluded } = assetGroupFromSaved(property, rows);
+  const { group, excluded, leftOut } = assetGroupFromSaved(property, rows);
   if (group.components.length === 0) return null;
   const byId = new Map(rows.map((r) => [r.id, r]));
   const inputs = group.components.map((component) => {
@@ -183,6 +208,7 @@ export function savedConditionReport(
     forecast: landlordForecast(group.components, property.unit_count, year, safetyBufferOf(property.safety_buffer)),
     components: group.components,
     excluded,
+    leftOut,
     unrated: report.filter((r) => r.condition === null).length,
   };
 }

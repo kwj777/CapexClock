@@ -68,6 +68,19 @@ it("makes a PDF per property it can report on", async () => {
   expect(result!.text).not.toContain("Empty");
 }, 30_000);
 
+it("names what it leaves out and counts an overdue one as at risk", async () => {
+  const build = conditionReportBuilder(FONTS, () => new Date("2027-01-08T15:00:00Z"));
+  const windows = { ...ROOF, id: "c3", name: "Windows", install_year: 1998, useful_life_years: 25, replacement_cost_each: null };
+  const result = await build({ properties: [props("p1", "Maple Court", 1998)], components: [ROOF, windows] }, 2027, FOOTER);
+  expect(result!.text).toContain(
+    "- Maple Court: 2 at risk (https://capexclock.com/app/properties/p1) Not in the report: Windows (no replacement cost entered, past its end of life since 2023).",
+  );
+  const [call] = (renderToBuffer as jest.Mock).mock.calls.at(-1)!;
+  expect(call.props.leftOut).toEqual([
+    { componentId: "c3", name: "Windows", missing: "cost", endOfLifeYear: 2023, replaceNow: false },
+  ]);
+}, 30_000);
+
 it("returns null when no property can be reported on", async () => {
   const build = conditionReportBuilder(FONTS);
   await expect(build({ properties: [props("p3", "Empty", 2000)], components: [] }, 2027, FOOTER)).resolves.toBeNull();

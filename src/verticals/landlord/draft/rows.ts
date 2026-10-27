@@ -59,13 +59,18 @@ function hasStartingQuantity(row: DraftRow): boolean {
 
 /**
  * Applies an edit to one row. Typing a quantity stops it following the unit
- * count. Changing how it's counted resets a starting quantity to fit the new
- * way, but keeps one the owner typed, so arrowing through the picker (which
- * changes it on every key press in some browsers) never loses their number.
+ * count, unless it's the unit count itself: a per-unit row at the unit count
+ * stays priced per apartment, as it is once the page is loaded again. Changing
+ * how it's counted resets a starting quantity to fit the new way, but keeps one
+ * the owner typed, so arrowing through the picker (which changes it on every key
+ * press in some browsers) never loses their number.
  */
 export function editRow(row: DraftRow, patch: Partial<DraftRow>, unitCount: string): DraftRow {
   const next = { ...row, ...patch };
-  if (patch.quantity !== undefined) return { ...next, followsUnitCount: false };
+  if (patch.quantity !== undefined) {
+    const atUnitCount = next.unitLabel === "per_unit" && unitCount.trim() !== "" && next.quantity.trim() === unitCount.trim();
+    return { ...next, followsUnitCount: atUnitCount };
+  }
   if (patch.unitLabel !== undefined && patch.unitLabel !== row.unitLabel && hasStartingQuantity(row)) {
     return { ...next, ...quantityFor(patch.unitLabel, unitCount) };
   }
@@ -162,9 +167,27 @@ const LIBRARY_COST_BASIS: Record<UnitLabel, CostBasis> = {
 };
 
 /**
+ * Library items there's one of in each apartment, so an apartment's typical cost
+ * is also the cost of each one. Windows or cabinets aren't: an apartment has several.
+ */
+const ONE_PER_APARTMENT: ReadonlySet<string> = new Set([
+  "gas-furnace",
+  "central-ac",
+  "heat-pump",
+  "tank-water-heater",
+  "tankless-water-heater",
+  "refrigerator",
+  "range-oven",
+  "dishwasher",
+  "washer-dryer",
+  "electrical-panel",
+]);
+
+/**
  * The typical cost a row's cost field can show as a hint, from the library item.
  * Only while the field and the typical cost mean the same thing, per apartment or per
- * sq ft. A cost each (the owner's own count: one window, not an apartment's
+ * sq ft, or each for an item there's one of in each apartment (`each` is then true).
+ * Any other cost each (the owner's own count: one window, not an apartment's
  * eight) or for the building can't be compared with them, so those get no hint.
  * Neither does a building-wide item counted per apartment: its typical cost is a
  * 12-unit building's boiler or roof shared out, and one in each apartment costs
@@ -174,10 +197,14 @@ export function typicalCostFor(
   row: Pick<DraftRow, "unitLabel" | "quantity" | "followsUnitCount">,
   lib: LibraryComponent | undefined,
   typical: TypicalCost | undefined,
-): { low: number; high: number } | null {
+): { low: number; high: number; each: boolean } | null {
   if (!lib || !typical || LIBRARY_COST_BASIS[lib.unitLabel] !== typical.per) return null;
-  if (costBasis(row) !== typical.per) return null;
-  return { low: typical.low, high: typical.high };
+  const basis = costBasis(row);
+  if (basis === typical.per) return { low: typical.low, high: typical.high, each: false };
+  if (basis === "each" && row.unitLabel === "per_unit" && typical.per === "apartment" && ONE_PER_APARTMENT.has(lib.slug)) {
+    return { low: typical.low, high: typical.high, each: true };
+  }
+  return null;
 }
 
 /**
@@ -248,5 +275,10 @@ export function neighborRowId(rows: Pick<DraftRow, "id">[], id: string): string 
 
 /** True when the draft holds anything the owner typed or loaded. */
 export function hasEntries(draft: Draft): boolean {
-  return draft.rows.length > 0 || draft.unitCount.trim() !== "" || draft.yearBuilt.trim() !== "";
+  return (
+    draft.rows.length > 0 ||
+    draft.unitCount.trim() !== "" ||
+    draft.yearBuilt.trim() !== "" ||
+    (draft.name ?? "").trim() !== ""
+  );
 }

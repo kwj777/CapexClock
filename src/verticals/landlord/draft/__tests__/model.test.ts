@@ -83,6 +83,12 @@ describe("condition, notes and a guessed install year", () => {
     expect(cleanDetails(row)).toBe(row);
   });
 
+  it("keeps a property name, and drops one that isn't text", () => {
+    expect(upgradeDraft({ name: "14 Maple Court", unitCount: "", yearBuilt: "", rows: [] }, 2026).name).toBe("14 Maple Court");
+    const damaged = { name: 7, unitCount: "", yearBuilt: "", rows: [] } as unknown as Draft;
+    expect(upgradeDraft(damaged, 2026)).not.toHaveProperty("name");
+  });
+
   it("sums up what's behind More", () => {
     expect(detailsSummary({ condition: "fair", notes: "Leaking" })).toBe("Fair, notes");
     expect(detailsSummary({ condition: "poor", notes: "  " })).toBe("Poor");

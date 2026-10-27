@@ -1,13 +1,15 @@
 import { assertForecastOptions, forecastAssetGroups, rollupForecasts } from "@/engine";
 import { withLandlordMetrics, type LandlordForecast } from "./forecast";
 import { assertUnitCount, portfolioMetrics } from "./metrics";
-import { assetGroupFromSaved, type SavedComponent, type SavedProperty } from "./property";
+import { assetGroupFromSaved, type LeftOutComponent, type SavedComponent, type SavedProperty } from "./property";
 import { landlordOptions } from "./rules";
 
 export interface PropertySummary<P extends SavedProperty> {
   readonly property: P;
   readonly forecast: LandlordForecast;
   readonly excluded: number;
+  /** The rows behind `excluded`, in saved order. */
+  readonly leftOut: readonly LeftOutComponent[];
   readonly componentCount: number;
 }
 
@@ -63,10 +65,11 @@ export function summarizePortfolio<P extends SavedProperty>(
     return { property, own, ...assetGroupFromSaved(property, own) };
   });
   const forecasts = forecastAssetGroups(built.map((b) => b.group), options);
-  const summaries = built.map(({ property, own, excluded }, i): PropertySummary<P> => ({
+  const summaries = built.map(({ property, own, excluded, leftOut }, i): PropertySummary<P> => ({
     property,
     forecast: withLandlordMetrics(forecasts[i].result, property.unit_count),
     excluded,
+    leftOut,
     componentCount: own.length,
   }));
   const sums = rollupForecasts(summaries.map((s) => s.forecast));

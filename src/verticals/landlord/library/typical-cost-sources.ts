@@ -97,6 +97,44 @@ export function typicalCostBasis(cost: TypicalCost): string | null {
   return unchanged ? (TYPICAL_COST_BASIS.get(cost.slug) ?? null) : null;
 }
 
+/**
+ * A typical price for a building-wide item that doesn't depend on the building's
+ * size: a price per sq ft of roof, or a range for one boiler. Shown in the
+ * calculator under a cost for the building, where the per-apartment typical cost
+ * (a 12-unit building's shared out) can't be compared. Never used in the math.
+ */
+export interface BuildingCost {
+  low: number;
+  high: number;
+  /** What the range is for, after it: "per sq ft of roof, old shingles removed". */
+  what: string;
+}
+
+/**
+ * The building-wide items' prices, from the same working as TYPICAL_COST_BASIS
+ * (typical-costs.md). Not a whole building's cost: for a duplex that would read
+ * like a quote. The fire alarm panel adds its panel and fitting ranges.
+ */
+const BUILDING_COSTS: ReadonlyMap<string, BuildingCost> = new Map([
+  ["asphalt-shingle-roof", { low: 4.5, high: 8, what: "per sq ft of roof, old shingles removed" }],
+  ["flat-membrane-roof", { low: 6, high: 12, what: "per sq ft of roof, old roof removed" }],
+  ["gutters", { low: 5, high: 10, what: "per foot of gutters and downspouts, old ones removed" }],
+  ["boiler", { low: 13000, high: 35000, what: "for a 300,000–600,000 BTU boiler" }],
+  ["exterior-paint", { low: 2, high: 6, what: "per sq ft of wall" }],
+  ["vinyl-siding", { low: 3.5, high: 7, what: "per sq ft of wall, old siding removed" }],
+  ["fire-alarm-panel", { low: 3000, high: 10000, what: "for a panel, installed and programmed" }],
+]);
+
+/**
+ * The building-wide price for a library item, or null. Only while its typical cost
+ * is still the built-in one, as with typicalCostBasis: a cost edited or blanked in
+ * the dashboard no longer matches the working.
+ */
+export function buildingCostOf(slug: string, cost: TypicalCost | undefined): BuildingCost | null {
+  if (!cost || cost.slug !== slug || typicalCostBasis(cost) === null) return null;
+  return BUILDING_COSTS.get(slug) ?? null;
+}
+
 /** Sources for the quick estimate's own assumptions (apartment size and parking). */
 export const ASSUMPTION_SOURCES = {
   apartmentSize: { name: "RentCafe", url: "https://www.rentcafe.com/blog/rental-market/real-estate-news/national-average-apartment-size/" },
