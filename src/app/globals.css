@@ -47,6 +47,24 @@ body {
   outline-offset: 2px;
 }
 
+/*
+ * iPhone Safari zooms in on any focused field under 16px, so phones get 16px
+ * text in every text field, select and text area. Unlayered, so it beats the
+ * text-sm/text-xs utilities; desktop keeps the denser look. Never fix this by
+ * disabling pinch-zoom.
+ */
+@media (max-width: 639.98px) {
+  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
+    font-size: 16px;
+    line-height: 1.5rem;
+  }
+}
+
+/* An email address is one long word; at large text sizes it breaks rather than widening the page. */
+a[href^="mailto:"] {
+  overflow-wrap: anywhere;
+}
+
 /* Chart palette (validated categorical order; see calculator ForecastChart). */
 .viz-root {
   --viz-surface: #ffffff;
@@ -59,7 +77,8 @@ body {
   --series-5: #e87ba4;
   --series-6: #008300;
   --series-7: #4a3aa7;
-  --series-8: #e34948;
+  /* "Other" is the last category: gray, so it never reads as a warning. */
+  --series-8: #64748b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -74,6 +93,6 @@ body {
     --series-5: #d55181;
     --series-6: #008300;
     --series-7: #9085e9;
-    --series-8: #e66767;
+    --series-8: #94a3b8;
   }
 }

@@ -1,4 +1,4 @@
-import { endOfLifeYear, nextReplacementReserve } from "@/engine";
+import { endOfLifeYear, nextReplacementReserve, replacementCost } from "@/engine";
 import { EARLIEST_INSTALL_YEAR } from "./draft/components";
 import { defaultLife, type LibraryComponent } from "./library/components";
 import { readNumber } from "./parse";
@@ -22,7 +22,20 @@ export interface LifespanResult {
    * out a later replacement for now: the year it starts counting it, or null.
    */
   readonly forecastCountsFrom: number | null;
+  /**
+   * For an item redone as tenants move out (see TURNOVER_SLUGS): the monthly amount
+   * if a set share is redone each year, cost ÷ life ÷ 12, next to `monthly`, which
+   * has them all done at once. Null for other items, or before there's a monthly amount.
+   */
+  readonly spreadMonthly: number | null;
 }
+
+/**
+ * Items an owner usually redoes one apartment at a time as tenants move out, so the
+ * page also shows what spreading them out costs. Interior paint only once there's more
+ * than one apartment; carpet is counted in square feet across the building.
+ */
+const TURNOVER_SLUGS: ReadonlySet<string> = new Set(["interior-paint", "carpet"]);
 
 /** Why no dollar figure shows yet, once a cost has been typed, and which field it's about. */
 export interface LifespanMoneyHint {
@@ -63,6 +76,7 @@ export function lifespanEstimate(input: {
   const sqFt = item.unitLabel === "per_sq_ft";
   let moneyHint: LifespanMoneyHint | null = null;
   let reserve: { monthly: number; neededNow: number; savingFor: number } | null = null;
+  let spreadMonthly: number | null = null;
   if (each !== null && (Number.isNaN(each) || each < 0)) {
     moneyHint = { text: "Enter the cost as a plain number, like 1400.", field: "cost", invalid: true };
   } else if (each !== null && qty === null) {
@@ -82,6 +96,9 @@ export function lifespanEstimate(input: {
       { id: item.slug, category: item.category, name: item.name, quantity: qty, installYear: year, usefulLifeYears: life, replacementCostEach: each },
       currentYear,
     );
+    if (TURNOVER_SLUGS.has(item.slug) && (sqFt || qty > 1)) {
+      spreadMonthly = replacementCost({ quantity: qty, replacementCostEach: each }) / life / 12;
+    }
   }
 
   const due = endOfLifeYear({ installYear: year, usefulLifeYears: life });
@@ -100,6 +117,7 @@ export function lifespanEstimate(input: {
       neededNow: reserve?.neededNow ?? null,
       savingFor,
       forecastCountsFrom: savingFor !== null && savingFor > currentYear + lookAhead ? savingFor - lookAhead : null,
+      spreadMonthly,
     },
   };
 }

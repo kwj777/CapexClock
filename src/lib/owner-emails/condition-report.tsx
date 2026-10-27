@@ -3,7 +3,7 @@
 
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import ConditionReportPdf, { REPORT_FONT } from "@/components/report/ConditionReportPdf";
-import { savedConditionReport } from "@/verticals/landlord";
+import { leftOutLife, savedConditionReport } from "@/verticals/landlord";
 import type { ConditionReportBuilder } from "./run";
 import { conditionReportEmail, type ReportSummaryLine } from "./templates";
 
@@ -73,9 +73,11 @@ export function conditionReportBuilder(fonts: ReportFonts, now: () => Date = () 
       lines.push({
         propertyId: property.id,
         name: property.name,
-        atRisk: report.rows.filter((r) => r.status !== "ok").length,
+        atRisk:
+          report.rows.filter((r) => r.status !== "ok").length +
+          report.leftOut.filter((c) => (leftOutLife(c, year)?.status ?? "ok") !== "ok").length,
         unrated: report.unrated,
-        excluded: report.excluded,
+        leftOut: report.leftOut,
       });
     }
     if (lines.length === 0) return null;

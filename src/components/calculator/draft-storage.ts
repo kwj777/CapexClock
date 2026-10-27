@@ -66,6 +66,8 @@ export const IMPORT_NOTICE_KEY = "capexclock:calculator:import-notice:v1";
 export function saveImportNotice(said: string): void {
   try {
     window.sessionStorage.setItem(IMPORT_NOTICE_KEY, said);
+    // The import is the latest news: an older lifespan-page arrival note isn't shown.
+    window.sessionStorage.removeItem(ARRIVAL_KEY);
   } catch {
     // Storage blocked: the import still works, without the message.
   }
@@ -83,6 +85,50 @@ export function peekImportNotice(): string | null {
 export function clearImportNotice(): void {
   try {
     window.sessionStorage.removeItem(IMPORT_NOTICE_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/**
+ * The row a lifespan page just added or updated, kept for this tab only, so the
+ * calculator it opens can say the item arrived and point to it, once.
+ */
+export const ARRIVAL_KEY = "capexclock:calculator:arrival:v1";
+
+export interface Arrival {
+  rowId: string;
+  /** How to name it in a sentence, e.g. "your gas furnace". */
+  name: string;
+}
+
+export function saveArrival(arrival: Arrival): void {
+  try {
+    window.sessionStorage.setItem(ARRIVAL_KEY, JSON.stringify(arrival));
+    // The arrival is the latest news: an older import message isn't shown.
+    window.sessionStorage.removeItem(IMPORT_NOTICE_KEY);
+  } catch {
+    // Storage blocked: the item still arrives, without the note.
+  }
+}
+
+/** The arrival, if its row is in `current`; read without removing it. */
+export function peekArrival(current: Draft): Arrival | null {
+  try {
+    const raw = window.sessionStorage.getItem(ARRIVAL_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const { rowId, name } = parsed as Record<string, unknown>;
+    if (typeof rowId !== "string" || typeof name !== "string") return null;
+    return current.rows.some((r) => r.id === rowId) ? { rowId, name } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearArrival(): void {
+  try {
+    window.sessionStorage.removeItem(ARRIVAL_KEY);
   } catch {
     // Nothing to clear.
   }

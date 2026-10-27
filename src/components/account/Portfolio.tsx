@@ -77,8 +77,12 @@ export default function Portfolio({
           note={totals.perUnit !== null && missing.length > 0 ? missingUnitsNote(missing) : undefined}
           emphasis
         />
-        <Stat label={`Needed in ${startYear}`} value={formatMoney(totals.neededNow)} />
-        <Stat label="Items at risk" value={String(totals.atRisk)} />
+        <Stat
+          label={`Needed in ${startYear}`}
+          value={formatMoney(totals.neededNow)}
+          note="Overdue or due this year"
+        />
+        <Stat label="Items at risk" value={String(totals.atRisk)} note="Past end of life or within 2 years" />
       </div>
 
       <ul className="mt-8 grid gap-4 md:grid-cols-2">
@@ -94,7 +98,7 @@ export default function Portfolio({
                   ? `${property.unit_count} ${countNoun(LANDLORD_LABELS.divisor, property.unit_count)}`
                   : "No unit count"}{" "}
                 · {componentCount} component{componentCount === 1 ? "" : "s"}
-                {excluded > 0 && ` · ${excluded} left out of the forecast`}
+                {excluded > 0 && ` · ${excluded} not counted yet (missing details)`}
               </p>
               <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                 <div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PlanEveryReplacement from "@/components/lifespan/PlanEveryReplacement";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getLibrary } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
@@ -33,7 +34,11 @@ export default async function LifespanIndex() {
           </h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
             Typical useful life for the big-ticket items in a rental building. Pick one to see what affects it and
-            when yours is likely due.
+            when yours is likely due, or put all of yours into the{" "}
+            <Link href="/capex-calculator" className="text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
+              free CapEx calculator
+            </Link>
+            .
           </p>
           <div className="mt-10 space-y-8">
             {[...groups].map(([category, items]) => (
@@ -64,6 +69,7 @@ export default async function LifespanIndex() {
               </section>
             ))}
           </div>
+          <PlanEveryReplacement className="mt-12" />
         </div>
       </main>
       <SiteFooter />

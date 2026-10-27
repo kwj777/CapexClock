@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import BuyNow from "@/components/paid/BuyNow";
+import NotOnSaleForm from "@/components/paid/NotOnSaleForm";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { pageMetadata } from "@/lib/metadata";
 import {
@@ -40,7 +41,7 @@ const FAQ = [
     // The membership is only on sale when the portal link is set (see presaleLinks).
     a: LINKS.portal
       ? "Any time online, with Manage or cancel membership at the bottom of every page. It stops renewing, and you aren't charged again."
-      : `Any time online, with Manage or cancel membership, which goes at the bottom of every page when memberships go on sale. Or email ${CONTACT_EMAIL}. It stops renewing, and you aren't charged again.`,
+      : `Once memberships go on sale, you'll be able to cancel any time online, or by emailing ${CONTACT_EMAIL}. It stops renewing, and you aren't charged again.`,
   },
   {
     q: "What's in the condition report?",
@@ -144,7 +145,7 @@ export default function PricingPage() {
               {FAQ.map(({ q, a }) => (
                 <div key={q} className="py-4">
                   <dt className="font-semibold text-slate-950 dark:text-white">{q}</dt>
-                  <dd className="mt-1 text-slate-600 dark:text-slate-400">{a}</dd>
+                  <dd className="mt-1 text-slate-600 dark:text-slate-400">{withEmailLink(a)}</dd>
                 </div>
               ))}
             </dl>
@@ -153,6 +154,21 @@ export default function PricingPage() {
       </main>
       <SiteFooter />
     </>
+  );
+}
+
+/** An FAQ answer with our email address as a link. The FAQPage data keeps the plain text. */
+function withEmailLink(text: string): ReactNode {
+  const parts = text.split(CONTACT_EMAIL);
+  return parts.flatMap((part, i) =>
+    i === 0
+      ? [part]
+      : [
+          <a key={i} href={`mailto:${CONTACT_EMAIL}`} className={link}>
+            {CONTACT_EMAIL}
+          </a>,
+          part,
+        ],
   );
 }
 
@@ -174,8 +190,9 @@ function Plan({ name, price, summary, children }: { name: string; price: string;
 }
 
 /**
- * Buy now with the price note, or "not on sale right now" while the offer's link
- * isn't set: before sales start, and after it sells out or sales are paused.
+ * Buy now with the price note, or "not on sale right now" and that offer's
+ * "tell me first" list while its link isn't set: before sales start, and after
+ * it sells out or sales are paused.
  */
 function Buy({ offer }: { offer: Offer }) {
   const buyLink = LINKS.offers[offer];
@@ -189,13 +206,8 @@ function Buy({ offer }: { offer: Offer }) {
   return (
     <div className="mt-6 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
       <p className="font-medium text-slate-900 dark:text-white">{OFFER_TEXT[offer].priceNote}</p>
-      <p className="mt-1">
-        Not on sale right now.{" "}
-        <Link href="/#signup" className={link}>
-          Join the early access list
-        </Link>{" "}
-        to hear when it is.
-      </p>
+      <p className="mt-1">Not on sale right now. Want to hear when it is?</p>
+      <NotOnSaleForm offer={offer} />
     </div>
   );
 }

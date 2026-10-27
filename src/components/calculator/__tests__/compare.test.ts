@@ -18,6 +18,7 @@ import {
   compareSummary,
   EMERGENCY_PERCENT_TEXT,
   emergencyNote,
+  allPaidThisYearEitherWay,
   eitherWayVariants,
   focusStep,
   ifYouWait,
@@ -314,6 +315,12 @@ describe("the comparison's wording", () => {
     expect(shown(eitherWayVariants(allNow, 2026, 0))).toEqual([
       "Everything here is past end of life or due in 2026, so it's paid in 2026 either way.",
     ]);
+  });
+
+  it("leads with the explanation only when everything is paid this year either way", () => {
+    expect(allPaidThisYearEitherWay([{ paidInFirstYearEitherWay: true }, { paidInFirstYearEitherWay: true }])).toBe(true);
+    expect(allPaidThisYearEitherWay([{ paidInFirstYearEitherWay: true }, { paidInFirstYearEitherWay: false }])).toBe(false);
+    expect(allPaidThisYearEitherWay([])).toBe(false);
   });
 
   it("adds the emergency extra to the explanation once there's a percent, in the same spot", () => {

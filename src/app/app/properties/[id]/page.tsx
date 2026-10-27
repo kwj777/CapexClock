@@ -21,7 +21,9 @@ const getProperty = cache(async (id: string) => {
 
 export async function generateMetadata({ params }: PageProps<"/app/properties/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const property = UUID.test(id) ? await getProperty(id).catch(() => null) : null;
+  // null: no such property (or not this account's), as not-found.tsx says. undefined: it couldn't be read.
+  const property = UUID.test(id) ? await getProperty(id).catch(() => undefined) : null;
+  if (property === null) return { title: "Property not found | CapexClock" };
   return { title: `${property?.name ?? "Property"} | CapexClock` };
 }
 
