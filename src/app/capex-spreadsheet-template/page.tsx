@@ -105,12 +105,16 @@ export default async function SpreadsheetTemplatePage() {
               {EXAMPLE_BUILDING.name.replace(/^Example: /, "A ")}, built in {EXAMPLE_BUILDING.yearBuilt}. The download
               has every column, with the building&apos;s name, units and year built on each row.
             </p>
+            {/* The table is cut at a column edge on phones, so it looks complete; say it isn't. */}
+            <p aria-hidden="true" className="mt-4 text-sm text-slate-500 md:hidden dark:text-slate-400">
+              8 columns, swipe sideways to see them all →
+            </p>
             <div
               role="region"
               // Its own name, not the section's again, so the two regions can be told apart.
               aria-label="Example rows (scrolls sideways)"
               tabIndex={0}
-              className="mt-5 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+              className="mt-2 overflow-x-auto md:mt-5 rounded-xl border border-slate-200 dark:border-slate-800"
             >
               <table className="w-full min-w-[44rem] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-700 dark:bg-slate-900 dark:text-slate-300">

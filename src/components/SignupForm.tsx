@@ -22,7 +22,7 @@ const METHOD_OPTIONS = [
 type Status = "idle" | "submitting" | "success" | "error";
 
 const fieldClass =
-  "mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+  "mt-1.5 block w-full rounded-lg border border-slate-500 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 
 export default function SignupForm() {
   const [status, setStatus] = useState<Status>("idle");

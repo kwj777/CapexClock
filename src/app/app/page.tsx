@@ -26,6 +26,12 @@ export default async function PortfolioPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-8 sm:px-6">
+      {/* The header has no room for the email on phones, so it goes here. */}
+      {account.email && (
+        <p className="mb-4 truncate text-sm text-slate-500 sm:hidden dark:text-slate-400">
+          Signed in as {account.email}
+        </p>
+      )}
       <PortfolioHeader library={library} properties={properties.map(({ id, name }) => ({ id, name }))} />
 
       <ImportDraftPrompt />

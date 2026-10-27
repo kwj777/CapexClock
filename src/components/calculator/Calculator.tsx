@@ -95,7 +95,7 @@ const CUSTOM = "__custom__";
 const REPLACE_LABEL = "Replace this year";
 
 const inputClass =
-  "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+  "block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 /** Lets the browser skip drawing a row that's out of view, sized as it last looked. */
 const offscreenClass =
@@ -107,7 +107,7 @@ const rowGridClass =
 const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 const textButton =
-  "text-left text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300";
+  "py-1 text-left text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300";
 
 /** The public calculator: work is kept in this browser until it's saved to an account. */
 export default function Calculator({
@@ -598,7 +598,7 @@ function CalculatorBody({
           {(photoButton, photoPanel) => (
             <>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-x-5 gap-y-1">
+                <div className="flex flex-wrap gap-x-5 gap-y-3">
                   <button
                     id={importButtonId}
                     type="button"
@@ -953,7 +953,8 @@ function ComponentRow({
             </span>
           )}
         </label>
-        <label className="block">
+        {/* Full width on phones, so the 16px placeholder isn't cut off. */}
+        <label className="col-span-2 block sm:col-span-1">
           <span className={`${labelClass} lg:sr-only`}>{costLabel(row)}</span>
           <div className="relative mt-1 lg:mt-0">
             <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-slate-500 dark:text-slate-400">
@@ -977,8 +978,9 @@ function ComponentRow({
             </span>
           )}
         </label>
-        {/* As tall as a field and pushed down past a label's line, so the box sits on the fields' line. */}
-        <label className="mt-7 flex min-h-[2.375rem] items-center gap-2 self-start text-sm text-slate-700 lg:mt-0 lg:justify-center dark:text-slate-300">
+        {/* As tall as a field and pushed down past a label's line, so the box sits on the fields' line.
+            Phones put it beside Remove and More instead. */}
+        <label className="flex min-h-[2.375rem] items-center gap-2 self-start text-sm text-slate-700 sm:mt-7 lg:mt-0 lg:justify-center dark:text-slate-300">
           <input
             type="checkbox"
             checked={row.scenario === "replace_now"}
@@ -989,7 +991,7 @@ function ComponentRow({
           <span className="lg:sr-only">{REPLACE_LABEL}</span>
         </label>
         {/* More comes last, so the fields it shows are next in the tab order. */}
-        <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:mt-7 sm:min-h-[2.375rem] sm:justify-end sm:self-start lg:mt-0">
+        <div className="flex items-center justify-between gap-2 sm:mt-7 sm:min-h-[2.375rem] sm:justify-end sm:self-start lg:mt-0">
           <button
             type="button"
             onClick={onRemove}
