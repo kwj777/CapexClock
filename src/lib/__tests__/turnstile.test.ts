@@ -1,6 +1,7 @@
 import {
   captchaReducer,
   initialCaptcha,
+  sendErrorKind,
   sendErrorMessage,
   sendPlan,
   TURNSTILE_SCRIPT_URL,
@@ -100,9 +101,18 @@ describe("sendErrorMessage", () => {
     expect(sendErrorMessage({ message: "captcha verification process failed" })).toMatch(/security check/);
   });
 
+  it("says the connection failed instead of blaming the address", () => {
+    const offline = { name: "AuthRetryableFetchError", status: 0, message: "Failed to fetch" };
+    expect(sendErrorMessage(offline)).toBe("We couldn't reach CapexClock just now. Check your connection and try again.");
+    expect(sendErrorKind({ message: "Failed to fetch" })).toBe("network");
+    expect(sendErrorKind({ name: "AuthRetryableFetchError", status: 504, message: "Gateway Timeout" })).toBe("network");
+    expect(sendErrorKind({ message: "NetworkError when attempting to fetch resource." })).toBe("network");
+  });
+
   it("falls back to checking the address", () => {
     expect(sendErrorMessage({ status: 500, message: "Error sending magic link email" })).toMatch(
       /^We couldn't send the link\. Check the address/,
     );
+    expect(sendErrorKind({ status: 500, message: "Error sending magic link email" })).toBe("other");
   });
 });

@@ -8,6 +8,7 @@ import {
   editRow,
   EMPTY_DRAFT,
   exampleDraft,
+  forecastDraft,
   withImport,
   withUnitCount,
   type Draft,
@@ -272,6 +273,14 @@ describe("the filled-in example", () => {
     expect(next.rows.map(shown)).toEqual(csv.rows.map(shown));
     expect(next.rows.map((r) => r.followsUnitCount)).toEqual(csv.rows.map((r) => r.followsUnitCount));
     expect([next.unitCount, next.yearBuilt]).toEqual([csv.unitCount, csv.yearBuilt]);
+  });
+
+  it("forecasts the same as the calculator's Load an example", () => {
+    const { next } = importInto(EMPTY_DRAFT, gridFromCsv(exampleCsv()));
+    const imported = forecastDraft(next, CURRENT_YEAR).forecast;
+    const loaded = forecastDraft(exampleDraft(), CURRENT_YEAR).forecast;
+    expect(imported.monthlyReservePerUnit).toBe(loaded.monthlyReservePerUnit);
+    expect(imported.years.map((y) => y.total)).toEqual(loaded.years.map((y) => y.total));
   });
 
   it("imports as the calculator's example, every row Ready", () => {

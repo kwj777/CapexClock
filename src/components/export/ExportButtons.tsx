@@ -72,7 +72,8 @@ export default function ExportButtons({
     <PaidIdeaDisclosure idea="report">
       {(reportButton, reportPanel) => (
         <div>
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Phones stack them full width, so the row doesn't wrap unevenly. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               ref={(el) => {
                 buttons.current.pdf = el;

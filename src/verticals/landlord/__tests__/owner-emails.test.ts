@@ -28,11 +28,12 @@ const ROWS: SavedComponent[] = [
 ];
 
 describe("remindersDue", () => {
-  it("lists what is due this year, overdue and replace-now included, overdue first", () => {
+  it("lists what is due this year, overdue, replace-now and missing a cost included, overdue first", () => {
     const items = remindersDue([P1, P2], ROWS, 2027, new Set());
     expect(items.map((i) => [i.componentId, i.cost, i.overdue, i.replaceNow])).toEqual([
       ["late", 18000, true, false],
       ["due", 1500, false, false],
+      ["nocost", null, true, false],
       ["now", 1000, false, true],
     ]);
     expect(items[0]).toMatchObject({ propertyId: "p1", propertyName: "Elm St", name: "Roof" });
@@ -40,7 +41,16 @@ describe("remindersDue", () => {
 
   it("skips what was already reminded about this year, but not last year", () => {
     const sent = new Set([reminderKey("late", 2027), reminderKey("due", 2026)]);
-    expect(remindersDue([P1, P2], ROWS, 2027, sent).map((i) => i.componentId)).toEqual(["due", "now"]);
+    expect(remindersDue([P1, P2], ROWS, 2027, sent).map((i) => i.componentId)).toEqual(["due", "nocost", "now"]);
+  });
+
+  it("leaves out rows missing a cost that aren't due yet, and rows with no year to count from", () => {
+    const P3: SavedProperty = { id: "p3", name: "Pine", unit_count: 1, year_built: null };
+    const rows = [
+      row("a", "p3", { install_year: 2020, useful_life_years: 20, replacement_cost_each: null }),
+      row("b", "p3", { install_year: null, replacement_cost_each: null }),
+    ];
+    expect(remindersDue([P3], rows, 2027, new Set())).toEqual([]);
   });
 
   it("is empty with nothing due", () => {
@@ -63,6 +73,9 @@ describe("budgetSummary", () => {
     ]);
     expect(elm.monthlyReservePerUnit).toBeCloseTo(elm.monthlyReserve / 4);
     expect(s.properties[1]).toMatchObject({ excluded: 1, componentCount: 2, monthlyReservePerUnit: null });
+    expect(s.properties[1].leftOut).toEqual([
+      { componentId: "nocost", name: "Fence", missing: "cost", endOfLifeYear: 2012, replaceNow: false },
+    ]);
     expect(s.totals.budgetYearTotal).toBe(20500);
     expect(s.totals.tenYearTotal).toBeCloseTo(s.properties[0].tenYearTotal + s.properties[1].tenYearTotal);
     expect(s.totals.monthlyReserve).toBeCloseTo(s.properties[0].monthlyReserve + s.properties[1].monthlyReserve);
@@ -86,6 +99,9 @@ describe("savedConditionReport", () => {
     ];
     const report = savedConditionReport(P1, rows, 2027)!;
     expect(report).toMatchObject({ propertyName: "Elm St", unitCount: 4, yearBuilt: 2000, excluded: 1, unrated: 1 });
+    expect(report.leftOut).toEqual([
+      { componentId: "x", name: "Item x", missing: "cost", endOfLifeYear: 2027, replaceNow: false },
+    ]);
     expect(report.rows.map((r) => [r.name, r.condition, r.notes, r.remainingLife])).toEqual([
       ["Roof", null, "", -7],
       ["Water heater", "fair", "Rust at the fittings", 0],

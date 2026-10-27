@@ -3,8 +3,9 @@
 // is made from these. Everything comes from what the owner supplied; nothing
 // is filled in for them.
 
-import { componentLife, type Component, type LifeStatus } from "@/engine";
+import { componentLife, lifeStatus, type Component, type LifeStatus } from "@/engine";
 import type { ComponentCondition } from "./draft/model";
+import type { LeftOutComponent } from "./property";
 import { LANDLORD_RULES } from "./rules";
 import type { UnitLabel } from "./units";
 
@@ -64,6 +65,19 @@ export function reportRows(inputs: readonly ReportInput[], year: number): Report
     .sort((a, b) => a.remainingLife - b.remainingLife || a.name.localeCompare(b.name));
 }
 
+/**
+ * Years left and at-risk status for a row the report leaves out (no cost), counted
+ * as for a report row; null when it has no install year to count from.
+ */
+export function leftOutLife(
+  row: Pick<LeftOutComponent, "endOfLifeYear">,
+  year: number,
+): { remainingLife: number; status: LifeStatus } | null {
+  if (row.endOfLifeYear === null) return null;
+  const remainingLife = row.endOfLifeYear - year;
+  return { remainingLife, status: lifeStatus(remainingLife, LANDLORD_RULES.atRiskYears) };
+}
+
 const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 
 /** "18 years", "Under 1 year", with "(est.)" when the install year is a guess. */
@@ -72,10 +86,12 @@ export function ageText(row: Pick<ReportRow, "age" | "installYearIsEstimate">): 
   return row.installYearIsEstimate ? `${age} (est.)` : age;
 }
 
-/** "4 years", "Due this year" or "15 years past". */
-export function remainingLifeText(remainingLife: number): string {
-  if (remainingLife === 0) return "Due this year";
-  return remainingLife < 0 ? `${years(-remainingLife)} past` : years(remainingLife);
+/** "4 years", "Due this year" or "15 years past"; "4 yrs", "This year" and "15 yrs past" when `short`, for narrow columns. */
+export function remainingLifeText(remainingLife: number, short = false): string {
+  if (remainingLife === 0) return short ? "This year" : "Due this year";
+  const n = Math.abs(remainingLife);
+  const text = short ? `${n} ${n === 1 ? "yr" : "yrs"}` : years(n);
+  return remainingLife < 0 ? `${text} past` : text;
 }
 
 /** "Past end of life", "Due within 2 years" or "" for the at-risk marker. */
