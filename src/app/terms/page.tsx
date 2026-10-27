@@ -10,7 +10,7 @@ import {
   REPORT_LABEL,
   SAMPLE_REPORT_PATH,
 } from "@/lib/paid-ideas";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { CONTACT_EMAIL, LEGAL_NAME, LEGAL_STATE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms | CapexClock",
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 // Plan T5 sets what this page must say. Keep it in step with /pricing, the
 // panels (src/components/paid) and the thank-you pages.
-const UPDATED = "October 2, 2026";
+const UPDATED = "October 27, 2026";
 
 // Baked in at build time. The membership only goes on sale with it.
 const PORTAL = presaleLinksFromEnv().portal;
@@ -45,8 +45,8 @@ export default function TermsPage() {
         <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6 sm:px-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">Terms</h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-            The terms for CapexClock&apos;s free tools and the two things we sell while we test them. Last updated{" "}
-            {UPDATED}.
+            The terms for CapexClock&apos;s free tools and the two things we sell while we test them. CapexClock is run
+            by {LEGAL_NAME}, a {LEGAL_STATE} limited liability company (&quot;we&quot;). Last updated {UPDATED}.
           </p>
 
           <Section title="The short version">
