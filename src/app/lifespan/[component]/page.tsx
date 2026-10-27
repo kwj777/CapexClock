@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import LifespanEstimator from "@/components/lifespan/LifespanEstimator";
-import { getLibrary } from "@/lib/library/source";
+import PlanEveryReplacement from "@/components/lifespan/PlanEveryReplacement";
+import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
 import {
   capitalize,
@@ -46,6 +47,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
   const found = await findComponent((await params).component);
   if (!found) notFound();
   const { item, library } = found;
+  const typical = (await getTypicalCosts()).find((c) => c.slug === item.slug);
   const notes = notesFor(item.slug);
   const life = defaultLife(item);
   const { noun, plural } = subjectFor(item);
@@ -62,11 +64,11 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
     },
     {
       q: `When should I start saving to replace ${noun}?`,
-      a: `From day one. Spreading the cost over ${plural ? "their" : "its"} ${item.lifeLow}–${item.lifeHigh} year life keeps the replacement from landing as a surprise. The mini calculator on this page shows a monthly amount for yours.`,
+      a: `From day one. Spreading the cost over ${plural ? "their" : "its"} ${item.lifeLow}–${item.lifeHigh} year life keeps the replacement from landing as a surprise. Add a replacement cost to the mini calculator on this page to see a monthly amount for yours.`,
     },
     {
       q: `How ${plural ? "are" : "is"} ${noun} priced in the calculator?`,
-      a: `By default ${plural ? "they're" : "it's"} priced ${UNIT_LABEL_TEXT[item.unitLabel]}. Enter your own quote or recent invoice; CapexClock never fills in costs for you.`,
+      a: `By default ${plural ? "they're" : "it's"} priced ${UNIT_LABEL_TEXT[item.unitLabel]}. Enter your own quote or recent invoice. Where we have one, we show a typical range to compare with; the math only uses the cost you enter.`,
     },
   ];
   const jsonLd = {
@@ -119,7 +121,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
           )}
 
           <div className="mt-8">
-            <LifespanEstimator item={item} />
+            <LifespanEstimator item={item} typical={typical} />
           </div>
 
           {notes && (
@@ -160,15 +162,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
             </dl>
           </section>
 
-          <section className="mt-12 rounded-2xl bg-slate-950 p-6 text-white dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-            <h2 className="text-xl font-semibold">Plan every replacement in your building</h2>
-            <p className="mt-2 text-slate-300">
-              List your roof, HVAC, water heaters and more to get a 10-year forecast and one monthly reserve number.
-            </p>
-            <Link href="/capex-calculator" className="mt-4 inline-block rounded-lg bg-amber-500 px-4 py-2 font-semibold text-slate-950 hover:bg-amber-400">
-              Open the free CapEx calculator
-            </Link>
-          </section>
+          <PlanEveryReplacement className="mt-12" />
 
           {related.length > 0 && (
             <section className="mt-12">
