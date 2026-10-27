@@ -15,7 +15,7 @@ import {
 } from "@/lib/import/wording";
 
 const inputClass =
-  "block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
+  "block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-slate-500 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400";
 const headingClass = "text-sm font-semibold text-slate-950 dark:text-white";
 
 const SECTIONS: { status: RowStatus; blurb: string; badge: string }[] = [

@@ -79,7 +79,8 @@ export default function ExportButtons({
           <h3 id={headingId} className="text-base font-semibold text-slate-950 dark:text-white">
             Download your forecast
           </h3>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Phones stack them full width, so the row doesn't wrap unevenly. */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               ref={(el) => {
                 buttons.current.pdf = el;
