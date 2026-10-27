@@ -24,7 +24,7 @@ const FAQ = [
   },
   {
     q: "How is the monthly amount calculated for listed expenses?",
-    a: "It's the smallest steady monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short.",
+    a: "It's the smallest monthly deposit that has enough saved for each expense by the year it's due, after counting your current balance. When an expensive item comes early, the amount is set by that item rather than by the average, so you never run short. Once that item is paid you'll need less, and the calculator shows about how much.",
   },
   {
     q: "What does 0 years until due mean?",

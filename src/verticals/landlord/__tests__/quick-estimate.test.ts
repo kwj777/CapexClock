@@ -2,7 +2,9 @@ import { landlordForecast } from "../forecast";
 import { EARLIEST_YEAR_BUILT, YEAR_BUILT_TEXT } from "../draft/components";
 import { COMPONENT_LIBRARY, type LibraryComponent } from "../library/components";
 import { TYPICAL_COSTS, type TypicalCost } from "../library/typical-costs";
+import { typicalCostBasis } from "../library/typical-cost-sources";
 import {
+  BUILDING_WIDE,
   FLOOR_SQ_FT_PER_APARTMENT,
   GIVE_OR_TAKE_YEARS,
   estimateFigures,
@@ -16,6 +18,7 @@ import {
   readQuickInputs,
   roundEstimate,
   SHARED_JOBS,
+  smallBuildingShare,
   SPREAD_REPLACEMENTS,
   TICKED_BY_DEFAULT,
 } from "../quick-estimate";
@@ -249,5 +252,19 @@ describe("reading the quick estimate's fields", () => {
     for (const units of ["100001", "1e308", "1e400", "-3"]) {
       expect(readQuickInputs(units, "1998", 2026)).toMatchObject({ units: null, unitsProblem: QUICK_UNITS_PROBLEM });
     }
+  });
+});
+
+describe("whole-building items in a small building", () => {
+  it("lists exactly the items shared out over 12 apartments", () => {
+    for (const c of TYPICAL_COSTS) {
+      expect([c.slug, BUILDING_WIDE.has(c.slug)]).toEqual([c.slug, typicalCostBasis(c)?.includes("÷ 12 apartments") ?? false]);
+    }
+  });
+
+  it("is flagged under 12 units when a whole-building item is ticked", () => {
+    expect(smallBuildingShare(new Set(["asphalt-shingle-roof", "carpet"]), 4)).toBe(true);
+    expect(smallBuildingShare(new Set(["asphalt-shingle-roof"]), 12)).toBe(false);
+    expect(smallBuildingShare(new Set(["carpet", "refrigerator"]), 4)).toBe(false);
   });
 });

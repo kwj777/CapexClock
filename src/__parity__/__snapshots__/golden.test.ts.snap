@@ -2544,7 +2544,7 @@ exports[`the quick estimate with nothing that can be priced, or no units 1`] = `
 exports[`the reserve calculator 101 years 1`] = `
 [
   "expenses ",
-  "problems 1:years Enter a cost and a whole number of years from 0 to 100.",
+  "problems 1:years Enter whole years from 0 to 100, like 5.",
   "balance 0  units 0 ",
   "no result",
 ]
@@ -2786,7 +2786,7 @@ exports[`the reserve calculator formatted 1`] = `
 exports[`the reserve calculator half done 1`] = `
 [
   "expenses ",
-  "problems 1:years Enter a cost and a whole number of years from 0 to 100.",
+  "problems 1:years Enter whole years from 0 to 100, like 5.",
   "balance 0  units 0 ",
   "no result",
 ]
@@ -2871,7 +2871,7 @@ exports[`the reserve calculator overflow 1`] = `
 exports[`the reserve calculator unreadable cost, blank years, fraction 1`] = `
 [
   "expenses ",
-  "problems 1:cost Enter a cost and a whole number of years from 0 to 100. / 2:years Enter a cost and a whole number of years from 0 to 100. / 3:years Enter a cost and a whole number of years from 0 to 100.",
+  "problems 1:cost Enter the cost as a plain number, like 15000. / 2:years Enter whole years from 0 to 100, like 5. / 3:years Enter whole years from 0 to 100, like 5.",
   "balance 0  units 0 ",
   "no result",
 ]

@@ -15,6 +15,25 @@ import { LANDLORD_RULES, landlordOptions } from "./rules";
 
 /** Building-wide items are priced per apartment for a building this size. */
 export const ESTIMATE_BUILDING_UNITS = 12;
+/** Items for the whole building, shared out per apartment as if for ESTIMATE_BUILDING_UNITS units. */
+export const BUILDING_WIDE: ReadonlySet<string> = new Set([
+  "asphalt-shingle-roof",
+  "flat-membrane-roof",
+  "gutters",
+  "boiler",
+  "exterior-paint",
+  "vinyl-siding",
+  "fire-alarm-panel",
+]);
+
+/**
+ * True when a building smaller than the one the estimate assumes has a
+ * whole-building item ticked, so its real share per unit is likely higher.
+ */
+export function smallBuildingShare(ticked: ReadonlySet<string>, units: number): boolean {
+  return units < ESTIMATE_BUILDING_UNITS && [...ticked].some((slug) => BUILDING_WIDE.has(slug));
+}
+
 /** Carpet or plank per apartment: a 900 sq ft apartment less its kitchen and bathroom floors. */
 export const FLOOR_SQ_FT_PER_APARTMENT = 800;
 /** Paved parking per apartment: 1.5 spaces of about 325 sq ft each, driving lanes included. */
