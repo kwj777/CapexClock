@@ -1,8 +1,29 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  createContext,
+  Suspense,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { RESERVE_TABS, TAB_LABELS, tabAfterKey, tabFromSearch, tabHref, type ReserveTab } from "./tabs";
+
+// A panel drawn outside the tabs (on its own, as in the tests) counts as shown.
+const TabShown = createContext(true);
+
+/**
+ * True while the panel this is in is the chosen tab, so a panel can tell
+ * whether the owner can see it: both stay mounted, the other one hidden.
+ */
+export function useTabShown(): boolean {
+  return useContext(TabShown);
+}
 
 /**
  * Follows the tab in the address: on the first load, after a link to the page
@@ -23,7 +44,7 @@ function FollowAddress({ onTab }: { onTab: (tab: ReserveTab) => void }) {
  * The quick estimate and the expense list as tabs. The chosen tab is kept in the
  * address (?tab=expenses), so a reload or a shared link opens it, and the tab
  * always follows the address. Both panels stay mounted, so switching back keeps
- * what was typed.
+ * what was typed, and each can ask useTabShown whether it's the one showing.
  */
 export default function ReserveTabs({ panels }: { panels: Record<ReserveTab, ReactNode> }) {
   const baseId = useId();
@@ -91,7 +112,7 @@ export default function ReserveTabs({ panels }: { panels: Record<ReserveTab, Rea
           hidden={t !== tab}
           className="mt-4"
         >
-          {panels[t]}
+          <TabShown.Provider value={t === tab}>{panels[t]}</TabShown.Provider>
         </div>
       ))}
     </div>

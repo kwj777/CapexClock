@@ -633,7 +633,10 @@ Trends. Add `quick_estimate_shown` as step 1 and `$pageview` as step 2, then fil
 **Path name** equals `/capex-calculator`. Open **Funnel settings** (below the steps, closed at
 first) and set **Conversion window limit** to **1 hour**. The quick estimate is working when at least 1 in 5 people reach step 2.
 `quick_estimate_shown` goes once per page view, after an estimate has been on screen for 2
-seconds, and carries only `systems`, how many systems were ticked.
+seconds with the Quick estimate tab open, and carries only `systems`, how many systems were ticked.
+From the October 26 deploy until the deploy that added this note, a returning visitor's restored
+estimate also sent it with the tab hidden (`?tab=expenses`), on every page view, so step 1 in that
+window includes visitors who never saw an estimate. Read the funnel from after that deploy.
 
 ### Weekly Supabase query
 
