@@ -24,8 +24,10 @@ import {
   type QuickSystem,
   type TypicalCost,
 } from "@/verticals/landlord";
+import { shownEvent, SHOWN_AFTER_MS } from "./estimate-shown";
 import { estimateText, quickPrompt } from "./estimate-text";
 import { keepSaved, loadSaved, parseSavedQuick, QUICK_STORAGE_KEY, useInBrowser } from "./reserve-storage";
+import { useTabShown } from "./ReserveTabs";
 
 const input =
   "mt-1 block w-full rounded-md border border-slate-500 bg-white px-2.5 py-2 text-sm text-slate-900 tabular-nums placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 aria-invalid:border-red-500 dark:border-slate-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400";
@@ -111,17 +113,21 @@ export default function QuickEstimate({
   }, [summary]);
 
   // Once per page view, after an estimate has stayed on screen for a moment, so
-  // typing a unit count digit by digit doesn't send it early.
+  // typing a unit count digit by digit doesn't send it early. Only while this
+  // tab is showing: a range restored from last time is also there when the page
+  // opens on the expense list, and switching tabs starts the wait again.
   const sent = useRef(false);
   const shownSystems = shown?.systems ?? null;
+  const tabShown = useTabShown();
   useEffect(() => {
-    if (shownSystems === null || sent.current) return;
+    const event = shownEvent(shownSystems, tabShown, sent.current);
+    if (!event) return;
     const timer = window.setTimeout(() => {
       sent.current = true;
-      void track("quick_estimate_shown", { systems: shownSystems });
-    }, 2000);
+      void track("quick_estimate_shown", event);
+    }, SHOWN_AFTER_MS);
     return () => window.clearTimeout(timer);
-  }, [summary, shownSystems]);
+  }, [summary, shownSystems, tabShown]);
 
   function toggle(slug: string, on: boolean) {
     setTicked((t) => {

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { COMPONENT_LIBRARY, TICKED_BY_DEFAULT, TYPICAL_COSTS } from "@/verticals/landlord";
 import QuickEstimate from "../QuickEstimate";
-import ReserveTabs from "../ReserveTabs";
+import ReserveTabs, { useTabShown } from "../ReserveTabs";
 import { ENTER_PROMPT } from "../estimate-text";
 
 // The first render only, as the page is built: typing and ticking are checked in the browser.
@@ -88,5 +88,17 @@ describe("the reserve calculator's tabs as the page is built", () => {
   it("ties each tab to its panel", () => {
     const controls = [...html.matchAll(/aria-controls="([^"]+)"/g)].map((m) => m[1]);
     for (const id of controls) expect(html).toContain(`id="${id}" role="tabpanel"`);
+  });
+
+  it("tells each panel whether it's the tab showing, and a panel on its own that it is", () => {
+    function Shown({ name }: { name: string }) {
+      return <p>{`${name} ${useTabShown() ? "shown" : "hidden"}`}</p>;
+    }
+    const tabs = renderToStaticMarkup(
+      <ReserveTabs panels={{ quick: <Shown name="quick" />, expenses: <Shown name="expenses" /> }} />,
+    );
+    expect(tabs).toContain("<p>quick shown</p>");
+    expect(tabs).toContain("<p>expenses hidden</p>");
+    expect(renderToStaticMarkup(<Shown name="alone" />)).toBe("<p>alone shown</p>");
   });
 });
