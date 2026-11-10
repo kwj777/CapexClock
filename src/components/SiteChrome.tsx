@@ -75,6 +75,9 @@ export function SiteFooter() {
           <Link href="/capex-spreadsheet-template" className="hover:text-slate-900 dark:hover:text-white">
             CapEx spreadsheet template
           </Link>
+          <Link href="/blog" className="hover:text-slate-900 dark:hover:text-white">
+            Blog
+          </Link>
         </nav>
         <div className="flex flex-wrap gap-x-5 gap-y-1 *:py-1">
           <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
