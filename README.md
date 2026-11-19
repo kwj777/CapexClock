@@ -1,6 +1,31 @@
 # CapexClock
 
-Free CapEx forecaster for small rental property owners. Live at capexclock.com.
+Free CapEx forecaster for small rental property owners. Live at
+[capexclock.com](https://capexclock.com).
+
+Landlords with a handful of units rarely know when the roof, the water heaters or the HVAC
+will come due, or how much to set aside each month. CapexClock takes each component's
+install year and expected lifespan and turns them into a 10-year replacement schedule, a
+monthly reserve figure and an "at risk now" list, with exports to PDF and Excel.
+
+**Built with:** Next.js (App Router), React, TypeScript (strict), Tailwind CSS, Supabase
+(Postgres, magic-link auth, Row Level Security), Netlify (functions and edge functions),
+Recharts, React PDF, PostHog, Jest.
+
+**Highlights**
+
+- **A standalone forecasting engine.** The math in [`src/engine`](src/engine) is plain
+  TypeScript with no knowledge of rentals, pages or the database, so another kind of building
+  could plug into it. Lint rules keep the UI from reaching into it directly, and its tests hold
+  coverage at 90% or more. See [ENGINE.md](src/engine/ENGINE.md).
+- **Accounts with data isolation.** Each owner can only read or change their own properties,
+  enforced in the database by Row Level Security, with versioned SQL migrations.
+- **Tested and gated.** About 1,200 tests across 100+ test files. Every deploy runs lint and
+  the test suite first, so a failing check stops it.
+- **Production details.** Hourly static regeneration for content pages, a CAPTCHA on sign-in,
+  scheduled member emails from a serverless function, and a privacy-respecting analytics relay.
+
+The rest of this file is the developer guide: setup, deployment and how each feature works.
 
 ## Phase 1: early-access landing page
 
