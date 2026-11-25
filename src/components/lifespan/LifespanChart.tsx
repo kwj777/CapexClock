@@ -3,13 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CostSources } from "@/components/CostSources";
-import {
-  nextLifespanSort,
-  sortLifespanRows,
-  type LifespanChartRow,
-  type LifespanSort,
-  type LifespanSortKey,
-} from "./lifespan-chart";
+import type { LifespanChartRow } from "./lifespan-chart";
+import { nextLifespanSort, sortLifespanRows, type LifespanSort, type LifespanSortKey } from "./lifespan-sort";
 
 const link = "text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400";
 const headCell = "py-2 pr-3 align-bottom text-xs font-medium text-slate-600 dark:text-slate-400";
