@@ -52,7 +52,7 @@ const TOOLS = [
   {
     href: "/lifespan",
     title: "Component lifespans",
-    body: "How long roofs, furnaces, water heaters and 22 other components typically last, and the signs they're near the end.",
+    body: "How long roofs, furnaces, water heaters and 22 other components typically last, what they cost to replace, and the signs they're near the end.",
   },
 ];
 

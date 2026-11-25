@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatCostRange } from "@/components/calculator/format";
+import { CostSources, SourceLink } from "@/components/CostSources";
 import { track } from "@/lib/analytics";
 import {
   ASSUMPTION_SOURCES,
@@ -19,7 +20,6 @@ import {
   TICKED_BY_DEFAULT,
   TYPICAL_COST_SOURCES,
   typicalCostBasis,
-  type CostSource,
   type LibraryComponent,
   type QuickSystem,
   type TypicalCost,
@@ -305,7 +305,7 @@ export default function QuickEstimate({
                         {s.cost.per === "apartment" ? "per apartment" : `per sq ft, ${s.perApartment} sq ft per apartment`}
                       </span>
                       <Basis text={typicalCostBasis(s.cost)} />
-                      <Sources sources={TYPICAL_COST_SOURCES.get(s.item.slug)} />
+                      <CostSources sources={TYPICAL_COST_SOURCES.get(s.item.slug)} />
                     </td>
                     <td className="py-2 align-top tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300">
                       {s.item.lifeLow}–{s.item.lifeHigh} yrs
@@ -365,31 +365,7 @@ export default function QuickEstimate({
   );
 }
 
-function SourceLink({ source }: { source: CostSource }) {
-  return (
-    <a href={source.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
-      {source.name}
-      <span className="sr-only"> (opens in a new tab)</span>
-    </a>
-  );
-}
-
 function Basis({ text }: { text: string | null }) {
   if (!text) return null;
   return <span className="block text-xs text-slate-500 dark:text-slate-400">Based on {text}</span>;
-}
-
-function Sources({ sources }: { sources: readonly CostSource[] | undefined }) {
-  if (!sources?.length) return null;
-  return (
-    <span className="block text-xs text-slate-500 dark:text-slate-400">
-      {sources.length === 1 ? "Source: " : "Sources: "}
-      {sources.map((source, i) => (
-        <span key={source.url}>
-          {i > 0 && ", "}
-          <SourceLink source={source} />
-        </span>
-      ))}
-    </span>
-  );
 }

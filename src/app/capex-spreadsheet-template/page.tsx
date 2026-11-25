@@ -13,9 +13,9 @@ import { CONDITION_TEXT } from "@/verticals/landlord";
 import { FAQ, faqJsonLd } from "./faq";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Free CapEx Spreadsheet Template for Rental Properties | CapexClock",
+  title: "Free CapEx Spreadsheet Template for Rentals | CapexClock",
   description:
-    "A free capital expenditure spreadsheet template for rental properties: the columns to track for your roof, HVAC, water heaters and more, a filled-in example, and an import into a free 10-year forecast.",
+    "Free CapEx spreadsheet for Excel or Google Sheets, with a filled-in example. List your roof, HVAC and more, then import it for a monthly reserve per door.",
   path: "/capex-spreadsheet-template",
 });
 

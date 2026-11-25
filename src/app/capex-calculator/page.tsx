@@ -7,9 +7,9 @@ import { pageMetadata } from "@/lib/metadata";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Free CapEx Calculator for Rental Properties | CapexClock",
+  title: "Free CapEx Calculator: Monthly Reserve per Door | CapexClock",
   description:
-    "Enter your roof, HVAC, water heaters and more with install years and costs. Get a 10-year replacement forecast and a monthly reserve per unit. Free.",
+    "Find out how much to set aside each month per rental unit for the roof, HVAC, water heaters and more, and what's due in the next 10 years. Free, no signup.",
   path: "/capex-calculator",
 });
 
@@ -122,7 +122,7 @@ export default async function CapexCalculatorPage() {
             </Link>{" "}
             for expenses you already know about, and{" "}
             <Link href="/lifespan" className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400">
-              typical lifespans
+              typical lifespans and replacement costs
             </Link>{" "}
             for 25 building components.
           </p>
