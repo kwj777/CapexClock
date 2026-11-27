@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // Keep this page in step with what the code does (src/lib/analytics.ts,
 // netlify/edge-functions/posthog-relay.ts, src/lib/supabase, src/components/SignupForm.tsx, src/components/paid,
 // src/lib/turnstile.ts, the Stripe links in src/lib/paid-ideas.ts) whenever those change.
-const UPDATED = "October 27, 2026";
+const UPDATED = "November 27, 2026";
 
 // The sign-in check is mentioned only on deploys that have it switched on.
 const CAPTCHA_ON = turnstileSiteKey(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) !== null;
@@ -137,6 +137,12 @@ export default function PrivacyPage() {
               keeps a random ID in a cookie and in your browser&apos;s local storage so it can tell visits apart. The
               cookie lasts one year. We also keep the date of your last visit in your browser to count return visits.
               We don&apos;t record your screen. If you block cookies, the site still works.
+            </p>
+            <p className="mt-3">
+              If a link with tracking tags (&ldquo;UTM tags&rdquo;, for example on one of our posts) or another website
+              brought you here, your browser also remembers that for 30 days. When you make an account, we send those
+              tags, your account&apos;s random ID and the date (never your email) to our own marketing tool, so we can
+              see which posts bring owners in.
             </p>
             <p className="mt-3">
               Analytics go to PostHog through capexclock.com rather than straight to PostHog, so we don&apos;t lose
