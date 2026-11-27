@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import Analytics from "@/components/Analytics";
+import RememberCameFrom from "@/components/RememberCameFrom";
 import { SHARED_OPEN_GRAPH, SHARED_TWITTER } from "@/lib/metadata";
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </a>
         {children}
         <Analytics />
+        <RememberCameFrom />
       </body>
     </html>
   );
