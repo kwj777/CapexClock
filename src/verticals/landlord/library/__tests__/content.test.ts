@@ -44,6 +44,14 @@ describe("lifespan notes", () => {
     }
   });
 
+  it("say what renting changes and when to repair or replace, for every library item", () => {
+    for (const c of COMPONENT_LIBRARY) {
+      const notes = notesFor(c.slug);
+      expect(`${c.slug}: ${notes?.rental ? "rental" : "missing"}`).toBe(`${c.slug}: rental`);
+      expect(`${c.slug}: ${notes?.repairOrReplace ? "repair" : "missing"}`).toBe(`${c.slug}: repair`);
+    }
+  });
+
   it("only finds notes the file defines", () => {
     expect(notesFor("boiler")).toBe(LIFESPAN_NOTES.boiler);
     expect(notesFor("constructor")).toBeUndefined();

@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import LifespanEstimator from "@/components/lifespan/LifespanEstimator";
 import PlanEveryReplacement from "@/components/lifespan/PlanEveryReplacement";
+import { formatCostRange } from "@/components/calculator/format";
 import { getLibrary, getTypicalCosts } from "@/lib/library/source";
 import { pageMetadata } from "@/lib/metadata";
 import {
+  buildingCostOf,
   capitalize,
   defaultLife,
   lifeDrivers,
@@ -15,8 +17,11 @@ import {
   notesFor,
   relatedHeading,
   subjectFor,
+  TYPICAL_COST_SOURCES,
+  typicalCostBasis,
   UNIT_LABEL_TEXT,
   type LibraryComponent,
+  type TypicalCost,
 } from "@/verticals/landlord";
 
 // Library edits in Supabase show up within an hour; new components get pages on first visit.
@@ -50,6 +55,7 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
   const typical = (await getTypicalCosts()).find((c) => c.slug === item.slug);
   const notes = notesFor(item.slug);
   const life = defaultLife(item);
+  const cost = costSummary(item, typical);
   const { noun, plural } = subjectFor(item);
   const does = plural ? "do" : "does";
   const lasts = plural ? "last" : "lasts";
@@ -62,6 +68,14 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
       q: `How long ${does} ${noun} last?`,
       a: `Typically ${item.lifeLow} to ${item.lifeHigh} years. CapexClock uses ${life} years as its default, and you can change it for your building.`,
     },
+    ...(cost
+      ? [
+          {
+            q: `How much does it cost to replace ${noun}?`,
+            a: `${cost.sentence} Prices vary a lot by region and job, so use a local quote when you plan.`,
+          },
+        ]
+      : []),
     {
       q: `When should I start saving to replace ${noun}?`,
       a: `From day one. Spreading the cost over ${plural ? "their" : "its"} ${item.lifeLow}–${item.lifeHigh} year life keeps the replacement from landing as a surprise. Add a replacement cost to the mini calculator on this page to see a monthly amount for yours.`,
@@ -145,6 +159,42 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
             </div>
           )}
 
+          {cost && (
+            <section className="mt-10">
+              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">What a replacement costs</h2>
+              <p className="mt-3 text-slate-600 dark:text-slate-300">{cost.sentence}</p>
+              {cost.basis && <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Based on {cost.basis}.</p>}
+              {cost.sources.length > 0 && (
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Source:{" "}
+                  {cost.sources.map((src, i) => (
+                    <span key={src.url}>
+                      {i > 0 && ", "}
+                      <a href={src.url} rel="nofollow noopener" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
+                        {src.name}
+                      </a>
+                    </span>
+                  ))}
+                  . Use your own quote in the calculator; prices vary by region.
+                </p>
+              )}
+            </section>
+          )}
+
+          {notes?.rental && (
+            <section className="mt-10">
+              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">In a rental</h2>
+              <p className="mt-3 text-slate-600 dark:text-slate-300">{notes.rental}</p>
+            </section>
+          )}
+
+          {notes?.repairOrReplace && (
+            <section className="mt-10">
+              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Repair or replace?</h2>
+              <p className="mt-3 text-slate-600 dark:text-slate-300">{notes.repairOrReplace}</p>
+            </section>
+          )}
+
           <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
             This is general guidance, not an inspection. If something about yours worries you, have a licensed pro look
             at it.
@@ -188,4 +238,32 @@ export default async function LifespanPage({ params }: PageProps<"/lifespan/[com
       <SiteFooter />
     </>
   );
+}
+
+/**
+ * The typical replacement cost as a sentence, with how it was worked out and its
+ * sources, or null when there's no typical cost. Per apartment or per sq ft, as
+ * the calculator prices it; a building-wide item also gets its building price
+ * (per sq ft of roof, one boiler), since a 12-unit building's share is only one
+ * way to read it.
+ */
+function costSummary(item: LibraryComponent, typical: TypicalCost | undefined) {
+  if (!typical) return null;
+  const range = formatCostRange(typical.low, typical.high);
+  const building = item.unitLabel === "per_building" ? buildingCostOf(item.slug, typical) : null;
+  let sentence: string;
+  if (typical.per === "sq_ft") {
+    sentence = `Typically ${range} per square foot, installed.`;
+  } else if (item.unitLabel === "per_building") {
+    sentence = building
+      ? `Typically ${formatCostRange(building.low, building.high)} ${building.what}, or about ${range} per apartment in a 12-unit building.`
+      : `Typically about ${range} per apartment in a 12-unit building.`;
+  } else {
+    sentence = `Typically ${range} per apartment, installed.`;
+  }
+  return {
+    sentence,
+    basis: typicalCostBasis(typical),
+    sources: TYPICAL_COST_SOURCES.get(item.slug) ?? [],
+  };
 }
